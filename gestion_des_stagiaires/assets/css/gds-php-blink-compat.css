@@ -753,3 +753,46 @@ body.paper-page {
 .doc-tile--sm span {
   font-size: 0.78rem;
 }
+
+
+/* Line-by-line label : value list (replaces tabular paper-fields in most docs) */
+.paper-info {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  column-gap: 20px;
+  row-gap: 4px;
+  margin: 10px 0 8px;
+  font-size: 0.97rem;
+}
+.paper-info dt {
+  color: #4a4a4a;
+  font-weight: 500;
+  padding: 5px 0 4px;
+}
+.paper-info dt::after {
+  content: " :";
+  color: #777;
+}
+.paper-info dd {
+  margin: 0;
+  padding: 5px 0 4px;
+  border-bottom: 1px dotted #c9ccd1;
+  color: #111;
+  font-weight: 500;
+}
+.paper-info dd:last-of-type {
+  border-bottom: 1px dotted #c9ccd1;
+}
+.paper-info--two {
+  grid-template-columns: 170px 1fr 170px 1fr;
+  column-gap: 16px;
+}
+.paper-lead {
+  margin: 0 0 12px;
+  line-height: 1.55;
+  font-size: 0.98rem;
+}
+.paper-closing {
+  margin: 14px 0 0;
+  line-height: 1.55;
+}

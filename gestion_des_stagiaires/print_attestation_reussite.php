@@ -20,8 +20,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Attestation de réussite — <?= h((string) $s['nom']) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -46,17 +46,18 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <h1 class="paper-title">ATTESTATION DE RÉUSSITE</h1>
     <p class="paper-subtitle">Année scolaire <?= h((string) $s['annee_scolaire']) ?></p>
 
-    <section class="paper-body">
-        <p>Le Directeur du <strong>Groupe IPIRNET</strong> atteste que :</p>
-        <table class="paper-fields">
-            <tr><th>Nom et prénom</th><td colspan="3"><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $s['matricule']) ?></td><th>Classe</th><td><?= h((string) $s['nom_classe']) ?></td></tr>
-            <tr><th>Filière</th><td colspan="3"><?= h((string) $s['nom_filiere']) ?></td></tr>
-            <tr><th>Moyenne générale</th><td colspan="3"><strong><?= h((string) $gm) ?> / 20</strong></td></tr>
-        </table>
-        <p style="margin-top:1.25rem;">a satisfait aux épreuves et contrôles continus de l'année scolaire <strong><?= h((string) $s['annee_scolaire']) ?></strong> et est déclaré(e) <strong>ADMIS(E)</strong>.</p>
-        <p>La présente attestation est délivrée pour servir et valoir ce que de droit.</p>
-    </section>
+    <p class="paper-lead">Le Directeur du <strong>Groupe IPIRNET</strong> atteste que :</p>
+
+    <dl class="paper-info">
+        <dt>Nom et prénom</dt><dd><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></dd>
+        <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
+        <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
+        <dt>Filière</dt><dd><?= h((string) $s['nom_filiere']) ?></dd>
+        <dt>Moyenne générale</dt><dd><strong><?= h((string) $gm) ?> / 20</strong></dd>
+    </dl>
+
+    <p class="paper-closing">a satisfait aux épreuves et contrôles continus de l'année scolaire <strong><?= h((string) $s['annee_scolaire']) ?></strong> et est déclaré(e) <strong>ADMIS(E)</strong>.</p>
+    <p class="paper-closing">La présente attestation est délivrée pour servir et valoir ce que de droit.</p>
 
     <section class="paper-engagements" style="margin-top:2rem;">
         <div class="paper-signatures">
