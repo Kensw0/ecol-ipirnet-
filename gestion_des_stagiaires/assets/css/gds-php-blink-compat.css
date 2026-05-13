@@ -460,6 +460,9 @@ body.public-page {
 .auth__form .card a {
   color: #be185d;
 }
+.auth__form form.compact label {
+  color: #111;
+}
 .auth__form form.compact input {
   background: #fff;
   color: #111;
