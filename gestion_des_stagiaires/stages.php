@@ -45,14 +45,14 @@ $curPage = 'stages';
 $pageTitle = 'Stages / PFE';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT id_stagiaire, matricule, nom, prenom FROM stagiaires ORDER BY nom, prenom')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere, c.nom_classe FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
 $edit = null;
 if (isset($_GET['edit'])) {
     $st = $pdo->prepare('SELECT * FROM stages WHERE id_stage = ?');
     $st->execute([(int) $_GET['edit']]);
     $edit = $st->fetch();
 }
-$rows = $pdo->query('SELECT st.*, s.matricule, s.nom FROM stages st JOIN stagiaires s ON s.id_stagiaire=st.id_stagiaire ORDER BY st.date_debut DESC')->fetchAll();
+$rows = $pdo->query('SELECT st.*, s.matricule, s.nom, s.prenom, c.nom_classe, f.nom_filiere FROM stages st JOIN stagiaires s ON s.id_stagiaire=st.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY st.date_debut DESC')->fetchAll();
 ?>
 <div class="card">
 <form method="post" class="compact">
@@ -79,7 +79,7 @@ $rows = $pdo->query('SELECT st.*, s.matricule, s.nom FROM stages st JOIN stagiai
             <select name="id_stagiaire" required>
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom']) ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ' / ' . (string) $s['nom_classe'] . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -90,7 +90,7 @@ $rows = $pdo->query('SELECT st.*, s.matricule, s.nom FROM stages st JOIN stagiai
 </div>
 <div class="card">
 <table class="data">
-    <tr><th>ID</th><th>Type</th><th>Entreprise</th><th>Dates</th><th>Soutenance</th><th>Stagiaire</th><th class="no-print"></th></tr>
+    <tr><th>ID</th><th>Type</th><th>Entreprise</th><th>Dates</th><th>Soutenance</th><th>Stagiaire</th><th>Classe / filière</th><th class="no-print"></th></tr>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><?= (int) $r['id_stage'] ?></td>
@@ -98,7 +98,8 @@ $rows = $pdo->query('SELECT st.*, s.matricule, s.nom FROM stages st JOIN stagiai
             <td><?= h((string) ($r['entreprise'] ?? '')) ?></td>
             <td><?= h(trim((string)($r['date_debut'] ?? '') . ' → ' . (string)($r['date_fin'] ?? ''))) ?></td>
             <td><?= h((string) ($r['date_soutenance'] ?? '—')) ?></td>
-            <td><?= h((string) $r['matricule']) ?></td>
+            <td><?= h((string) $r['matricule'] . ' ' . $r['nom'] . ' ' . ($r['prenom'] ?? '')) ?></td>
+            <td><?= h((string) $r['nom_classe'] . ' / ' . gds_filiere_code((string) $r['nom_filiere'])) ?></td>
             <td class="link-row no-print">
                 <a href="print_convention_stage.php?id=<?= (int) $r['id_stage'] ?>" target="_blank">Convention</a>
                 <a href="stages.php?edit=<?= (int) $r['id_stage'] ?>">Modifier</a>

@@ -1,11 +1,12 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
+gds_sync_reference_data($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_id'])) {
         $pdo->prepare('DELETE FROM g_notes WHERE id_g_note = ?')->execute([(int) $_POST['delete_id']]);
-        flash_set('g_note supprimée.');
+        flash_set('Note de synthèse supprimée.');
         redirect('g_notes.php');
     }
     if (isset($_POST['save'])) {
@@ -24,22 +25,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['id_g_note']) && (int) $_POST['id_g_note'] > 0) {
             $pdo->prepare('UPDATE g_notes SET libelle=?, annee_scolaire=?, semestre=?, moyenne_synthese=?, commentaire=?, date_enregistrement=?, id_stagiaire=?, id_module=? WHERE id_g_note=?')
                 ->execute([$lib, $an, $sem, $moy, $com === '' ? null : $com, $de, $sid, $mid, (int) $_POST['id_g_note']]);
-            flash_set('g_note mise à jour.');
+            flash_set('Note de synthèse mise à jour.');
         } else {
             $pdo->prepare('INSERT INTO g_notes (libelle, annee_scolaire, semestre, moyenne_synthese, commentaire, date_enregistrement, id_stagiaire, id_module) VALUES (?,?,?,?,?,?,?,?)')
                 ->execute([$lib, $an, $sem, $moy, $com === '' ? null : $com, $de, $sid, $mid]);
-            flash_set('g_note créée.');
+            flash_set('Note de synthèse créée.');
         }
         redirect('g_notes.php');
     }
 }
 
 $curPage = 'g_notes';
-$pageTitle = 'g_notes (synthèse)';
+$pageTitle = 'Notes';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT id_stagiaire, matricule, nom, prenom FROM stagiaires ORDER BY nom, prenom')->fetchAll();
-$mods = $pdo->query('SELECT id_module, nom_module FROM modules ORDER BY nom_module')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
+$mods = $pdo->query('SELECT m.id_module, m.nom_module, f.nom_filiere FROM modules m JOIN filieres f ON f.id_filiere = m.id_filiere ORDER BY f.nom_filiere, m.nom_module')->fetchAll();
 
 $edit = null;
 if (isset($_GET['edit'])) {
@@ -48,12 +49,12 @@ if (isset($_GET['edit'])) {
     $edit = $st->fetch();
 }
 
-$rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
+$rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
 ?>
 <div class="card">
 <form method="post" class="compact">
     <fieldset>
-        <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une ligne g_notes</legend>
+        <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une note de synthèse</legend>
         <?php if ($edit): ?>
             <input type="hidden" name="id_g_note" value="<?= (int) $edit['id_g_note'] ?>">
         <?php endif; ?>
@@ -67,7 +68,7 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
             <select name="id_stagiaire" required>
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom']) ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -75,7 +76,7 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
             <select name="id_module">
                 <option value="">—</option>
                 <?php foreach ($mods as $m): ?>
-                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h((string)$m['nom_module']) ?></option>
+                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $m['nom_filiere']) . ' — ' . gds_module_label((string) $m['nom_module'])) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>

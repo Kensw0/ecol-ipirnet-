@@ -86,6 +86,106 @@ function h(string $s): string
     return htmlspecialchars(gds_fix_text($s), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+const GDS_FILIERE_OPTIONS = [
+    'TSDI' => 'Technicien Spécialisé en Développement Informatique',
+    'TGI'  => 'Technicien en Informatique de Gestion',
+    'TSGE' => 'Technicien Spécialisé en Gestion des Entreprises',
+    'OPAD' => 'Opérateur Administratif',
+];
+
+const GDS_MODULES_BY_CODE = [
+    'TSDI' => [
+        'Métier et formation',
+        'L’entreprise et son environnement',
+        'Notion de mathématique appliquée',
+        'Gestion du temps',
+        'Veille technologique',
+        'Logiciel d’application',
+        'Programmation événementielle',
+        'Technique de programmation structurée',
+        'Langage de programmation structurée',
+        'Programmation orienté objet',
+        'Concept et mod d’un system d’information',
+        'Installation d’un poste informatique',
+        'Communication en Anglais',
+        'Assistant technique à la clientèle',
+    ],
+    'TGI' => [],
+    'TSGE' => [],
+    'OPAD' => [],
+];
+
+function gds_module_label(string $moduleName): string
+{
+    $moduleName = gds_fix_text(trim($moduleName));
+    return preg_replace('/^M\.F\.\s*\d+(?:\.\d+)?\s*:\s*/u', '', $moduleName) ?? $moduleName;
+}
+
+function gds_filiere_code(string $name): string
+{
+    if (function_exists('mb_strtolower')) {
+        $needle = mb_strtolower(gds_fix_text(trim($name)), 'UTF-8');
+        foreach (GDS_FILIERE_OPTIONS as $code => $label) {
+            $full = mb_strtolower(gds_fix_text($label), 'UTF-8');
+            if ($needle === mb_strtolower($code, 'UTF-8') || $needle === $full) {
+                return $code;
+            }
+        }
+    } else {
+        $needle = strtolower(gds_fix_text(trim($name)));
+        foreach (GDS_FILIERE_OPTIONS as $code => $label) {
+            if ($needle === strtolower($code) || $needle === strtolower(gds_fix_text($label))) {
+                return $code;
+            }
+        }
+    }
+    return $name;
+}
+
+function gds_sync_reference_data(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+
+    $findFiliere = $pdo->prepare('SELECT id_filiere, nom_filiere FROM filieres WHERE nom_filiere IN (?, ?) LIMIT 1');
+    $insertFiliere = $pdo->prepare('INSERT INTO filieres (nom_filiere) VALUES (?)');
+    $findModule = $pdo->prepare('SELECT id_module, nom_module FROM modules WHERE id_filiere = ? AND nom_module IN (?, ?) LIMIT 1');
+    $insertModule = $pdo->prepare('INSERT INTO modules (nom_module, id_filiere) VALUES (?, ?)');
+    $renameModule = $pdo->prepare('UPDATE modules SET nom_module = ? WHERE id_module = ?');
+    $renameFiliere = $pdo->prepare('UPDATE filieres SET nom_filiere = ? WHERE id_filiere = ?');
+
+    foreach (GDS_FILIERE_OPTIONS as $code => $label) {
+        $findFiliere->execute([$label, $code]);
+        $fRow = $findFiliere->fetch();
+        if (!$fRow) {
+            $insertFiliere->execute([$label]);
+            $fid = (int) $pdo->lastInsertId();
+        } else {
+            $fid = (int) $fRow['id_filiere'];
+            if ((string) $fRow['nom_filiere'] !== $label) {
+                $renameFiliere->execute([$label, $fid]);
+            }
+        }
+
+        foreach (GDS_MODULES_BY_CODE[$code] as $moduleLabel) {
+            $legacyLabel = 'M.F. ' . $moduleLabel;
+            $findModule->execute([$fid, $moduleLabel, $legacyLabel]);
+            $mRow = $findModule->fetch();
+            if (!$mRow) {
+                $insertModule->execute([$moduleLabel, $fid]);
+                continue;
+            }
+            if ((string) $mRow['nom_module'] !== $moduleLabel) {
+                $renameModule->execute([$moduleLabel, (int) $mRow['id_module']]);
+            }
+        }
+    }
+
+    $done = true;
+}
+
 function redirect(string $url): void
 {
     header('Location: ' . $url);

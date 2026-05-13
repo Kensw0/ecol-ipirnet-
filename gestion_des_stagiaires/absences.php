@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
+gds_sync_reference_data($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_id'])) {
@@ -37,15 +38,15 @@ $curPage = 'absences';
 $pageTitle = 'Absences';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT id_stagiaire, matricule, nom, prenom FROM stagiaires ORDER BY nom, prenom')->fetchAll();
-$mods = $pdo->query('SELECT id_module, nom_module FROM modules ORDER BY nom_module')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
+$mods = $pdo->query('SELECT m.id_module, m.nom_module, f.nom_filiere FROM modules m JOIN filieres f ON f.id_filiere = m.id_filiere ORDER BY f.nom_filiere, m.nom_module')->fetchAll();
 $edit = null;
 if (isset($_GET['edit'])) {
     $st = $pdo->prepare('SELECT * FROM absences WHERE id_absence = ?');
     $st->execute([(int) $_GET['edit']]);
     $edit = $st->fetch();
 }
-$rows = $pdo->query('SELECT a.*, s.matricule, s.nom, m.nom_module FROM absences a JOIN stagiaires s ON s.id_stagiaire=a.id_stagiaire LEFT JOIN modules m ON m.id_module=a.id_module ORDER BY a.date_absence DESC')->fetchAll();
+$rows = $pdo->query('SELECT a.*, s.matricule, s.nom, f.nom_filiere, m.nom_module FROM absences a JOIN stagiaires s ON s.id_stagiaire=a.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=a.id_module ORDER BY a.date_absence DESC')->fetchAll();
 ?>
 <div class="card">
 <form method="post" class="compact">
@@ -61,7 +62,7 @@ $rows = $pdo->query('SELECT a.*, s.matricule, s.nom, m.nom_module FROM absences 
             <select name="id_stagiaire" required>
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom']) ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -69,7 +70,7 @@ $rows = $pdo->query('SELECT a.*, s.matricule, s.nom, m.nom_module FROM absences 
             <select name="id_module">
                 <option value="">—</option>
                 <?php foreach ($mods as $m): ?>
-                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h((string)$m['nom_module']) ?></option>
+                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $m['nom_filiere']) . ' — ' . gds_module_label((string) $m['nom_module'])) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -80,7 +81,7 @@ $rows = $pdo->query('SELECT a.*, s.matricule, s.nom, m.nom_module FROM absences 
 </div>
 <div class="card">
 <table class="data">
-    <tr><th>ID</th><th>Date</th><th>Module</th><th>Justifiée</th><th>Stagiaire</th><th class="no-print"></th></tr>
+    <tr><th>ID</th><th>Date</th><th>Filière</th><th>Module</th><th>Justifiée</th><th>Stagiaire</th><th class="no-print"></th></tr>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><?= (int) $r['id_absence'] ?></td>
