@@ -142,11 +142,117 @@ function gds_filiere_code(string $name): string
     return $name;
 }
 
+function gds_dedupe_reference_data(PDO $pdo): void
+{
+    // Step 1: collapse duplicate filiere rows that resolve to the same canonical code
+    // (e.g. one row inserted as 'TSDI' and another as the full label).
+    $rows = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY id_filiere')->fetchAll();
+    $groups = [];
+    foreach ($rows as $r) {
+        $code = gds_filiere_code((string) $r['nom_filiere']);
+        if (!isset(GDS_FILIERE_OPTIONS[$code])) {
+            continue;
+        }
+        $groups[$code][] = [
+            'id'   => (int) $r['id_filiere'],
+            'name' => (string) $r['nom_filiere'],
+        ];
+    }
+
+    foreach ($groups as $code => $group) {
+        if (count($group) < 2) {
+            continue;
+        }
+        $canonicalLabel = GDS_FILIERE_OPTIONS[$code];
+        $canonical = null;
+        foreach ($group as $g) {
+            if ($g['name'] === $canonicalLabel) {
+                $canonical = $g;
+                break;
+            }
+        }
+        if (!$canonical) {
+            usort($group, static fn(array $a, array $b): int => $a['id'] <=> $b['id']);
+            $canonical = $group[0];
+        }
+        $cid = (int) $canonical['id'];
+        if ($canonical['name'] !== $canonicalLabel) {
+            $pdo->prepare('UPDATE filieres SET nom_filiere = ? WHERE id_filiere = ?')
+                ->execute([$canonicalLabel, $cid]);
+        }
+        foreach ($group as $g) {
+            if ((int) $g['id'] === $cid) {
+                continue;
+            }
+            $dupId = (int) $g['id'];
+            $pdo->prepare('UPDATE classes SET id_filiere = ? WHERE id_filiere = ?')->execute([$cid, $dupId]);
+            $pdo->prepare('UPDATE modules SET id_filiere = ? WHERE id_filiere = ?')->execute([$cid, $dupId]);
+            $pdo->prepare('DELETE FROM filieres WHERE id_filiere = ?')->execute([$dupId]);
+        }
+    }
+
+    // Step 2: collapse duplicate modules within the same filière
+    // (e.g. 'M.F. 1.1 : Métier...' and 'Métier...' both attached to TSDI).
+    $filRows = $pdo->query('SELECT id_filiere FROM filieres')->fetchAll();
+    foreach ($filRows as $f) {
+        $fid = (int) $f['id_filiere'];
+        $modStmt = $pdo->prepare('SELECT id_module, nom_module FROM modules WHERE id_filiere = ? ORDER BY id_module');
+        $modStmt->execute([$fid]);
+        $modList = $modStmt->fetchAll();
+        $byLabel = [];
+        foreach ($modList as $m) {
+            $label = gds_module_label((string) $m['nom_module']);
+            $byLabel[$label][] = [
+                'id'   => (int) $m['id_module'],
+                'name' => (string) $m['nom_module'],
+            ];
+        }
+        foreach ($byLabel as $label => $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+            $canonical = null;
+            foreach ($group as $g) {
+                if ($g['name'] === $label) {
+                    $canonical = $g;
+                    break;
+                }
+            }
+            if (!$canonical) {
+                usort($group, static fn(array $a, array $b): int => $a['id'] <=> $b['id']);
+                $canonical = $group[0];
+            }
+            $cid = (int) $canonical['id'];
+            if ($canonical['name'] !== $label) {
+                $pdo->prepare('UPDATE modules SET nom_module = ? WHERE id_module = ?')
+                    ->execute([$label, $cid]);
+            }
+            foreach ($group as $g) {
+                if ((int) $g['id'] === $cid) {
+                    continue;
+                }
+                $dupId = (int) $g['id'];
+                try { $pdo->prepare('UPDATE evaluer SET id_module = ? WHERE id_module = ?')->execute([$cid, $dupId]); } catch (\Throwable $e) {}
+                try { $pdo->prepare('UPDATE absences SET id_module = ? WHERE id_module = ?')->execute([$cid, $dupId]); } catch (\Throwable $e) {}
+                try { $pdo->prepare('UPDATE g_notes SET id_module = ? WHERE id_module = ?')->execute([$cid, $dupId]); } catch (\Throwable $e) {}
+                $pdo->prepare('DELETE FROM modules WHERE id_module = ?')->execute([$dupId]);
+            }
+        }
+    }
+}
+
 function gds_sync_reference_data(PDO $pdo): void
 {
     static $done = false;
     if ($done) {
         return;
+    }
+
+    try {
+        gds_dedupe_reference_data($pdo);
+    } catch (\Throwable $e) {
+        // Dedupe is best-effort: if a referenced table is missing on a
+        // partially-installed DB we still want the rest of the sync to run.
     }
 
     $findFiliere = $pdo->prepare('SELECT id_filiere, nom_filiere FROM filieres WHERE nom_filiere IN (?, ?) LIMIT 1');
