@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($sid <= 0) {
             flash_set('Stagiaire invalide.');
-            redirect('stagiaires.php?mois=' . urlencode($mois));
+            redirect('stagiaires.php?mois=' . urlencode($mois) . '#liste-stagiaires');
         }
         $toPaid = isset($_POST['to_paid']) && (string) ($_POST['to_paid'] ?? '') === '1';
         $pdo->prepare(
@@ -24,14 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              ON DUPLICATE KEY UPDATE est_paye = VALUES(est_paye), marque_le = NOW()'
         )->execute([$sid, $mois, $toPaid ? 1 : 0]);
         flash_set($toPaid ? ('Cotisation marquée payée pour ' . $mois . '.') : ('Cotisation marquée non payée pour ' . $mois . '.'));
-        redirect('stagiaires.php?mois=' . urlencode($mois));
+        redirect('stagiaires.php?mois=' . urlencode($mois) . '#liste-stagiaires');
     }
     if (isset($_POST['delete_id'])) {
         $pdo->prepare('DELETE FROM stagiaires WHERE id_stagiaire = ?')->execute([(int) $_POST['delete_id']]);
         flash_set('Stagiaire supprimé (lignes liées en cascade).');
         $lm = (string) ($_POST['list_mois'] ?? '');
         $redirMois = preg_match('/^\d{4}-\d{2}$/', $lm) ? $lm : $listMoisNav;
-        redirect('stagiaires.php?mois=' . urlencode($redirMois));
+        redirect('stagiaires.php?mois=' . urlencode($redirMois) . '#liste-stagiaires');
     }
     if (isset($_POST['save'])) {
         $mat = trim((string) ($_POST['matricule'] ?? ''));
@@ -178,13 +178,14 @@ if ($rows) {
         </fieldset>
     </form>
 </div>
-<div class="card">
+<div class="card" id="liste-stagiaires">
+<h2 class="no-print" style="margin:0 0 0.5rem;font-size:1.1rem;">Liste des stagiaires</h2>
 <p class="no-print" style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem;">
     Cotisation mensuelle (sans échéances Merise) : choisissez le mois, puis indiquez pour chaque stagiaire s’il a payé ce mois-ci.
 </p>
-<form method="get" class="compact no-print" style="margin-bottom:1rem;">
+<form method="get" action="stagiaires.php#liste-stagiaires" class="compact no-print" style="margin-bottom:1rem;">
     <label>Mois affiché <input type="month" name="mois" value="<?= h($listMoisNav) ?>"></label>
-    <button type="submit" class="btn secondary">Afficher</button>
+    <button type="submit" class="btn secondary">Afficher la liste pour ce mois</button>
 </form>
 <table class="data">
     <tr><th>ID</th><th>Matricule</th><th>Nom</th><th>Classe</th><th>Filière</th><th>Cotisation <?= h($listMoisNav) ?></th><th class="no-print"></th></tr>
@@ -200,7 +201,7 @@ if ($rows) {
             <td><?= h((string) $r['nom_classe']) ?></td>
             <td><?= h((string) $r['nom_filiere']) ?></td>
             <td class="no-print">
-                <form method="post" class="inline">
+                <form method="post" action="stagiaires.php?mois=<?= urlencode($listMoisNav) ?>#liste-stagiaires" class="inline">
                     <input type="hidden" name="toggle_mensualite" value="1">
                     <input type="hidden" name="id_stagiaire" value="<?= $sid ?>">
                     <input type="hidden" name="mois_ref" value="<?= h($listMoisNav) ?>">
