@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 $id = (int) ($_GET['id'] ?? 0);
@@ -8,7 +8,7 @@ $st->execute([$id]);
 $s = $st->fetch();
 if (!$s || $mid <= 0) {
     http_response_code(404);
-    exit('ParamÃ¨tres invalides');
+    exit('Paramètres invalides');
 }
 $mod = $pdo->prepare('SELECT nom_module FROM modules WHERE id_module=?');
 $mod->execute([$mid]);
@@ -35,7 +35,7 @@ log_document_gen($pdo, 'bulletin', $id, $s['matricule'] . '-M' . $mid);
 <div class="print-doc">
 <p class="no-print"><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Imprimer</button> <a class="btn btn--ghost btn--sm" href="documents_officiels.php?id=<?= $id ?>">Retour</a></p>
 <h1 style="text-align:center;">BULLETIN DE NOTES</h1>
-<p><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?> â€” <?= h((string) $s['matricule']) ?></p>
+<p><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?> — <?= h((string) $s['matricule']) ?></p>
 <p><strong>Module :</strong> <?= h($mname) ?></p>
 <table class="data">
     <tr><th>Date</th><th>Type</th><th>Note</th><th>Commentaire</th></tr>

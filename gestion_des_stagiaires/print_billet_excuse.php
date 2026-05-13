@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 $id = (int) ($_GET['id'] ?? 0);
@@ -25,11 +25,11 @@ log_document_gen($pdo, 'billet_excuse', (int) $a['id_stagiaire'], 'ABS-' . $id);
 <div class="print-doc">
 <p class="no-print"><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Imprimer</button> <a class="btn btn--ghost btn--sm" href="absences.php">Retour</a></p>
 <h1 style="text-align:center;">BILLET D'EXCUSE</h1>
-<p>Lâ€™Ã©lÃ¨ve <strong><?= h((string) $a['nom'] . ' ' . (string) $a['prenom']) ?></strong>, matricule <strong><?= h((string) $a['matricule']) ?></strong>, classe <strong><?= h((string) $a['nom_classe']) ?></strong>,</p>
-<p>a Ã©tÃ© absent(e) le <strong><?= h((string) $a['date_absence']) ?></strong>
-<?php if (!empty($a['heure_debut'])): ?> de <?= h(substr((string) $a['heure_debut'], 0, 5)) ?> Ã  <?= h(substr((string) ($a['heure_fin'] ?? ''), 0, 5)) ?><?php endif; ?>.</p>
-<p>Motif / justificatif : <?= h((string) ($a['justificatif'] ?? 'â€”')) ?></p>
-<p>Statut : <?= (int) $a['est_justifiee'] ? 'JustifiÃ©e' : 'Non justifiÃ©e' ?>.</p>
+<p>L’élève <strong><?= h((string) $a['nom'] . ' ' . (string) $a['prenom']) ?></strong>, matricule <strong><?= h((string) $a['matricule']) ?></strong>, classe <strong><?= h((string) $a['nom_classe']) ?></strong>,</p>
+<p>a été absent(e) le <strong><?= h((string) $a['date_absence']) ?></strong>
+<?php if (!empty($a['heure_debut'])): ?> de <?= h(substr((string) $a['heure_debut'], 0, 5)) ?> à <?= h(substr((string) ($a['heure_fin'] ?? ''), 0, 5)) ?><?php endif; ?>.</p>
+<p>Motif / justificatif : <?= h((string) ($a['justificatif'] ?? '—')) ?></p>
+<p>Statut : <?= (int) $a['est_justifiee'] ? 'Justifiée' : 'Non justifiée' ?>.</p>
 <p>Le <?= h(date('d/m/Y')) ?></p>
 </div>
 </body>

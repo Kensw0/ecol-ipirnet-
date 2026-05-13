@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 $id = (int) ($_GET['id'] ?? 0);
@@ -26,12 +26,12 @@ log_document_gen($pdo, 'convention_stage', (int) $t['id_stagiaire'], 'ST-' . $id
 <p class="no-print"><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Imprimer</button> <a class="btn btn--ghost btn--sm" href="stages.php">Retour</a></p>
 <h1 style="text-align:center;">CONVENTION DE STAGE</h1>
 <p><strong>Stagiaire :</strong> <?= h((string) $t['nom'] . ' ' . (string) $t['prenom']) ?> (<?= h((string) $t['matricule']) ?>)</p>
-<p><strong>Organisme dâ€™accueil :</strong> <?= h((string) ($t['entreprise'] ?? '')) ?></p>
+<p><strong>Organisme d’accueil :</strong> <?= h((string) ($t['entreprise'] ?? '')) ?></p>
 <p><strong>Sujet :</strong> <?= h((string) ($t['sujet'] ?? '')) ?></p>
-<p><strong>PÃ©riode :</strong> <?= h((string) ($t['date_debut'] ?? '')) ?> au <?= h((string) ($t['date_fin'] ?? '')) ?></p>
+<p><strong>Période :</strong> <?= h((string) ($t['date_debut'] ?? '')) ?> au <?= h((string) ($t['date_fin'] ?? '')) ?></p>
 <p><strong>Type :</strong> <?= h((string) $t['type_stage']) ?></p>
-<p><strong>URL convention signÃ©e (rÃ©f.) :</strong> <?= h((string) ($t['convention_url'] ?? 'â€”')) ?></p>
-<p>Signatures : Ã‰tablissement â€” Entreprise â€” Stagiaire</p>
+<p><strong>URL convention signée (réf.) :</strong> <?= h((string) ($t['convention_url'] ?? '—')) ?></p>
+<p>Signatures : Établissement — Entreprise — Stagiaire</p>
 </div>
 </body>
 </html>

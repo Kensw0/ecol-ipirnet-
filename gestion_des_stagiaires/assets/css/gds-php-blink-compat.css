@@ -1,5 +1,11 @@
 /* GDS PHP — Blink look + legacy markup (forms, tables, public, login, print) */
 
+/* Force form controls (inputs, selects, scrollbars) to render in light mode
+   even when the OS / browser is in dark mode — prevents invisible password text. */
+html {
+  color-scheme: light;
+}
+
 /* ── Dark admin shell (closer to Blink preview than flat light main) ── */
 .main-content {
   background: linear-gradient(165deg, hsl(262 36% 9%) 0%, hsl(262 28% 6%) 45%, hsl(250 22% 7%) 100%);
@@ -458,6 +464,54 @@ body.public-page {
   background: #fff;
   color: #111;
   border: 1px solid #d4d4d8;
+}
+.auth__form form.compact input::placeholder {
+  color: #9ca3af;
+}
+/* Chrome autofill keeps the field white + text black */
+.auth__form form.compact input:-webkit-autofill,
+.auth__form form.compact input:-webkit-autofill:hover,
+.auth__form form.compact input:-webkit-autofill:focus,
+.auth__form form.compact input:-webkit-autofill:active {
+  -webkit-text-fill-color: #111;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  caret-color: #111;
+}
+
+/* Public shell forms (inscription candidature, etc.) — light theme */
+.public-shell form.compact label {
+  color: hsl(262, 47%, 18%);
+}
+.public-shell form.compact input,
+.public-shell form.compact select,
+.public-shell form.compact textarea {
+  background: #fff;
+  color: #111;
+  border: 1px solid #d4d4d8;
+}
+.public-shell form.compact input::placeholder,
+.public-shell form.compact textarea::placeholder {
+  color: #9ca3af;
+}
+.public-shell form.compact input:focus,
+.public-shell form.compact select:focus,
+.public-shell form.compact textarea:focus {
+  border-color: hsl(262, 47%, 35%);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+.public-shell form.compact input:-webkit-autofill,
+.public-shell form.compact input:-webkit-autofill:hover,
+.public-shell form.compact input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  caret-color: #111;
+}
+.public-shell form.compact fieldset {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+.public-shell form.compact legend {
+  color: hsl(262, 47%, 18%);
 }
 
 /* Print pages */
