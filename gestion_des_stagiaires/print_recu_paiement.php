@@ -2,7 +2,17 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$id = (int) ($_GET['id'] ?? 0);
+// ---- School constants (same source of truth as the other 4.1 documents) ----
+$SCHOOL_ORG          = 'GROUPE IPIRNET';
+$SCHOOL_TAGLINE_1    = "Institut Privé d'Informatique Réseau et Nouvelles";
+$SCHOOL_TAGLINE_2    = 'Etude de Télécommunication';
+$SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
+$SCHOOL_AUTH_LINE_2  = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
+$SCHOOL_CITY         = 'Berrechid';
+$SCHOOL_ADDRESS      = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
+$SCHOOL_LEGAL        = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
+
+$id   = (int) ($_GET['id'] ?? 0);
 $mois = (string) ($_GET['mois'] ?? date('Y-m'));
 if (!preg_match('/^\d{4}-\d{2}$/', $mois)) {
     $mois = date('Y-m');
@@ -17,20 +27,44 @@ if (!$s) {
 $men = $pdo->prepare('SELECT est_paye, marque_le FROM mensualites WHERE id_stagiaire=? AND mois_ref=?');
 $men->execute([$id, $mois]);
 $m = $men->fetch();
-$estPaye = $m ? (int) $m['est_paye'] === 1 : false;
+$estPaye  = $m ? (int) $m['est_paye'] === 1 : false;
 $marqueLe = $m['marque_le'] ?? null;
-$montant = (string) ($_GET['montant'] ?? '');
-$mode = (string) ($_GET['mode'] ?? '');
+$montant  = trim((string) ($_GET['montant'] ?? ''));
+$mode     = trim((string) ($_GET['mode'] ?? ''));
+
 log_document_gen($pdo, 'recu_paiement', $id, (string) $s['matricule'] . '-' . $mois);
 
+// Friendly month label.
 $moisAff = $mois;
-try {
-    $dt = DateTime::createFromFormat('Y-m', $mois);
-    if ($dt) {
-        $months = [1=>'janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-        $moisAff = $months[(int)$dt->format('n')] . ' ' . $dt->format('Y');
-    }
-} catch (Throwable $e) {}
+$dt = DateTime::createFromFormat('Y-m', $mois);
+if ($dt) {
+    $months  = [1=>'janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    $moisAff = $months[(int) $dt->format('n')] . ' ' . $dt->format('Y');
+}
+
+// Numbering like the cert: "01/25-26".
+$seq = (int) $pdo->query("SELECT COUNT(*) FROM documents_generes WHERE type_document='recu_paiement'")->fetchColumn();
+$annee = (string) ($s['annee_scolaire'] ?? '');
+$shortAnnee = $annee;
+if (preg_match('/^(\d{4})[\/\-](\d{4})$/', $annee, $mm)) {
+    $shortAnnee = substr($mm[1], -2) . '-' . substr($mm[2], -2);
+} elseif (preg_match('/^(\d{4})$/', $annee, $mm)) {
+    $y = (int) $mm[1];
+    $shortAnnee = substr((string) $y, -2) . '-' . substr((string) ($y + 1), -2);
+}
+$recuNum = sprintf('%02d/%s', max($seq, 1), $shortAnnee);
+
+$nomComplet = trim((string) $s['nom'] . ' ' . (string) $s['prenom']);
+$classe     = (string) ($s['nom_classe'] ?? '');
+$filiere    = gds_fix_text((string) ($s['nom_filiere'] ?? ''));
+
+$dateEnc = '—';
+if ($marqueLe !== null && $marqueLe !== '') {
+    $t = strtotime((string) $marqueLe);
+    $dateEnc = $t !== false ? date('d/m/Y H:i', $t) : (string) $marqueLe;
+} elseif ($estPaye) {
+    $dateEnc = date('d/m/Y H:i');
+}
 
 $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
 ?><!DOCTYPE html>
@@ -38,75 +72,280 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Reçu de paiement — <?= h((string) $s['nom']) ?> — <?= h($mois) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=5">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
+    <title>Reçu de Paiement — <?= h($nomComplet) ?> — <?= h($mois) ?></title>
+    <style>
+        @page { size: A4; margin: 12mm; }
+        * { box-sizing: border-box; }
+        html, body { background: #f1f3f5; }
+        body {
+            margin: 0;
+            padding: 18px 0 40px;
+            font-family: "Cambria", "Times New Roman", "Liberation Serif", serif;
+            color: #111;
+            font-size: 12pt;
+        }
+        .cs-doc {
+            max-width: 880px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 28px 34px 18px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+            border: 1px solid #cdd0d4;
+        }
+        .cs-print-btns { text-align: center; margin-bottom: 14px; }
+        .cs-print-btns button, .cs-print-btns a {
+            background: #f4f4f5;
+            border: 1px solid #ccc;
+            padding: .35rem .8rem;
+            border-radius: 8px;
+            font-size: .85rem;
+            cursor: pointer;
+            text-decoration: none;
+            color: #111;
+            margin: 0 4px;
+        }
+
+        /* ===== Letterhead 3-column ===== */
+        .cs-head { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .cs-head td { border: 1px solid #111; padding: 8px 10px; vertical-align: middle; text-align: center; }
+        .cs-head .cs-head-left, .cs-head .cs-head-right { width: 18%; }
+        .cs-head-logo { max-width: 90px; max-height: 90px; display: inline-block; }
+        .cs-stamp {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            border: 2px solid #b8860b;
+            color: #b8860b;
+            font-family: "Times New Roman", serif;
+            font-weight: 700;
+            font-size: .95rem;
+            letter-spacing: 0.05em;
+            background:
+              radial-gradient(circle, #fff 55%, transparent 56%),
+              repeating-conic-gradient(#b8860b 0 6deg, transparent 6deg 12deg);
+            padding: 4px;
+        }
+        .cs-head-mid .cs-org { font-weight: 700; font-size: 1.6rem; letter-spacing: 0.03em; }
+        .cs-head-mid .cs-tag { font-style: italic; font-size: .95rem; margin-top: 2px; }
+        .cs-head-mid .cs-auth { font-size: .8rem; margin-top: 4px; }
+
+        /* ===== Title in oval ===== */
+        .cs-title-wrap { display: flex; justify-content: center; margin: 22px 0 14px; }
+        .cs-title-oval {
+            border: 1.5px solid #1a1a1a;
+            border-radius: 50%;
+            padding: 14px 60px;
+            min-width: 55%;
+            text-align: center;
+            font-family: "Monotype Corsiva", "Lucida Handwriting", "Brush Script MT", cursive;
+            font-style: italic;
+            font-size: 1.55rem;
+            color: #0b3b66;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .cs-title-oval .cs-num {
+            font-family: "Cambria", "Times New Roman", serif;
+            font-style: normal;
+            font-weight: 700;
+            color: #111;
+            font-size: 1.05rem;
+            margin-left: 18px;
+        }
+        .cs-year {
+            text-align: center;
+            font-style: italic;
+            font-size: 1rem;
+            margin: 2px 0 14px;
+            color: #444;
+        }
+
+        /* ===== Body ===== */
+        .cs-body { padding: 0 8px; }
+        .cs-fields { width: 100%; border-collapse: collapse; margin: 4px 0 14px; }
+        .cs-fields td { padding: 4px 6px; font-size: 12pt; line-height: 1.5; vertical-align: top; }
+        .cs-fields td:first-child { width: 32%; white-space: nowrap; }
+        .cs-fields .cs-sep { width: 1px; padding: 0 2px; }
+        .cs-closing { margin: 10px 0 6px; line-height: 1.6; text-align: justify; }
+
+        /* ===== Détail box (clean black border, no color blocks) ===== */
+        .cs-detail {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 4px 0 16px;
+            font-size: 11.5pt;
+        }
+        .cs-detail caption {
+            caption-side: top;
+            text-align: left;
+            font-weight: 700;
+            padding: 4px 0 6px;
+            color: #0b3b66;
+            letter-spacing: 0.02em;
+        }
+        .cs-detail th, .cs-detail td {
+            border: 1px solid #111;
+            padding: 7px 12px;
+            vertical-align: top;
+        }
+        .cs-detail th {
+            width: 32%;
+            background: #f4f4f5;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        /* ===== Signatures (3 boxes: stagiaire / caissière / cachet) ===== */
+        .cs-sign {
+            margin: 18px 0 8px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .cs-sign th, .cs-sign td {
+            border: 1px solid #111;
+            padding: 12px 14px;
+            vertical-align: top;
+            width: 33.33%;
+        }
+        .cs-sign th {
+            font-weight: 400;
+            font-style: italic;
+            font-family: "Monotype Corsiva", "Lucida Handwriting", "Brush Script MT", cursive;
+            font-size: 1.15rem;
+            color: #0b3b66;
+            text-align: center;
+            background: #fafafa;
+        }
+        .cs-sign td { height: 110px; font-size: 11.5pt; }
+
+        /* ===== Footer ===== */
+        .cs-footer {
+            border-top: 1px solid #111;
+            padding-top: 6px;
+            margin: 18px 6px 0;
+            text-align: center;
+            font-size: .82rem;
+            line-height: 1.45;
+        }
+
+        @media print {
+            html, body { background: #fff; }
+            body { padding: 0; }
+            .cs-doc { box-shadow: none; border: none; padding: 0; margin: 0; max-width: none; }
+            .no-print, .cs-print-btns { display: none !important; }
+        }
+    </style>
 </head>
-<body class="print-page paper-page">
-<div class="paper-doc">
-    <p class="no-print" style="text-align:center;">
-        <button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Imprimer</button>
-        <a class="btn btn--ghost btn--sm" href="documents_officiels.php?id=<?= $id ?>">Retour</a>
-    </p>
+<body>
+<div class="cs-doc">
+    <div class="cs-print-btns no-print">
+        <button type="button" onclick="window.print()">Imprimer</button>
+        <a href="documents_officiels.php?id=<?= $id ?>">Retour</a>
+    </div>
 
-    <header class="paper-letterhead">
-        <div class="paper-letterhead__brand">
-            <img src="assets/img/logo.png" alt="" class="paper-letterhead__logo">
-            <div>
-                <div class="paper-letterhead__org">Groupe IPIRNET</div>
-                <div class="paper-letterhead__sub">Service comptabilité / scolarité</div>
-            </div>
+    <table class="cs-head">
+        <tr>
+            <td class="cs-head-left">
+                <img src="assets/img/logo.png" alt="" class="cs-head-logo">
+            </td>
+            <td class="cs-head-mid">
+                <div class="cs-org"><?= h($SCHOOL_ORG) ?></div>
+                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
+                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_2) ?></div>
+                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
+                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
+            </td>
+            <td class="cs-head-right">
+                <div class="cs-stamp">ACCREDITÉ</div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="cs-title-wrap">
+        <div class="cs-title-oval">
+            Reçu de Paiement
+            <span class="cs-num">N° <?= h($recuNum) ?></span>
         </div>
-        <div class="paper-letterhead__meta">
-            <div><strong>Reçu N° :</strong> R-<?= h((string) $s['matricule']) ?>-<?= h(str_replace('-','',$mois)) ?></div>
-            <div><strong>Date :</strong> <?= h(date('d/m/Y')) ?></div>
-        </div>
-    </header>
+    </div>
 
-    <h1 class="paper-title">REÇU DE PAIEMENT</h1>
-    <p class="paper-subtitle">Cotisation mensuelle — <?= h($moisAff) ?></p>
+    <p class="cs-year">Cotisation mensuelle — <?= h($moisAff) ?></p>
 
-    <dl class="paper-info">
-        <dt>Nom &amp; prénom</dt><dd><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></dd>
-        <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
-        <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
-        <dt>Filière</dt><dd><?= h((string) $s['nom_filiere']) ?></dd>
-    </dl>
+    <div class="cs-body">
+        <table class="cs-fields">
+            <tr>
+                <td>Nom et prénom</td>
+                <td class="cs-sep">:</td>
+                <td><strong><?= h($nomComplet) ?></strong></td>
+            </tr>
+            <tr>
+                <td>Matricule</td>
+                <td class="cs-sep">:</td>
+                <td><strong><?= h((string) $s['matricule']) ?></strong></td>
+            </tr>
+            <tr>
+                <td>Classe</td>
+                <td class="cs-sep">:</td>
+                <td><strong><?= h($classe) ?></strong></td>
+            </tr>
+            <tr>
+                <td>Filière</td>
+                <td class="cs-sep">:</td>
+                <td><strong><?= h($filiere) ?></strong></td>
+            </tr>
+        </table>
 
-    <section class="paper-section">
-        <h2>Détail du règlement</h2>
-        <dl class="paper-info">
-            <dt>Mois concerné</dt><dd><?= h($moisAff) ?></dd>
-            <dt>Statut</dt><dd><?= $estPaye ? '<strong style="color:#16a34a;">PAYÉ</strong>' : '<strong style="color:#b91c1c;">NON PAYÉ</strong>' ?></dd>
-            <dt>Montant</dt><dd><?= $montant !== '' ? h($montant) . ' MAD' : '<em>à compléter par la caissière</em>' ?></dd>
-            <dt>Mode de règlement</dt><dd><?= $mode !== '' ? h($mode) : '<em>espèces / chèque / virement</em>' ?></dd>
-            <dt>Date d'encaissement</dt><dd><?= h((string) ($marqueLe ?? date('d/m/Y H:i'))) ?></dd>
-        </dl>
-    </section>
+        <table class="cs-detail">
+            <caption>Détail du règlement</caption>
+            <tr>
+                <th>Mois concerné</th>
+                <td><?= h($moisAff) ?></td>
+            </tr>
+            <tr>
+                <th>Statut</th>
+                <td><strong><?= $estPaye ? 'PAYÉ' : 'NON PAYÉ' ?></strong></td>
+            </tr>
+            <tr>
+                <th>Montant</th>
+                <td><?= $montant !== '' ? h($montant) . ' MAD' : '<em>à compléter par la caissière</em>' ?></td>
+            </tr>
+            <tr>
+                <th>Mode de règlement</th>
+                <td><?= $mode !== '' ? h($mode) : '<em>espèces / chèque / virement</em>' ?></td>
+            </tr>
+            <tr>
+                <th>Date d'encaissement</th>
+                <td><?= h($dateEnc) ?></td>
+            </tr>
+        </table>
 
-    <section class="paper-engagements">
-        <p class="paper-closing">Ce reçu est délivré au stagiaire désigné ci-dessus pour faire valoir ce que de droit.</p>
-        <div class="paper-signatures">
-            <div>
-                <p class="paper-signatures__role">Signature du stagiaire</p>
-                <p class="paper-signatures__line">&nbsp;</p>
-            </div>
-            <div>
-                <p class="paper-signatures__role">Caissière / direction</p>
-                <p class="paper-signatures__line">&nbsp;</p>
-            </div>
-            <div>
-                <p class="paper-signatures__role">Cachet</p>
-                <p class="paper-signatures__line">&nbsp;</p>
-            </div>
-        </div>
-    </section>
+        <p class="cs-closing">
+            Ce reçu est délivré au stagiaire désigné ci-dessus pour faire valoir ce que de droit.
+        </p>
+    </div>
 
-    <footer class="paper-footer">
-        Groupe IPIRNET — Document officiel généré le <?= h(date('d/m/Y H:i')) ?>.
-    </footer>
+    <table class="cs-sign">
+        <tr>
+            <th>Signature du stagiaire</th>
+            <th>Caissière / Direction</th>
+            <th>Cachet</th>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td>
+                <p>Fait à <?= h($SCHOOL_CITY) ?> le&nbsp;: <?= h(date('d/m/Y')) ?></p>
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+    </table>
+
+    <div class="cs-footer">
+        <?= h($SCHOOL_ADDRESS) ?><br>
+        <?= h($SCHOOL_LEGAL) ?>
+    </div>
 </div>
-
 <?php if ($auto): ?>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 200); });</script>
 <?php endif; ?>
