@@ -22,8 +22,31 @@ $gdsFrenchDate = static function (): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= h($pageTitle) ?> — IPIRNET</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css">
+    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=2">
+    <?php if ($isPublic): ?>
+    <style>
+        /* Inline fallback for the public candidature form: black text on white inputs */
+        html { color-scheme: light; }
+        .public-shell form.compact input,
+        .public-shell form.compact select,
+        .public-shell form.compact textarea {
+            background-color: #ffffff !important;
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
+            caret-color: #111111 !important;
+            border: 1px solid #d4d4d8 !important;
+            forced-color-adjust: none !important;
+        }
+        .public-shell form.compact input:-webkit-autofill,
+        .public-shell form.compact input:-webkit-autofill:hover,
+        .public-shell form.compact input:-webkit-autofill:focus {
+            -webkit-text-fill-color: #111111 !important;
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+            caret-color: #111111 !important;
+        }
+    </style>
+    <?php endif; ?>
 </head>
 <body class="<?= $isPublic ? 'public-page' : '' ?>">
 <?php if ($isPublic): ?>
