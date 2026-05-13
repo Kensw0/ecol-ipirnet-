@@ -146,6 +146,38 @@ if ($rows) {
     </fieldset>
 </form>
 </div>
+<div class="card no-print">
+    <form method="get" action="print_liste_stagiaires.php" target="_blank" class="compact">
+        <fieldset>
+            <legend>Imprimer la liste des stagiaires</legend>
+            <label>Filière
+                <select name="id_filiere">
+                    <option value="">— Toutes —</option>
+                    <?php foreach ($pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere') as $fp): ?>
+                        <option value="<?= (int) $fp['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Classe
+                <select name="id_classe">
+                    <option value="">— Toutes —</option>
+                    <?php foreach ($classes as $cp): ?>
+                        <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Tri
+                <select name="sort">
+                    <option value="nom">Ordre alphabétique (Nom)</option>
+                    <option value="matricule">Par matricule (Code)</option>
+                    <option value="filiere">Par filière</option>
+                    <option value="classe">Par classe</option>
+                </select>
+            </label>
+            <button type="submit" class="btn">Imprimer la liste</button>
+        </fieldset>
+    </form>
+</div>
 <div class="card">
 <p class="no-print" style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem;">
     Cotisation mensuelle (sans échéances Merise) : choisissez le mois, puis indiquez pour chaque stagiaire s’il a payé ce mois-ci.
