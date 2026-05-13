@@ -22,12 +22,16 @@ $gdsFrenchDate = static function (): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= h($pageTitle) ?> — IPIRNET</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="assets/css/app.css?v=2">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=2">
+    <link rel="stylesheet" href="assets/css/app.css?v=3">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=3">
     <?php if ($isPublic): ?>
     <style>
         /* Inline fallback for the public candidature form: black text on white inputs */
         html { color-scheme: light; }
+        .public-shell form.compact label,
+        .public-shell form.compact legend {
+            color: #111111 !important;
+        }
         .public-shell form.compact input,
         .public-shell form.compact select,
         .public-shell form.compact textarea {
