@@ -27,7 +27,7 @@ $moisAff = $mois;
 try {
     $dt = DateTime::createFromFormat('Y-m', $mois);
     if ($dt) {
-        $months = [1=>'janvier','f\xc3\xa9vrier','mars','avril','mai','juin','juillet','ao\xc3\xbbt','septembre','octobre','novembre','d\xc3\xa9cembre'];
+        $months = [1=>'janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
         $moisAff = $months[(int)$dt->format('n')] . ' ' . $dt->format('Y');
     }
 } catch (Throwable $e) {}
@@ -39,8 +39,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Reçu de paiement — <?= h((string) $s['nom']) ?> — <?= h($mois) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -66,25 +66,26 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <h1 class="paper-title">REÇU DE PAIEMENT</h1>
     <p class="paper-subtitle">Cotisation mensuelle — <?= h($moisAff) ?></p>
 
-    <section class="paper-section">
-        <table class="paper-fields">
-            <tr><th>Nom &amp; prénom</th><td colspan="3"><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $s['matricule']) ?></td><th>Classe</th><td><?= h((string) $s['nom_classe']) ?></td></tr>
-            <tr><th>Filière</th><td colspan="3"><?= h((string) $s['nom_filiere']) ?></td></tr>
-        </table>
-    </section>
+    <dl class="paper-info">
+        <dt>Nom &amp; prénom</dt><dd><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></dd>
+        <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
+        <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
+        <dt>Filière</dt><dd><?= h((string) $s['nom_filiere']) ?></dd>
+    </dl>
 
     <section class="paper-section">
         <h2>Détail du règlement</h2>
-        <table class="paper-fields">
-            <tr><th>Mois concerné</th><td><?= h($moisAff) ?></td><th>Statut</th><td><?= $estPaye ? '<strong style="color:#16a34a;">PAYÉ</strong>' : '<strong style="color:#b91c1c;">NON PAYÉ</strong>' ?></td></tr>
-            <tr><th>Montant</th><td><?= $montant !== '' ? h($montant) . ' MAD' : '<em>à compléter par la caissière</em>' ?></td><th>Mode de règlement</th><td><?= $mode !== '' ? h($mode) : '<em>espèces / chèque / virement</em>' ?></td></tr>
-            <tr><th>Date d'encaissement</th><td colspan="3"><?= h((string) ($marqueLe ?? date('d/m/Y H:i'))) ?></td></tr>
-        </table>
+        <dl class="paper-info">
+            <dt>Mois concerné</dt><dd><?= h($moisAff) ?></dd>
+            <dt>Statut</dt><dd><?= $estPaye ? '<strong style="color:#16a34a;">PAYÉ</strong>' : '<strong style="color:#b91c1c;">NON PAYÉ</strong>' ?></dd>
+            <dt>Montant</dt><dd><?= $montant !== '' ? h($montant) . ' MAD' : '<em>à compléter par la caissière</em>' ?></dd>
+            <dt>Mode de règlement</dt><dd><?= $mode !== '' ? h($mode) : '<em>espèces / chèque / virement</em>' ?></dd>
+            <dt>Date d'encaissement</dt><dd><?= h((string) ($marqueLe ?? date('d/m/Y H:i'))) ?></dd>
+        </dl>
     </section>
 
-    <section class="paper-section paper-engagements">
-        <p>Ce reçu est délivré au stagiaire désigné ci-dessus pour faire valoir ce que de droit.</p>
+    <section class="paper-engagements">
+        <p class="paper-closing">Ce reçu est délivré au stagiaire désigné ci-dessus pour faire valoir ce que de droit.</p>
         <div class="paper-signatures">
             <div>
                 <p class="paper-signatures__role">Signature du stagiaire</p>

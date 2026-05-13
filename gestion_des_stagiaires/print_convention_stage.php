@@ -17,8 +17,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Convention de stage — <?= h((string) $t['nom']) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -41,42 +41,44 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     </header>
 
     <h1 class="paper-title">CONVENTION DE STAGE</h1>
-    <p class="paper-subtitle"><?= h((string) $t['type_stage']) === 'pfe' ? 'Projet de fin d\u2019\xc3\xa9tudes (PFE)' : 'Stage en entreprise' ?> — Année <?= h((string) $t['annee_scolaire']) ?></p>
+    <p class="paper-subtitle"><?= h((string) $t['type_stage']) === 'pfe' ? 'Projet de fin d\'études (PFE)' : 'Stage en entreprise' ?> — Année <?= h((string) $t['annee_scolaire']) ?></p>
 
     <section class="paper-section">
-        <h2>1. Stagiaire</h2>
-        <table class="paper-fields">
-            <tr><th>Nom &amp; prénom</th><td colspan="3"><?= h((string) $t['nom'] . ' ' . (string) $t['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $t['matricule']) ?></td><th>CIN</th><td><?= h((string) ($t['cin'] ?? '')) ?></td></tr>
-            <tr><th>Classe / filière</th><td colspan="3"><?= h((string) $t['nom_classe'] . ' — ' . (string) $t['nom_filiere']) ?></td></tr>
-            <tr><th>Adresse</th><td colspan="3"><?= h((string) ($t['adresse'] ?? '')) ?></td></tr>
-        </table>
+        <h2>Stagiaire</h2>
+        <dl class="paper-info">
+            <dt>Nom &amp; prénom</dt><dd><?= h((string) $t['nom'] . ' ' . (string) $t['prenom']) ?></dd>
+            <dt>Matricule</dt><dd><?= h((string) $t['matricule']) ?></dd>
+            <dt>CIN</dt><dd><?= h((string) ($t['cin'] ?? '')) ?></dd>
+            <dt>Classe / filière</dt><dd><?= h((string) $t['nom_classe'] . ' — ' . (string) $t['nom_filiere']) ?></dd>
+            <dt>Adresse</dt><dd><?= h((string) ($t['adresse'] ?? '')) ?></dd>
+        </dl>
     </section>
 
     <section class="paper-section">
-        <h2>2. Organisme d'accueil</h2>
-        <table class="paper-fields">
-            <tr><th>Entreprise / organisme</th><td colspan="3"><?= h((string) ($t['entreprise'] ?? '')) ?></td></tr>
-            <tr><th>Sujet du stage</th><td colspan="3"><?= h((string) ($t['sujet'] ?? '')) ?></td></tr>
-        </table>
+        <h2>Organisme d'accueil</h2>
+        <dl class="paper-info">
+            <dt>Entreprise / organisme</dt><dd><?= h((string) ($t['entreprise'] ?? '')) ?></dd>
+            <dt>Sujet du stage</dt><dd><?= h((string) ($t['sujet'] ?? '')) ?></dd>
+        </dl>
     </section>
 
     <section class="paper-section">
-        <h2>3. Période</h2>
-        <table class="paper-fields">
-            <tr><th>Date de début</th><td><?= h((string) ($t['date_debut'] ?? '')) ?></td><th>Date de fin</th><td><?= h((string) ($t['date_fin'] ?? '')) ?></td></tr>
+        <h2>Période</h2>
+        <dl class="paper-info">
+            <dt>Date de début</dt><dd><?= h((string) ($t['date_debut'] ?? '')) ?></dd>
+            <dt>Date de fin</dt><dd><?= h((string) ($t['date_fin'] ?? '')) ?></dd>
             <?php if (!empty($t['date_soutenance'])): ?>
-            <tr><th>Date de soutenance</th><td colspan="3"><?= h((string) $t['date_soutenance']) ?></td></tr>
+            <dt>Date de soutenance</dt><dd><?= h((string) $t['date_soutenance']) ?></dd>
             <?php endif; ?>
             <?php if (!empty($t['jury'])): ?>
-            <tr><th>Jury / modalités</th><td colspan="3"><?= nl2br(h((string) $t['jury'])) ?></td></tr>
+            <dt>Jury / modalités</dt><dd><?= nl2br(h((string) $t['jury'])) ?></dd>
             <?php endif; ?>
-        </table>
+        </dl>
     </section>
 
     <section class="paper-section paper-engagements">
-        <h2>4. Engagements</h2>
-        <p>Le stagiaire s'engage à respecter le règlement intérieur de l'organisme d'accueil et la confidentialité des informations auxquelles il aura accès. L'organisme d'accueil s'engage à assurer un encadrement pédagogique adéquat.</p>
+        <h2>Engagements</h2>
+        <p class="paper-lead">Le stagiaire s'engage à respecter le règlement intérieur de l'organisme d'accueil et la confidentialité des informations auxquelles il aura accès. L'organisme d'accueil s'engage à assurer un encadrement pédagogique adéquat.</p>
         <div class="paper-signatures">
             <div>
                 <p class="paper-signatures__role">L'établissement (IPIRNET)</p>

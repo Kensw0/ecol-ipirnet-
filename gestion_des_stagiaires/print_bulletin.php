@@ -27,8 +27,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bulletin — <?= h((string) $s['nom']) ?> — <?= h($mname) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -53,12 +53,12 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <h1 class="paper-title">BULLETIN DE NOTES</h1>
     <p class="paper-subtitle">Module : <?= h($mname) ?> — Année <?= h((string) $s['annee_scolaire']) ?></p>
 
-    <section class="paper-section">
-        <table class="paper-fields">
-            <tr><th>Nom et prénom</th><td colspan="3"><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $s['matricule']) ?></td><th>Classe</th><td><?= h((string) $s['nom_classe']) ?></td></tr>
-        </table>
-    </section>
+    <dl class="paper-info">
+        <dt>Nom et prénom</dt><dd><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></dd>
+        <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
+        <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
+        <dt>Module</dt><dd><?= h($mname) ?></dd>
+    </dl>
 
     <section class="paper-section">
         <h2>Évaluations</h2>

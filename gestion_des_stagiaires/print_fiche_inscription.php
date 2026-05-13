@@ -18,8 +18,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fiche d'inscription — <?= h((string) $s['nom']) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -46,34 +46,39 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <p class="paper-subtitle">Année scolaire <?= h((string) $s['annee_scolaire']) ?></p>
 
     <section class="paper-section">
-        <h2>1. Identité du stagiaire</h2>
-        <table class="paper-fields">
-            <tr><th>Nom</th><td><?= h((string) $s['nom']) ?></td><th>Prénom</th><td><?= h((string) $s['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $s['matricule']) ?></td><th>CIN</th><td><?= h((string) ($s['cin'] ?? '')) ?></td></tr>
-            <tr><th>Date de naissance</th><td><?= h((string) ($s['date_naissance'] ?? '')) ?></td><th>Téléphone</th><td><?= h((string) ($s['telephone'] ?? '')) ?></td></tr>
-            <tr><th>Adresse</th><td colspan="3"><?= h((string) ($s['adresse'] ?? '')) ?></td></tr>
-            <tr><th>Email</th><td colspan="3"><?= h((string) ($s['email'] ?? '')) ?></td></tr>
-        </table>
+        <h2>Identité du stagiaire</h2>
+        <dl class="paper-info">
+            <dt>Nom</dt><dd><?= h((string) $s['nom']) ?></dd>
+            <dt>Prénom</dt><dd><?= h((string) $s['prenom']) ?></dd>
+            <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
+            <dt>CIN</dt><dd><?= h((string) ($s['cin'] ?? '')) ?></dd>
+            <dt>Date de naissance</dt><dd><?= h((string) ($s['date_naissance'] ?? '')) ?></dd>
+            <dt>Téléphone</dt><dd><?= h((string) ($s['telephone'] ?? '')) ?></dd>
+            <dt>Adresse</dt><dd><?= h((string) ($s['adresse'] ?? '')) ?></dd>
+            <dt>Email</dt><dd><?= h((string) ($s['email'] ?? '')) ?></dd>
+        </dl>
     </section>
 
     <section class="paper-section">
-        <h2>2. Responsable / parent</h2>
-        <table class="paper-fields">
-            <tr><th>Nom du père / tuteur</th><td><?= h((string) ($s['nom_tuteur'] ?? '')) ?></td><th>Téléphone parent</th><td><?= h((string) ($s['telephone_parent'] ?? '')) ?></td></tr>
-        </table>
+        <h2>Responsable / parent</h2>
+        <dl class="paper-info">
+            <dt>Nom du père / tuteur</dt><dd><?= h((string) ($s['nom_tuteur'] ?? '')) ?></dd>
+            <dt>Téléphone parent</dt><dd><?= h((string) ($s['telephone_parent'] ?? '')) ?></dd>
+        </dl>
     </section>
 
     <section class="paper-section">
-        <h2>3. Inscription</h2>
-        <table class="paper-fields">
-            <tr><th>Date d'inscription</th><td><?= h((string) ($s['date_inscription'] ?? '')) ?></td><th>Classe</th><td><?= h((string) $s['nom_classe']) ?></td></tr>
-            <tr><th>Filière</th><td colspan="3"><?= h((string) $s['nom_filiere']) ?></td></tr>
-        </table>
+        <h2>Inscription</h2>
+        <dl class="paper-info">
+            <dt>Date d'inscription</dt><dd><?= h((string) ($s['date_inscription'] ?? '')) ?></dd>
+            <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
+            <dt>Filière</dt><dd><?= h((string) $s['nom_filiere']) ?></dd>
+        </dl>
     </section>
 
     <section class="paper-section paper-engagements">
-        <h2>4. Engagement</h2>
-        <p>Je soussigné(e) <strong><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></strong> déclare avoir pris connaissance du règlement intérieur de l'établissement et m'engage à le respecter.</p>
+        <h2>Engagement</h2>
+        <p class="paper-lead">Je soussigné(e) <strong><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></strong> déclare avoir pris connaissance du règlement intérieur de l'établissement et m'engage à le respecter.</p>
         <div class="paper-signatures">
             <div>
                 <p class="paper-signatures__role">Signature du stagiaire</p>

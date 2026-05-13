@@ -18,8 +18,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Certificat de scolarité — <?= h((string) $s['nom']) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -44,16 +44,19 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <h1 class="paper-title">CERTIFICAT DE SCOLARITÉ</h1>
     <p class="paper-subtitle">Année scolaire <?= h((string) $s['annee_scolaire']) ?></p>
 
-    <section class="paper-body">
-        <p>Le Directeur du <strong>Groupe IPIRNET</strong> certifie que l'élève désigné ci-dessous est régulièrement inscrit(e) dans notre établissement :</p>
-        <table class="paper-fields">
-            <tr><th>Nom et prénom</th><td colspan="3"><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $s['matricule']) ?></td><th>CIN</th><td><?= h((string) ($s['cin'] ?? '')) ?></td></tr>
-            <tr><th>Date de naissance</th><td><?= h((string) ($s['date_naissance'] ?? '')) ?></td><th>Année scolaire</th><td><?= h((string) $s['annee_scolaire']) ?></td></tr>
-            <tr><th>Classe</th><td><?= h((string) $s['nom_classe']) ?></td><th>Filière</th><td><?= h((string) $s['nom_filiere']) ?></td></tr>
-        </table>
-        <p style="margin-top:1.25rem;">Le présent certificat est délivré à l'intéressé(e) pour servir et valoir ce que de droit.</p>
-    </section>
+    <p class="paper-lead">Le Directeur du <strong>Groupe IPIRNET</strong> certifie que l'élève désigné ci-dessous est régulièrement inscrit(e) dans notre établissement :</p>
+
+    <dl class="paper-info">
+        <dt>Nom et prénom</dt><dd><?= h((string) $s['nom'] . ' ' . (string) $s['prenom']) ?></dd>
+        <dt>Matricule</dt><dd><?= h((string) $s['matricule']) ?></dd>
+        <dt>CIN</dt><dd><?= h((string) ($s['cin'] ?? '')) ?></dd>
+        <dt>Date de naissance</dt><dd><?= h((string) ($s['date_naissance'] ?? '')) ?></dd>
+        <dt>Année scolaire</dt><dd><?= h((string) $s['annee_scolaire']) ?></dd>
+        <dt>Classe</dt><dd><?= h((string) $s['nom_classe']) ?></dd>
+        <dt>Filière</dt><dd><?= h((string) $s['nom_filiere']) ?></dd>
+    </dl>
+
+    <p class="paper-closing">Le présent certificat est délivré à l'intéressé(e) pour servir et valoir ce que de droit.</p>
 
     <section class="paper-engagements" style="margin-top:2rem;">
         <div class="paper-signatures">

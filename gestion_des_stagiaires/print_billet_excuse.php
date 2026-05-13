@@ -17,8 +17,8 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Billet d'excuse — <?= h((string) $a['nom']) ?></title>
-    <link rel="stylesheet" href="assets/css/app.css?v=4">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
+    <link rel="stylesheet" href="assets/css/app.css?v=5">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=5">
 </head>
 <body class="print-page paper-page">
 <div class="paper-doc">
@@ -43,21 +43,19 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <h1 class="paper-title">BILLET D'EXCUSE</h1>
     <p class="paper-subtitle">Année scolaire <?= h((string) $a['annee_scolaire']) ?></p>
 
-    <section class="paper-body">
-        <table class="paper-fields">
-            <tr><th>Élève</th><td colspan="3"><?= h((string) $a['nom'] . ' ' . (string) $a['prenom']) ?></td></tr>
-            <tr><th>Matricule</th><td><?= h((string) $a['matricule']) ?></td><th>Classe</th><td><?= h((string) $a['nom_classe']) ?></td></tr>
-            <tr><th>Date de l'absence</th><td><?= h((string) $a['date_absence']) ?></td>
-                <th>Horaire</th>
-                <td><?php if (!empty($a['heure_debut'])): ?><?= h(substr((string) $a['heure_debut'], 0, 5)) ?> – <?= h(substr((string) ($a['heure_fin'] ?? ''), 0, 5)) ?><?php else: ?>journée<?php endif; ?></td>
-            </tr>
-            <tr><th>Motif / justificatif</th><td colspan="3"><?= h((string) ($a['justificatif'] ?? '—')) ?></td></tr>
-            <tr><th>Statut</th><td colspan="3"><?= (int) $a['est_justifiee'] ? '<strong style="color:#16a34a;">Justifiée</strong>' : '<strong style="color:#b91c1c;">Non justifiée</strong>' ?></td></tr>
-        </table>
-        <p style="margin-top:1rem;">L'élève désigné(e) ci-dessus est autorisé(e) à réintégrer sa classe.</p>
-    </section>
+    <dl class="paper-info">
+        <dt>Élève</dt><dd><?= h((string) $a['nom'] . ' ' . (string) $a['prenom']) ?></dd>
+        <dt>Matricule</dt><dd><?= h((string) $a['matricule']) ?></dd>
+        <dt>Classe</dt><dd><?= h((string) $a['nom_classe']) ?></dd>
+        <dt>Date de l'absence</dt><dd><?= h((string) $a['date_absence']) ?></dd>
+        <dt>Horaire</dt><dd><?php if (!empty($a['heure_debut'])): ?><?= h(substr((string) $a['heure_debut'], 0, 5)) ?> – <?= h(substr((string) ($a['heure_fin'] ?? ''), 0, 5)) ?><?php else: ?>journée<?php endif; ?></dd>
+        <dt>Motif / justificatif</dt><dd><?= h((string) ($a['justificatif'] ?? '—')) ?></dd>
+        <dt>Statut</dt><dd><?= (int) $a['est_justifiee'] ? '<strong style="color:#16a34a;">Justifiée</strong>' : '<strong style="color:#b91c1c;">Non justifiée</strong>' ?></dd>
+    </dl>
 
-    <section class="paper-engagements" style="margin-top:2rem;">
+    <p class="paper-closing">L'élève désigné(e) ci-dessus est autorisé(e) à réintégrer sa classe.</p>
+
+    <section class="paper-engagements" style="margin-top:1.5rem;">
         <div class="paper-signatures">
             <div>
                 <p class="paper-signatures__role">Signature du parent / tuteur</p>
