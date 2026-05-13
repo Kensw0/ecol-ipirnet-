@@ -39,8 +39,9 @@ $curPage = 'g_notes';
 $pageTitle = 'Notes';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
-$mods = $pdo->query('SELECT m.id_module, m.nom_module, f.nom_filiere FROM modules m JOIN filieres f ON f.id_filiere = m.id_filiere ORDER BY f.nom_filiere, m.nom_module')->fetchAll();
+$filieres = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.id_filiere, f.nom_filiere FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
+$mods = $pdo->query('SELECT m.id_module, m.nom_module, f.id_filiere, f.nom_filiere FROM modules m JOIN filieres f ON f.id_filiere = m.id_filiere ORDER BY f.nom_filiere, m.nom_module')->fetchAll();
 
 $edit = null;
 if (isset($_GET['edit'])) {
@@ -52,12 +53,20 @@ if (isset($_GET['edit'])) {
 $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
 ?>
 <div class="card">
-<form method="post" class="compact">
+<form method="post" class="compact" data-filiere-form="true">
     <fieldset>
         <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une note de synthèse</legend>
         <?php if ($edit): ?>
             <input type="hidden" name="id_g_note" value="<?= (int) $edit['id_g_note'] ?>">
         <?php endif; ?>
+        <label>Filière (filtre)
+            <select data-role="filiere-filter">
+                <option value="">— Toutes —</option>
+                <?php foreach ($filieres as $fi): ?>
+                    <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label>Libellé <input name="libelle" required size="50" value="<?= h((string) ($edit['libelle'] ?? '')) ?>"></label>
         <label>Année scolaire <input name="annee_scolaire" required value="<?= h((string) ($edit['annee_scolaire'] ?? '2025-2026')) ?>"></label>
         <label>Semestre <input name="semestre" type="number" min="0" value="<?= $edit && $edit['semestre'] !== null ? (int)$edit['semestre'] : '' ?>"></label>
@@ -65,18 +74,18 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.
         <label>Commentaire <textarea name="commentaire" rows="2" cols="60"><?= h((string) ($edit['commentaire'] ?? '')) ?></textarea></label>
         <label>Date enregistrement <input type="date" name="date_enregistrement" required value="<?= h((string) ($edit['date_enregistrement'] ?? date('Y-m-d'))) ?>"></label>
         <label>Stagiaire
-            <select name="id_stagiaire" required>
+            <select name="id_stagiaire" required data-filiere-filter="true">
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ')') ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" data-filiere-id="<?= (int) $s['id_filiere'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
         <label>Module (vide = synthèse globale)
-            <select name="id_module">
+            <select name="id_module" data-filiere-filter="true">
                 <option value="">—</option>
                 <?php foreach ($mods as $m): ?>
-                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $m['nom_filiere']) . ' — ' . gds_module_label((string) $m['nom_module'])) ?></option>
+                    <option value="<?= (int) $m['id_module'] ?>" data-filiere-id="<?= (int) $m['id_filiere'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $m['nom_filiere']) . ' — ' . gds_module_label((string) $m['nom_module'])) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>

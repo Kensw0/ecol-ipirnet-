@@ -45,7 +45,9 @@ $curPage = 'stages';
 $pageTitle = 'Stages / PFE';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere, c.nom_classe FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
+gds_sync_reference_data($pdo);
+$filieres = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.id_filiere, f.nom_filiere, c.nom_classe FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
 $edit = null;
 if (isset($_GET['edit'])) {
     $st = $pdo->prepare('SELECT * FROM stages WHERE id_stage = ?');
@@ -55,10 +57,18 @@ if (isset($_GET['edit'])) {
 $rows = $pdo->query('SELECT st.*, s.matricule, s.nom, s.prenom, c.nom_classe, f.nom_filiere FROM stages st JOIN stagiaires s ON s.id_stagiaire=st.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY st.date_debut DESC')->fetchAll();
 ?>
 <div class="card">
-<form method="post" class="compact">
+<form method="post" class="compact" data-filiere-form="true">
     <fieldset>
         <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> un stage ou PFE (CDC §4.1 / page 8)</legend>
         <?php if ($edit): ?><input type="hidden" name="id_stage" value="<?= (int) $edit['id_stage'] ?>"><?php endif; ?>
+        <label>Filière (filtre)
+            <select data-role="filiere-filter">
+                <option value="">— Toutes —</option>
+                <?php foreach ($filieres as $fi): ?>
+                    <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label>Type
             <select name="type_stage">
                 <option value="stage_entreprise" <?= (!$edit || $edit['type_stage'] === 'stage_entreprise') ? 'selected' : '' ?>>Stage entreprise</option>
@@ -76,10 +86,10 @@ $rows = $pdo->query('SELECT st.*, s.matricule, s.nom, s.prenom, c.nom_classe, f.
         <label>URL rapport <input name="rapport_url" value="<?= h((string) ($edit['rapport_url'] ?? '')) ?>"></label>
         <label>Évaluation entreprise <input name="evaluation_entreprise" value="<?= h((string) ($edit['evaluation_entreprise'] ?? '')) ?>"></label>
         <label>Stagiaire
-            <select name="id_stagiaire" required>
+            <select name="id_stagiaire" required data-filiere-filter="true">
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ' / ' . (string) $s['nom_classe'] . ')') ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" data-filiere-id="<?= (int) $s['id_filiere'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ' / ' . (string) $s['nom_classe'] . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
