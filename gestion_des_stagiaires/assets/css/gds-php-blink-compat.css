@@ -1,0 +1,497 @@
+/* GDS PHP — Blink look + legacy markup (forms, tables, public, login, print) */
+
+/* ── Dark admin shell (closer to Blink preview than flat light main) ── */
+.main-content {
+  background: linear-gradient(165deg, hsl(262 36% 9%) 0%, hsl(262 28% 6%) 45%, hsl(250 22% 7%) 100%);
+  color: #f4f4f5;
+  min-height: 100vh;
+}
+
+.page-container {
+  position: relative;
+  z-index: 1;
+}
+
+.mouse-light-overlay {
+  z-index: 0;
+}
+
+/* Pink / magenta active nav like Blink */
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.28), rgba(168, 85, 247, 0.18)) !important;
+  border: 1px solid rgba(236, 72, 153, 0.45) !important;
+  color: #fff !important;
+  box-shadow: 0 0 24px rgba(236, 72, 153, 0.12);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+/* Dashboard heading */
+.dash-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.dash-page-head h1.page-title-dash {
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 400;
+  color: #fafafa;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.dash-page-head .page-sub-dash {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: rgba(244, 244, 245, 0.55);
+  max-width: 52ch;
+}
+.dash-page-head .dash-date {
+  font-size: 0.875rem;
+  color: rgba(244, 244, 245, 0.5);
+  text-align: right;
+}
+
+/* Glass / dark cards inside admin main */
+.main-content .page-container > .card,
+.main-content .page-container .card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e4e4e7;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+.main-content .page-container .card h2 {
+  color: rgba(250, 250, 250, 0.45);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-family: Inter, sans-serif;
+  font-weight: 700;
+  margin: 0 0 1rem;
+}
+.main-content .page-container .card p,
+.main-content .page-container .card li {
+  color: rgba(228, 228, 231, 0.88);
+}
+.main-content .page-container .card a {
+  color: #f472b6;
+}
+.main-content .page-container .card a:hover {
+  color: #fbcfe8;
+}
+
+/* Stat grid (index + legacy .grid-stats) */
+.stat-grid,
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+.stat-card,
+.stat {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 1.25rem 1.35rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover,
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.stat-value,
+.stat .n {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #bef264;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.stat-label,
+.stat .k {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(244, 244, 245, 0.45);
+  margin-top: 0.5rem;
+}
+
+/* Two-column dashboard */
+.dash-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .dash-layout {
+    grid-template-columns: 1fr 300px;
+  }
+}
+.dash-aside .card {
+  margin-bottom: 1rem;
+}
+.dash-aside .btn-accent {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+.dash-aside .btn-outline {
+  width: 100%;
+  justify-content: center;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fafafa;
+}
+
+/* Legacy tables */
+.table-container {
+  margin-bottom: 1rem;
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+table.data th {
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(244, 244, 245, 0.55);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+table.data td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e4e4e7;
+  font-size: 0.9rem;
+}
+table.data tr:last-child td {
+  border-bottom: none;
+}
+table.data tbody tr:hover td {
+  background: rgba(236, 72, 153, 0.06);
+}
+
+/* Forms */
+form.compact label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: rgba(244, 244, 245, 0.75);
+}
+form.compact input,
+form.compact select,
+form.compact textarea {
+  width: 100%;
+  max-width: 520px;
+  margin-top: 0.25rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fafafa;
+  font: inherit;
+}
+form.compact input:focus,
+form.compact select:focus,
+form.compact textarea:focus {
+  outline: none;
+  border-color: rgba(236, 72, 153, 0.6);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+}
+form.compact fieldset {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+form.compact legend {
+  padding: 0 0.5rem;
+  color: rgba(250, 250, 250, 0.85);
+  font-weight: 600;
+}
+
+/* Buttons — map old classes */
+a.btn,
+button.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  background: #fafafa;
+  color: hsl(262, 47%, 12%);
+}
+a.btn:hover,
+button.btn:hover {
+  filter: brightness(1.05);
+}
+.btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fafafa;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.btn.danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.btn.danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+form.inline {
+  display: inline;
+  margin-left: 0.35rem;
+}
+
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.link-row a {
+  color: #f472b6;
+}
+.link-row a:hover {
+  color: #fbcfe8;
+}
+
+/* Flash */
+.msg {
+  padding: 0.85rem 1.1rem;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+  font-size: 0.92rem;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  background: rgba(22, 101, 52, 0.35);
+  color: #bbf7d0;
+}
+.msg.err {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+}
+
+/* Badges used in PHP */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #bbf7d0;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.badge-warn {
+  background: rgba(234, 179, 8, 0.2);
+  color: #fef08a;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+.badge-bad {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* Admin footer */
+.gds-admin-footer {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  font-size: 0.8rem;
+  color: rgba(244, 244, 245, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.gds-admin-footer p {
+  margin: 0;
+}
+
+.sidebar-footer .btn-outline {
+  color: #fafafa !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+.sidebar-footer .btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Sidebar logo image */
+.brand-logo-sidebar-img {
+  max-height: 44px;
+  max-width: 140px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+/* Public shell (inscription, etc.) — light */
+body.public-page {
+  background: hsl(0, 0%, 96%);
+  color: hsl(262, 47%, 12%);
+}
+.public-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.public-shell__header {
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1rem 1.25rem;
+}
+.public-shell__main {
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+  width: 100%;
+}
+.public-shell__footer {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #64748b;
+  padding: 1.5rem;
+}
+.public-shell .msg {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(220, 252, 231, 0.95);
+  color: #14532d;
+}
+.public-shell .msg.err {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(254, 242, 242, 0.98);
+  color: #991b1b;
+}
+.public-shell .brand-logo-img {
+  max-height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+.public-shell .btn--sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 8px;
+}
+.public-shell .btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: hsl(262, 47%, 18%);
+}
+.public-shell .btn--primary {
+  background: hsl(262, 47%, 12%);
+  color: #fff;
+  border: none;
+}
+
+/* Login auth split */
+.auth {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+}
+.auth__brand {
+  background: hsl(262, 47%, 8%);
+  color: #fff;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.auth__form {
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #fafafa;
+}
+.auth__brand-logo {
+  max-height: 56px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 1.25rem;
+}
+.auth__form .card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1e1b4b;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.auth__form .card a {
+  color: #be185d;
+}
+.auth__form form.compact input {
+  background: #fff;
+  color: #111;
+  border: 1px solid #d4d4d8;
+}
+
+/* Print pages */
+body.print-page {
+  background: #f4f4f5;
+  padding: 1rem;
+}
+.print-doc {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  color: #111;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+.print-doc .btn,
+.print-doc .btn--ghost {
+  margin-bottom: 1rem;
+}
+body.print-page .btn--sm {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+}
+body.print-page .btn--ghost {
+  background: #f4f4f5;
+  border: 1px solid #ccc;
+  color: #111;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

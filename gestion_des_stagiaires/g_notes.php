@@ -1,0 +1,109 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/includes/bootstrap.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['delete_id'])) {
+        $pdo->prepare('DELETE FROM g_notes WHERE id_g_note = ?')->execute([(int) $_POST['delete_id']]);
+        flash_set('g_note supprimée.');
+        redirect('g_notes.php');
+    }
+    if (isset($_POST['save'])) {
+        $lib = trim((string) ($_POST['libelle'] ?? ''));
+        $an = trim((string) ($_POST['annee_scolaire'] ?? ''));
+        $sem = ($_POST['semestre'] ?? '') === '' ? null : (int) $_POST['semestre'];
+        $moy = ($_POST['moyenne_synthese'] ?? '') === '' ? null : (float) str_replace(',', '.', (string) $_POST['moyenne_synthese']);
+        $com = trim((string) ($_POST['commentaire'] ?? ''));
+        $de = (string) ($_POST['date_enregistrement'] ?? '');
+        $sid = (int) ($_POST['id_stagiaire'] ?? 0);
+        $mid = ($_POST['id_module'] ?? '') === '' ? null : (int) $_POST['id_module'];
+        if ($lib === '' || $an === '' || $de === '' || $sid <= 0) {
+            flash_set('Libellé, année, date et stagiaire requis.');
+            redirect('g_notes.php');
+        }
+        if (isset($_POST['id_g_note']) && (int) $_POST['id_g_note'] > 0) {
+            $pdo->prepare('UPDATE g_notes SET libelle=?, annee_scolaire=?, semestre=?, moyenne_synthese=?, commentaire=?, date_enregistrement=?, id_stagiaire=?, id_module=? WHERE id_g_note=?')
+                ->execute([$lib, $an, $sem, $moy, $com === '' ? null : $com, $de, $sid, $mid, (int) $_POST['id_g_note']]);
+            flash_set('g_note mise à jour.');
+        } else {
+            $pdo->prepare('INSERT INTO g_notes (libelle, annee_scolaire, semestre, moyenne_synthese, commentaire, date_enregistrement, id_stagiaire, id_module) VALUES (?,?,?,?,?,?,?,?)')
+                ->execute([$lib, $an, $sem, $moy, $com === '' ? null : $com, $de, $sid, $mid]);
+            flash_set('g_note créée.');
+        }
+        redirect('g_notes.php');
+    }
+}
+
+$curPage = 'g_notes';
+$pageTitle = 'g_notes (synthèse)';
+require __DIR__ . '/includes/header.php';
+
+$stag = $pdo->query('SELECT id_stagiaire, matricule, nom, prenom FROM stagiaires ORDER BY nom, prenom')->fetchAll();
+$mods = $pdo->query('SELECT id_module, nom_module FROM modules ORDER BY nom_module')->fetchAll();
+
+$edit = null;
+if (isset($_GET['edit'])) {
+    $st = $pdo->prepare('SELECT * FROM g_notes WHERE id_g_note = ?');
+    $st->execute([(int) $_GET['edit']]);
+    $edit = $st->fetch();
+}
+
+$rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
+?>
+<div class="card">
+<form method="post" class="compact">
+    <fieldset>
+        <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une ligne g_notes</legend>
+        <?php if ($edit): ?>
+            <input type="hidden" name="id_g_note" value="<?= (int) $edit['id_g_note'] ?>">
+        <?php endif; ?>
+        <label>Libellé <input name="libelle" required size="50" value="<?= h((string) ($edit['libelle'] ?? '')) ?>"></label>
+        <label>Année scolaire <input name="annee_scolaire" required value="<?= h((string) ($edit['annee_scolaire'] ?? '2025-2026')) ?>"></label>
+        <label>Semestre <input name="semestre" type="number" min="0" value="<?= $edit && $edit['semestre'] !== null ? (int)$edit['semestre'] : '' ?>"></label>
+        <label>Moyenne synthèse <input name="moyenne_synthese" type="number" step="0.01" value="<?= $edit && $edit['moyenne_synthese'] !== null ? h((string)$edit['moyenne_synthese']) : '' ?>"></label>
+        <label>Commentaire <textarea name="commentaire" rows="2" cols="60"><?= h((string) ($edit['commentaire'] ?? '')) ?></textarea></label>
+        <label>Date enregistrement <input type="date" name="date_enregistrement" required value="<?= h((string) ($edit['date_enregistrement'] ?? date('Y-m-d'))) ?>"></label>
+        <label>Stagiaire
+            <select name="id_stagiaire" required>
+                <option value=""></option>
+                <?php foreach ($stag as $s): ?>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>Module (vide = synthèse globale)
+            <select name="id_module">
+                <option value="">—</option>
+                <?php foreach ($mods as $m): ?>
+                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)($edit['id_module'] ?? 0) === (int)$m['id_module']) ? 'selected' : '' ?>><?= h((string)$m['nom_module']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <button type="submit" name="save" value="1" class="btn">Enregistrer</button>
+        <?php if ($edit): ?> <a class="btn secondary" href="g_notes.php">Annuler</a><?php endif; ?>
+    </fieldset>
+</form>
+</div>
+<div class="card">
+<table class="data">
+    <tr><th>ID</th><th>Libellé</th><th>Année</th><th>Moy.</th><th>Stagiaire</th><th>Module</th><th class="no-print"></th></tr>
+    <?php foreach ($rows as $r): ?>
+        <tr>
+            <td><?= (int) $r['id_g_note'] ?></td>
+            <td><?= h((string) $r['libelle']) ?></td>
+            <td><?= h((string) $r['annee_scolaire']) ?></td>
+            <td><?= h((string) ($r['moyenne_synthese'] ?? '')) ?></td>
+            <td><?= h((string) $r['matricule']) ?></td>
+            <td><?= h((string) ($r['nom_module'] ?? '—')) ?></td>
+            <td class="link-row no-print">
+                <a href="g_notes.php?edit=<?= (int) $r['id_g_note'] ?>">Modifier</a>
+                <form class="inline" method="post" onsubmit="return confirm('Supprimer ?');">
+                    <input type="hidden" name="delete_id" value="<?= (int) $r['id_g_note'] ?>">
+                    <button type="submit" class="btn danger">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+</table>
+</div>
+<?php require __DIR__ . '/includes/footer.php'; ?>
