@@ -14,50 +14,71 @@ function gds_fix_text(string $s): string
             $s = $conv;
         }
     }
+    // Normalize Unicode replacement char (U+FFFD) to literal "?" so strtr patterns match.
+    $s = str_replace("�", '?', $s);
+
     $repl = [
         // double-encoded UTF-8 -> Latin-1 -> UTF-8 leftovers
-        "Ã©" => "é", "Ã¨" => "è", "Ãª" => "ê", "Ã«" => "ë",
-        "Ã " => "à", "Ã¢" => "â", "Ã§" => "ç",
-        "Ã¹" => "ù", "Ã»" => "û", "Ã®" => "î", "Ã¯" => "ï",
-        "Ã´" => "ô", "Ã" => "É", "Ã" => "À",
-        "â€™" => "’", "â€“" => "–",
-        "â€”" => "—",
-        // Windows-1252 mojibake from MySQL latin1 mis-tagged columns
-        "?veloppement" => "éveloppement",
-        "?velopper"   => "évelopper",
-        "Donn?es"     => "Données",
-        "donn?es"     => "données",
-        "R?seau"      => "Réseau",
-        "r?seau"      => "réseau",
-        "S?curit?"    => "Sécurité",
-        "s?curit?"    => "sécurité",
-        "Sp?cialis"   => "Spécialis",
-        "Spécialis?" => "Spécialisé",  // already-correct é followed by broken é
-        "spécialis?" => "spécialisé",
-        "Spécialis?e" => "Spécialisée",
-        "spécialis?e" => "spécialisée",
-        "Technicien Spécialis? en" => "Technicien Spécialisé en",
-        "stagi?re"     => "stagiaire",
+        "é" => "é", "è" => "è", "ê" => "ê", "ë" => "ë",
+        // Fully broken (both accents lost) - put first so longest-match wins
+        "Sp?cialis?e"  => "Spécialisée",
+        "sp?cialis?e"  => "spécialisée",
+        "Sp?cialis?"   => "Spécialisé",
+        "sp?cialis?"   => "spécialisé",
+        "T?l?communication" => "Télécommunication",
+        "t?l?communication" => "télécommunication",
+        "T?l?phone"    => "Téléphone",
+        "t?l?phone"    => "téléphone",
+        "D?veloppement" => "Développement",
+        "d?veloppement" => "développement",
+        "D?velopper"   => "Développer",
+        "d?velopper"   => "développer",
+        "S?curit?"     => "Sécurité",
+        "s?curit?"     => "sécurité",
+        "?l?ves"       => "élèves",
         "?l?ve"        => "élève",
-        "?cole"        => "école",
         "?tablissement"=> "établissement",
         "g?n?rale"     => "générale",
         "G?n?rale"     => "Générale",
         "g?n?ral"      => "général",
+        "G?n?ral"      => "Général",
         "p?riode"      => "période",
         "P?riode"      => "Période",
         "g?n?ration"   => "génération",
-        "sp?cialis"   => "spécialis",
-        "P?dagogie"   => "Pédagogie",
-        "p?dagogie"   => "pédagogie",
-        "1?re"        => "1ère",
-        "2?me"        => "2ème",
-        "3?me"        => "3ème",
-        "Ann?e"       => "Année",
-        "ann?e"       => "année",
+        "G?n?ration"   => "Génération",
+        // Partial mojibake (one accent already correct UTF-8, other still '?')
+        "?veloppement" => "éveloppement",
+        "?velopper"    => "évelopper",
+        "Donn?es"      => "Données",
+        "donn?es"      => "données",
+        "R?seau"       => "Réseau",
+        "r?seau"       => "réseau",
+        "Spécialis?e" => "Spécialisée",
+        "spécialis?e" => "spécialisée",
+        "Spécialis?"  => "Spécialisé",
+        "spécialis?"  => "spécialisé",
+        "Sp?cialis"    => "Spécialis",
+        "sp?cialis"    => "spécialis",
+        "stagi?re"     => "stagiaire",
+        "?cole"        => "école",
+        "P?dagogie"    => "Pédagogie",
+        "p?dagogie"    => "pédagogie",
+        "1?re"         => "1ère",
+        "2?me"         => "2ème",
+        "3?me"         => "3ème",
+        "Ann?e"        => "Année",
+        "ann?e"        => "année",
         "Â" => "",
     ];
-    return strtr($s, $repl);
+    // Multi-pass: each pass may expose new patterns. Cap iterations.
+    for ($i = 0; $i < 4; $i++) {
+        $next = strtr($s, $repl);
+        if ($next === $s) {
+            break;
+        }
+        $s = $next;
+    }
+    return $s;
 }
 
 function h(string $s): string
