@@ -92,10 +92,9 @@ $gdsFrenchDate = static function (): string {
             </div>
             <div class="nav-group">
                 <span class="nav-label">Pédagogie</span>
-                <a href="referentiel.php" class="nav-item<?= $curPage === 'referentiel' ? ' active' : '' ?>"><i class="fa-solid fa-diagram-project"></i> <span>Filières / modules</span></a>
                 <a href="evaluer.php" class="nav-item<?= $curPage === 'evaluer' ? ' active' : '' ?>"><i class="fa-solid fa-pen-to-square"></i> <span>Notes</span></a>
                 <a href="moyennes.php" class="nav-item<?= $curPage === 'moyennes' ? ' active' : '' ?>"><i class="fa-solid fa-chart-line"></i> <span>Moyennes</span></a>
-                <a href="g_notes.php" class="nav-item<?= $curPage === 'g_notes' ? ' active' : '' ?>"><i class="fa-solid fa-file-lines"></i> <span>g_notes</span></a>
+                <a href="g_notes.php" class="nav-item<?= $curPage === 'g_notes' ? ' active' : '' ?>"><i class="fa-solid fa-file-lines"></i> <span>Notes</span></a>
                 <a href="absences.php" class="nav-item<?= $curPage === 'absences' ? ' active' : '' ?>"><i class="fa-solid fa-calendar-xmark"></i> <span>Absences</span></a>
                 <a href="stages.php" class="nav-item<?= $curPage === 'stages' ? ' active' : '' ?>"><i class="fa-solid fa-briefcase"></i> <span>Stages / PFE</span></a>
             </div>

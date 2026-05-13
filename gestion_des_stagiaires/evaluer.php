@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
+gds_sync_reference_data($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_id'])) {
@@ -33,11 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $curPage = 'evaluer';
-$pageTitle = 'Notes (évaluer)';
+$pageTitle = 'Notes';
 require __DIR__ . '/includes/header.php';
 
-$stag = $pdo->query('SELECT id_stagiaire, matricule, nom, prenom FROM stagiaires ORDER BY nom, prenom')->fetchAll();
-$mods = $pdo->query('SELECT id_module, nom_module FROM modules ORDER BY nom_module')->fetchAll();
+$stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.nom_filiere FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
+$mods = $pdo->query('SELECT m.id_module, m.nom_module, f.nom_filiere FROM modules m JOIN filieres f ON f.id_filiere = m.id_filiere ORDER BY f.nom_filiere, m.nom_module')->fetchAll();
 
 $edit = null;
 if (isset($_GET['edit'])) {
@@ -46,12 +47,12 @@ if (isset($_GET['edit'])) {
     $edit = $st->fetch();
 }
 
-$rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module FROM evaluer e JOIN stagiaires s ON s.id_stagiaire=e.id_stagiaire JOIN modules m ON m.id_module=e.id_module ORDER BY e.date_evaluation DESC')->fetchAll();
+$rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module, f.nom_filiere FROM evaluer e JOIN stagiaires s ON s.id_stagiaire=e.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere JOIN modules m ON m.id_module=e.id_module ORDER BY e.date_evaluation DESC')->fetchAll();
 ?>
 <div class="card">
 <form method="post" class="compact">
     <fieldset>
-        <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une note (association EVALUER)</legend>
+        <legend><?= $edit ? 'Modifier' : 'Ajouter' ?> une note</legend>
         <?php if ($edit): ?>
             <input type="hidden" name="id_eval" value="<?= (int) $edit['id_eval'] ?>">
         <?php endif; ?>
@@ -62,7 +63,7 @@ $rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
             <select name="id_stagiaire" required>
                 <option value=""></option>
                 <?php foreach ($stag as $s): ?>
-                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom']) ?></option>
+                    <option value="<?= (int) $s['id_stagiaire'] ?>" <?= ($edit && (int)$edit['id_stagiaire'] === (int)$s['id_stagiaire']) ? 'selected' : '' ?>><?= h($s['matricule'] . ' — ' . $s['nom'] . ' ' . $s['prenom'] . ' (' . gds_filiere_code((string) $s['nom_filiere']) . ')') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -70,7 +71,7 @@ $rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
             <select name="id_module" required>
                 <option value=""></option>
                 <?php foreach ($mods as $m): ?>
-                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)$edit['id_module'] === (int)$m['id_module']) ? 'selected' : '' ?>><?= h((string)$m['nom_module']) ?></option>
+                    <option value="<?= (int) $m['id_module'] ?>" <?= ($edit && (int)$edit['id_module'] === (int)$m['id_module']) ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $m['nom_filiere']) . ' — ' . gds_module_label((string) $m['nom_module'])) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -82,7 +83,7 @@ $rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
 </div>
 <div class="card">
 <table class="data">
-    <tr><th>ID</th><th>Date</th><th>Note</th><th>Type</th><th>Stagiaire</th><th>Module</th><th class="no-print"></th></tr>
+    <tr><th>ID</th><th>Date</th><th>Note</th><th>Type</th><th>Stagiaire</th><th>Filière</th><th>Module</th><th class="no-print"></th></tr>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><?= (int) $r['id_eval'] ?></td>
@@ -90,7 +91,8 @@ $rows = $pdo->query('SELECT e.*, s.matricule, s.nom, s.prenom, m.nom_module FROM
             <td><?= h((string) $r['valeur_note']) ?></td>
             <td><?= h((string) $r['type_evaluation']) ?></td>
             <td><?= h((string) $r['matricule'] . ' ' . $r['nom']) ?></td>
-            <td><?= h((string) $r['nom_module']) ?></td>
+            <td><?= h(gds_filiere_code((string) $r['nom_filiere'])) ?></td>
+            <td><?= h(gds_module_label((string) $r['nom_module'])) ?></td>
             <td class="link-row no-print">
                 <a href="evaluer.php?edit=<?= (int) $r['id_eval'] ?>">Modifier</a>
                 <form class="inline" method="post" onsubmit="return confirm('Supprimer ?');">
