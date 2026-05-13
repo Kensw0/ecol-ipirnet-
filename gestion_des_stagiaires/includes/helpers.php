@@ -1,9 +1,53 @@
 <?php
 declare(strict_types=1);
 
+function gds_fix_text(string $s): string
+{
+    if ($s === '') {
+        return $s;
+    }
+    // If the string isn't valid UTF-8 (e.g. legacy Windows-1252 bytes from MySQL latin1 columns),
+    // convert it so accented characters render properly instead of as '?'.
+    if (function_exists('mb_check_encoding') && !mb_check_encoding($s, 'UTF-8')) {
+        $conv = @mb_convert_encoding($s, 'UTF-8', 'Windows-1252');
+        if (is_string($conv) && $conv !== '') {
+            $s = $conv;
+        }
+    }
+    $repl = [
+        // double-encoded UTF-8 -> Latin-1 -> UTF-8 leftovers
+        "Ã©" => "é", "Ã¨" => "è", "Ãª" => "ê", "Ã«" => "ë",
+        "Ã " => "à", "Ã¢" => "â", "Ã§" => "ç",
+        "Ã¹" => "ù", "Ã»" => "û", "Ã®" => "î", "Ã¯" => "ï",
+        "Ã´" => "ô", "Ã" => "É", "Ã" => "À",
+        "â€™" => "’", "â€“" => "–",
+        "â€”" => "—",
+        // Windows-1252 mojibake from MySQL latin1 mis-tagged columns
+        "?veloppement" => "éveloppement",
+        "?velopper"   => "évelopper",
+        "Donn?es"     => "Données",
+        "donn?es"     => "données",
+        "R?seau"      => "Réseau",
+        "r?seau"      => "réseau",
+        "S?curit?"    => "Sécurité",
+        "s?curit?"    => "sécurité",
+        "Sp?cialis"   => "Spécialis",
+        "sp?cialis"   => "spécialis",
+        "P?dagogie"   => "Pédagogie",
+        "p?dagogie"   => "pédagogie",
+        "1?re"        => "1ère",
+        "2?me"        => "2ème",
+        "3?me"        => "3ème",
+        "Ann?e"       => "Année",
+        "ann?e"       => "année",
+        "Â" => "",
+    ];
+    return strtr($s, $repl);
+}
+
 function h(string $s): string
 {
-    return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return htmlspecialchars(gds_fix_text($s), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 function redirect(string $url): void
@@ -28,7 +72,7 @@ function flash_get(): ?string
 function log_document_gen(PDO $pdo, string $type, int $idStagiaire, ?string $reference = null): void
 {
     $allowed = [
-        'certificat_scolarite', 'billet_excuse', 'etat_mensualites',
+        'certificat_scolarite', 'billet_excuse', 'etat_mensualites', 'fiche_inscription', 'recu_paiement',
         'releve_notes', 'bulletin', 'attestation_reussite', 'convention_stage', 'autre',
     ];
     if (!in_array($type, $allowed, true)) {
