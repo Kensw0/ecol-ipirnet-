@@ -27,8 +27,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Connexion — IPIRNET</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css">
+    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=2">
+    <style>
+        /* Inline fallback: guarantees the password field text is black
+           regardless of browser dark mode, autofill, or cached stylesheets. */
+        html { color-scheme: light; }
+        .auth__form form.compact input[type="password"],
+        .auth__form form.compact input[type="text"],
+        .auth__form form.compact input[type="email"] {
+            background-color: #ffffff !important;
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
+            caret-color: #111111 !important;
+            border: 1px solid #d4d4d8 !important;
+            forced-color-adjust: none !important;
+        }
+        .auth__form form.compact input:-webkit-autofill,
+        .auth__form form.compact input:-webkit-autofill:hover,
+        .auth__form form.compact input:-webkit-autofill:focus,
+        .auth__form form.compact input:-webkit-autofill:active {
+            -webkit-text-fill-color: #111111 !important;
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+            caret-color: #111111 !important;
+        }
+    </style>
 </head>
 <body>
 <div class="auth">
@@ -49,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p style="font-size:0.9rem;margin:0 0 1rem;"><a href="inscription.php">Formulaire candidat (sans compte)</a> — demande d’inscription en attente de validation.</p>
             <form method="post" class="compact">
                 <input type="hidden" name="next" value="<?= h($next) ?>">
-                <label>Mot de passe <input name="password" type="password" required autocomplete="current-password" autofocus></label>
+                <label>Mot de passe <input name="password" type="password" required autocomplete="current-password" autofocus style="color:#111;background:#fff;-webkit-text-fill-color:#111;caret-color:#111;"></label>
                 <button type="submit" class="btn" style="margin-top:0.75rem;">Se connecter</button>
             </form>
         </div>
