@@ -101,7 +101,6 @@ $gdsFrenchDate = static function (): string {
             </div>
             <div class="nav-group">
                 <span class="nav-label">Documents</span>
-                <a href="documents.php" class="nav-item<?= $curPage === 'documents' ? ' active' : '' ?>"><i class="fa-solid fa-folder"></i> <span>Documents</span></a>
                 <a href="documents_officiels.php" class="nav-item<?= $curPage === 'officiels' ? ' active' : '' ?>"><i class="fa-solid fa-file-contract"></i> <span>Documents officiels</span></a>
                 <a href="alertes.php" class="nav-item<?= $curPage === 'alertes' ? ' active' : '' ?>"><i class="fa-solid fa-triangle-exclamation"></i> <span>Alertes</span></a>
             </div>

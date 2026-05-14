@@ -27,7 +27,7 @@ if ($sid <= 0): ?>
     <h2 style="margin-top:0;">Documents officiels — CDC §4.1</h2>
     <p style="margin:0 0 1rem;color:var(--muted);">
         Choisissez un stagiaire pour accéder aux modèles imprimables&nbsp;: fiche d'inscription, certificat,
-        relevé, bulletin, billet d'excuse, attestation, convention, reçu et état des cotisations.
+        relevé, billet d'excuse, attestation, convention, reçu et état des cotisations.
     </p>
     <form method="get" action="documents_officiels.php" class="no-print" style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
         <input type="search" name="q" value="<?= h($qStag) ?>" placeholder="Rechercher par nom, prénom ou matricule…" style="flex:1;min-width:220px;">
@@ -54,9 +54,6 @@ if ($sid <= 0): ?>
         flash_set('Stagiaire introuvable.');
         redirect('documents_officiels.php');
     }
-    $mods = $pdo->prepare('SELECT m.id_module, m.nom_module FROM modules m JOIN stagiaires st ON st.id_stagiaire = ? JOIN classes c ON c.id_classe = st.id_classe AND c.id_filiere = m.id_filiere ORDER BY m.nom_module');
-    $mods->execute([$sid]);
-    $mlist = $mods->fetchAll();
     $absList = $pdo->prepare('SELECT id_absence, date_absence FROM absences WHERE id_stagiaire = ? ORDER BY date_absence DESC LIMIT 12');
     $absList->execute([$sid]);
     $absRows = $absList->fetchAll();
@@ -97,18 +94,6 @@ if ($sid <= 0): ?>
             <span>Reçu mensuel imprimable (mois courant&nbsp;: <?= h($curMois) ?>).</span>
         </a>
     </div>
-
-    <h3 style="margin:1.5rem 0 .5rem;">Bulletin par module</h3>
-    <?php if ($mlist): ?>
-    <div class="doc-grid no-print">
-        <?php foreach ($mlist as $m): ?>
-            <a class="doc-tile doc-tile--sm" href="print_bulletin.php?id=<?= $sid ?>&amp;mid=<?= (int) $m['id_module'] ?>&amp;auto=1" target="_blank">
-                <strong><?= h((string) $m['nom_module']) ?></strong>
-                <span>Bulletin du module — impression directe.</span>
-            </a>
-        <?php endforeach; ?>
-    </div>
-    <?php else: ?><p style="color:var(--muted);">Aucun module rattaché à la classe de ce stagiaire.</p><?php endif; ?>
 
     <h3 style="margin:1.5rem 0 .5rem;">Billets d'excuse (absences récentes)</h3>
     <?php if ($absRows): ?>
