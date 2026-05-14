@@ -45,7 +45,6 @@ $curPage = 'stages';
 $pageTitle = 'Stages / PFE';
 require __DIR__ . '/includes/header.php';
 
-gds_sync_reference_data($pdo);
 $filieres = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere')->fetchAll();
 $stag = $pdo->query('SELECT s.id_stagiaire, s.matricule, s.nom, s.prenom, f.id_filiere, f.nom_filiere, c.nom_classe FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere ORDER BY s.nom, s.prenom')->fetchAll();
 $edit = null;
