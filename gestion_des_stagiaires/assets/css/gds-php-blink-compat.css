@@ -894,3 +894,136 @@ body.paper-page {
 .gds-filter-bar__form {
   display: contents;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Login page polish (auth__form layout)
+   ───────────────────────────────────────────────────────────── */
+.auth__form-inner {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+.auth__title {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+.auth__subtitle {
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+.auth__card {
+  padding: 1.75rem !important;
+  box-shadow: 0 12px 40px -16px rgba(15, 23, 42, 0.18);
+}
+.auth__login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin: 0;
+}
+.auth__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.auth__field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #4b5563 !important;
+  margin: 0;
+}
+.auth__field input {
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0.7rem 0.9rem !important;
+  font-size: 0.95rem !important;
+  border-radius: 10px !important;
+  border: 1px solid #d4d4d8 !important;
+  background: #fff !important;
+  color: #111 !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.auth__field input:focus {
+  outline: none;
+  border-color: #be185d !important;
+  box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.15);
+}
+.auth__field-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+  line-height: 1.4;
+}
+.auth__field-hint code {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.82rem;
+  color: #111827;
+}
+.auth__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.auth__form .btn.auth__btn-primary {
+  background: hsl(262, 47%, 14%) !important;
+  color: #fff !important;
+  padding: 0.65rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid hsl(262, 47%, 14%);
+  font-weight: 600;
+}
+.auth__form .btn.auth__btn-primary:hover {
+  background: hsl(262, 47%, 22%) !important;
+  border-color: hsl(262, 47%, 22%);
+  filter: none;
+}
+.auth__form .btn.auth__btn-secondary {
+  background: #fff !important;
+  color: hsl(262, 47%, 22%) !important;
+  border: 1px solid #d4d4d8;
+  padding: 0.65rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth__form .btn.auth__btn-secondary:hover {
+  background: #f3f4f6 !important;
+  border-color: #a1a1aa;
+  filter: none;
+}
+.auth__form .btn.auth__btn-primary i,
+.auth__form .btn.auth__btn-secondary i {
+  font-size: 0.85em;
+}
+.auth__helper {
+  margin: 0;
+  padding-top: 0.4rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+  line-height: 1.5;
+  border-top: 1px solid #f1f1f4;
+}
+/* Re-skin the flash banner on the light login background */
+.auth__form .msg {
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 500;
+}
+.auth__form .msg.err {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: #fef2f2;
+  color: #991b1b;
+}
