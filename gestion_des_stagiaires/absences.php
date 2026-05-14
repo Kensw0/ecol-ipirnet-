@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
-gds_sync_reference_data($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_id'])) {
