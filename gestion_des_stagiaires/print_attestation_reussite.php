@@ -21,7 +21,7 @@ if (!$s) {
     http_response_code(404);
     exit('Stagiaire introuvable');
 }
-$moy = $pdo->prepare('SELECT ROUND(AVG(moyenne_synthese),2) FROM g_notes WHERE id_stagiaire=? AND moyenne_synthese IS NOT NULL');
+$moy = $pdo->prepare('SELECT ROUND(AVG(valeur_note),2) FROM evaluer WHERE id_stagiaire=?');
 $moy->execute([$id]);
 $gm = $moy->fetchColumn();
 $gmDisplay = ($gm === false || $gm === null || $gm === '') ? '—' : number_format((float) $gm, 2, '.', ' ');
