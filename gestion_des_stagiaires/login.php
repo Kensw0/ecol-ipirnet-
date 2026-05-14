@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <img src="assets/img/logo.png" alt="IPIRNET" class="auth__brand-logo" width="200" height="64">
             <p class="eyebrow" style="color:#888;">Administration</p>
             <h2 style="color:#fff;font-size:clamp(1.5rem,3vw,2rem);margin:0.5rem 0 0;">IPIRNET — Gestion des stagiaires</h2>
-            <p style="color:#cfcfcf;max-width:36ch;margin-top:1rem;line-height:1.6;">Accès réservé au personnel (CDC §4.1).</p>
+            <p style="color:#cfcfcf;max-width:36ch;margin-top:1rem;line-height:1.6;">Accès réservé au personnel.</p>
         </div>
         <p style="color:#888;font-size:0.85rem;margin:0;">© <?= date('Y') ?> IPIRNET</p>
     </div>
@@ -72,11 +72,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1 class="page-title" style="margin-bottom:1rem;">Connexion administrateur</h1>
         <div class="card">
             <p class="muted" style="margin-top:0;font-size:0.92rem;">Mot de passe par défaut : <code>admin123</code> — définissez <code>GDS_ADMIN_PASSWORD</code> sur la machine pour le changer.</p>
-            <p style="font-size:0.9rem;margin:0 0 1rem;"><a href="inscription.php">Formulaire candidat (sans compte)</a> — demande d’inscription en attente de validation.</p>
             <form method="post" class="compact">
                 <input type="hidden" name="next" value="<?= h($next) ?>">
                 <label>Mot de passe <input name="password" type="password" required autocomplete="current-password" autofocus style="color:#111;background:#fff;-webkit-text-fill-color:#111;caret-color:#111;"></label>
-                <button type="submit" class="btn" style="margin-top:0.75rem;">Se connecter</button>
+                <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;margin-top:0.85rem;">
+                    <button type="submit" class="btn">Se connecter</button>
+                    <a href="inscription.php" class="btn secondary"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Demande d'inscription</a>
+                </div>
+                <p class="muted" style="margin:0.65rem 0 0;font-size:0.82rem;">Pas encore de compte ? Soumettez une demande d'inscription en attente de validation.</p>
             </form>
         </div>
     </div>
