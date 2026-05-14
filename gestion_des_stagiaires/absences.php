@@ -47,7 +47,12 @@ if (isset($_GET['edit'])) {
     $st->execute([(int) $_GET['edit']]);
     $edit = $st->fetch();
 }
-$rows = $pdo->query('SELECT a.*, s.matricule, s.nom, f.nom_filiere, m.nom_module FROM absences a JOIN stagiaires s ON s.id_stagiaire=a.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=a.id_module ORDER BY a.date_absence DESC')->fetchAll();
+$rows = $pdo->query('SELECT a.*, s.matricule, s.nom, s.prenom, f.id_filiere, f.nom_filiere, m.nom_module FROM absences a JOIN stagiaires s ON s.id_stagiaire=a.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=a.id_module ORDER BY a.date_absence DESC')->fetchAll();
+// Count absences per stagiaire so each row can be tagged with a 'volume' level
+$absCounts = [];
+foreach ($pdo->query('SELECT id_stagiaire, COUNT(*) AS n FROM absences GROUP BY id_stagiaire') as $cr) {
+    $absCounts[(int) $cr['id_stagiaire']] = (int) $cr['n'];
+}
 ?>
 <div class="card">
 <form method="post" class="compact" data-filiere-form="true">
@@ -89,15 +94,71 @@ $rows = $pdo->query('SELECT a.*, s.matricule, s.nom, f.nom_filiere, m.nom_module
 </form>
 </div>
 <div class="card">
-<table class="data">
+<fieldset class="compact no-print" style="margin-bottom:1rem;">
+    <legend>Filtrer les absences</legend>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
+        <select id="flt-abs-filiere">
+            <option value="">— Toutes —</option>
+            <?php foreach ($filieres as $fi): ?>
+                <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
+        <input id="flt-abs-search" type="search" placeholder="Nom, prénom ou matricule…" style="min-width:220px;">
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Statut
+        <select id="flt-abs-statut">
+            <option value="">— Toutes —</option>
+            <option value="1">Justifiées</option>
+            <option value="0">Non justifiées</option>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Absentéisme
+        <select id="flt-abs-level">
+            <option value="">— Tous —</option>
+            <option value="0-2">Peu (&lt; 3)</option>
+            <option value="3-6">Moyen (3 – 6)</option>
+            <option value="7-99999">Beaucoup (&gt; 6)</option>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
+        <select id="flt-abs-sort">
+            <option value="date_desc" data-sort-key="date" data-sort-dir="desc">Plus récentes d'abord</option>
+            <option value="date_asc"  data-sort-key="date" data-sort-dir="asc">Plus anciennes d'abord</option>
+            <option value="name"      data-sort-key="name">Nom du stagiaire</option>
+            <option value="count_desc" data-sort-key="abscount" data-sort-num="1" data-sort-dir="desc">Volume d'absences (haut → bas)</option>
+            <option value="count_asc"  data-sort-key="abscount" data-sort-num="1" data-sort-dir="asc">Volume d'absences (bas → haut)</option>
+        </select>
+    </label>
+    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichées : <span id="flt-abs-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
+</fieldset>
+<table class="data" id="liste-abs-table">
+    <thead>
     <tr><th>ID</th><th>Date</th><th>Filière</th><th>Module</th><th>Justifiée</th><th>Stagiaire</th><th class="no-print"></th></tr>
+    </thead>
+    <tbody>
     <?php foreach ($rows as $r): ?>
-        <tr>
+        <?php
+        $rowSid = (int) $r['id_stagiaire'];
+        $rowName = (string) $r['nom'] . ' ' . (string) $r['prenom'];
+        $absN = $absCounts[$rowSid] ?? 0;
+        ?>
+        <tr data-filterable="1"
+            data-id="<?= (int) $r['id_absence'] ?>"
+            data-filiere="<?= (int) ($r['id_filiere'] ?? 0) ?>"
+            data-statut="<?= (int) $r['est_justifiee'] ?>"
+            data-level="<?= $absN ?>"
+            data-abscount="<?= $absN ?>"
+            data-date="<?= h((string) $r['date_absence']) ?>"
+            data-name="<?= h($rowName) ?>"
+            data-matricule="<?= h((string) $r['matricule']) ?>">
             <td><?= (int) $r['id_absence'] ?></td>
             <td><?= h((string) $r['date_absence']) ?></td>
+            <td><?= h(gds_filiere_code((string) $r['nom_filiere'])) ?></td>
             <td><?= h((string) ($r['nom_module'] ?? '—')) ?></td>
             <td><?= (int) $r['est_justifiee'] ? 'oui' : 'non' ?></td>
-            <td><?= h((string) $r['matricule']) ?></td>
+            <td><?= h((string) $r['matricule'] . ' — ' . $rowName) ?></td>
             <td class="link-row no-print">
                 <a href="print_billet_excuse.php?id=<?= (int) $r['id_absence'] ?>" target="_blank">Billet d’excuse</a>
                 <a href="absences.php?edit=<?= (int) $r['id_absence'] ?>">Modifier</a>
@@ -108,6 +169,23 @@ $rows = $pdo->query('SELECT a.*, s.matricule, s.nom, f.nom_filiere, m.nom_module
             </td>
         </tr>
     <?php endforeach; ?>
+    </tbody>
 </table>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.gdsTableFilter) return;
+    window.gdsTableFilter({
+        table: '#liste-abs-table',
+        counter: '#flt-abs-count',
+        controls: [
+            { selector: '#flt-abs-filiere', field: 'filiere', type: 'equals' },
+            { selector: '#flt-abs-statut',  field: 'statut',  type: 'equals' },
+            { selector: '#flt-abs-level',   field: 'level',   type: 'range' },
+            { selector: '#flt-abs-search',  field: 'search',  type: 'contains', searchFields: ['name', 'matricule'] },
+            { selector: '#flt-abs-sort',    field: 'sort',    type: 'sort' }
+        ]
+    });
+});
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

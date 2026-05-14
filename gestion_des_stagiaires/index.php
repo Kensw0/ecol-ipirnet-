@@ -17,8 +17,7 @@ $nbDemandes = (int) $pdo->query("SELECT COUNT(*) FROM demandes_inscription WHERE
 $stats = [
     ['k' => 'Stagiaires', 'n' => $nbStag],
     ['k' => 'Demandes inscription (attente)', 'n' => $nbDemandes],
-    ['k' => 'Notes (lignes)', 'n' => (int) $pdo->query('SELECT COUNT(*) FROM evaluer')->fetchColumn()],
-    ['k' => 'g_notes', 'n' => (int) $pdo->query('SELECT COUNT(*) FROM g_notes')->fetchColumn()],
+    ['k' => 'Notes (synthèse)', 'n' => (int) $pdo->query('SELECT COUNT(*) FROM g_notes')->fetchColumn()],
     ['k' => 'Cotisations payées (' . $moisCourant . ')', 'n' => $nbPayeCeMois],
     ['k' => 'Sans cotisation ce mois', 'n' => $nbSansCotisation],
     ['k' => 'Absences (30j)', 'n' => (int) $pdo->query("SELECT COUNT(*) FROM absences WHERE date_absence >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)")->fetchColumn()],
@@ -32,7 +31,7 @@ $stats = [
                 <strong>Inscription en ligne</strong> (candidats : <a href="inscription.php" target="_blank" rel="noopener">formulaire public</a> → file d’attente jusqu’à validation),
                 <strong>saisie directe</strong> par l’admin sur Stagiaires,
                 <strong>cotisation mensuelle</strong> (marquage payé / non payé par mois sur la liste des stagiaires — pas d’entité ECHEANCE Merise),
-                <strong>pédagogie</strong> (notes, moyennes auto, g_notes, absences, stages/PFE/soutenance),
+                <strong>pédagogie</strong> (notes de synthèse, moyennes auto, absences, stages/PFE/soutenance),
                 <strong>documents officiels</strong> imprimables (certificat, relevé, bulletin, billet, convention, attestation, état des cotisations).
                 Référentiel pédagogique (filières, classes, modules) : données en <strong>base uniquement</strong>. Le <strong>CRUD stagiaire</strong> reste sur <strong>Stagiaires</strong>.
                 <strong>Accès</strong> : espace admin après <code>login.php</code> ; formulaire candidat sans compte sur <code>inscription.php</code>.

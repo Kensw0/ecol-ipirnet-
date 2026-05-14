@@ -25,6 +25,7 @@ $gdsFrenchDate = static function (): string {
     <link rel="stylesheet" href="assets/css/app.css?v=3">
     <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=3">
     <script defer src="assets/js/filiere-filter.js?v=1"></script>
+    <script defer src="assets/js/gds-table-filter.js?v=1"></script>
     <?php if ($isPublic): ?>
     <style>
         /* Inline fallback for the public candidature form: black text on white inputs */
@@ -93,7 +94,6 @@ $gdsFrenchDate = static function (): string {
             </div>
             <div class="nav-group">
                 <span class="nav-label">Pédagogie</span>
-                <a href="evaluer.php" class="nav-item<?= $curPage === 'evaluer' ? ' active' : '' ?>"><i class="fa-solid fa-pen-to-square"></i> <span>Notes</span></a>
                 <a href="moyennes.php" class="nav-item<?= $curPage === 'moyennes' ? ' active' : '' ?>"><i class="fa-solid fa-chart-line"></i> <span>Moyennes</span></a>
                 <a href="g_notes.php" class="nav-item<?= $curPage === 'g_notes' ? ' active' : '' ?>"><i class="fa-solid fa-file-lines"></i> <span>Notes</span></a>
                 <a href="absences.php" class="nav-item<?= $curPage === 'absences' ? ' active' : '' ?>"><i class="fa-solid fa-calendar-xmark"></i> <span>Absences</span></a>

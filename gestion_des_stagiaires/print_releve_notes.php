@@ -23,7 +23,8 @@ if (!$s) {
 }
 log_document_gen($pdo, 'releve_notes', $id, (string) $s['matricule']);
 
-$notes = $pdo->prepare('SELECT e.*, m.nom_module FROM evaluer e JOIN modules m ON m.id_module=e.id_module WHERE e.id_stagiaire=? ORDER BY m.nom_module, e.date_evaluation');
+// Notes de synthèse (g_notes) — single source of truth depuis la refonte CDC.
+$notes = $pdo->prepare('SELECT g.id_g_note, g.id_module, g.libelle, g.semestre, g.moyenne_synthese, g.commentaire, g.date_enregistrement, m.nom_module FROM g_notes g JOIN modules m ON m.id_module = g.id_module WHERE g.id_stagiaire = ? AND g.moyenne_synthese IS NOT NULL ORDER BY m.nom_module, g.date_enregistrement');
 $notes->execute([$id]);
 $rows = $notes->fetchAll();
 
@@ -38,13 +39,13 @@ foreach ($byModule as $mname => $list) {
     $sum = 0.0;
     $c = 0;
     foreach ($list as $r) {
-        $sum += (float) $r['valeur_note'];
+        $sum += (float) $r['moyenne_synthese'];
         $c++;
     }
     $moyMod[$mname] = $c > 0 ? round($sum / $c, 2) : null;
 }
 
-$moy = $pdo->prepare('SELECT ROUND(AVG(valeur_note),2) FROM evaluer WHERE id_stagiaire=?');
+$moy = $pdo->prepare('SELECT ROUND(AVG(moyenne_synthese),2) FROM g_notes WHERE id_stagiaire = ? AND moyenne_synthese IS NOT NULL');
 $moy->execute([$id]);
 $gm = $moy->fetchColumn();
 
@@ -355,9 +356,9 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
                     <?php foreach ($list as $i => $r): ?>
                         <tr>
                             <td><?= $i === 0 ? h($mname) : '' ?></td>
-                            <td class="type"><?= h((string) $r['type_evaluation']) ?></td>
-                            <td class="date"><?= h($fmtFr((string) $r['date_evaluation'])) ?></td>
-                            <td class="num"><?= h($fmtNote($r['valeur_note'])) ?></td>
+                            <td class="type"><?= h((string) ($r['libelle'] ?? '')) ?></td>
+                            <td class="date"><?= h($fmtFr((string) $r['date_enregistrement'])) ?></td>
+                            <td class="num"><?= h($fmtNote($r['moyenne_synthese'])) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endforeach; ?>
