@@ -47,13 +47,13 @@ $stats = [
         </div>
         <div class="card">
             <h2>Raccourcis</h2>
-            <p class="link-row">
-                <a href="demandes_inscription.php">Demandes d’inscription</a>
-                <a href="stagiaires.php">Stagiaires (cotisation du mois)</a>
-                <a href="moyennes.php">Moyennes</a>
-                <a href="alertes.php">Alertes</a>
-                <a href="documents_officiels.php">Documents officiels</a>
-            </p>
+            <div class="gds-shortcut-row">
+                <a class="gds-shortcut" href="demandes_inscription.php"><i class="fa-solid fa-clock" aria-hidden="true"></i> Demandes d’inscription</a>
+                <a class="gds-shortcut" href="stagiaires.php"><i class="fa-solid fa-users" aria-hidden="true"></i> Stagiaires (cotisation du mois)</a>
+                <a class="gds-shortcut" href="moyennes.php"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Moyennes</a>
+                <a class="gds-shortcut" href="alertes.php"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Alertes</a>
+                <a class="gds-shortcut" href="documents_officiels.php"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Documents officiels</a>
+            </div>
         </div>
     </div>
     <aside class="dash-aside no-print">
