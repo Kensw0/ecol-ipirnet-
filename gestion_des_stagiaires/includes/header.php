@@ -59,8 +59,8 @@ $gdsFrenchDate = static function (): string {
 <div class="public-shell">
     <header class="public-shell__header">
         <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-            <a href="inscription.php" style="display:inline-flex;align-items:center;gap:.6rem;">
-                <img src="assets/img/logo.png" alt="IPIRNET" class="brand-logo-img" width="160" height="48" style="max-height:48px;width:auto;height:auto;object-fit:contain;">
+            <a href="login.php" style="display:inline-flex;align-items:center;gap:.6rem;" title="Retour à la page de connexion">
+                <img src="assets/img/logo.png" alt="IPIRNET — retour à l'accueil" class="brand-logo-img" width="160" height="48" style="max-height:48px;width:auto;height:auto;object-fit:contain;">
             </a>
             <nav style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
                 <a class="btn btn--sm btn--ghost" href="inscription.php">Candidature en ligne</a>
