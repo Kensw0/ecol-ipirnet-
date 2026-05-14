@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
-$id = (int) ($_GET['id'] ?? 0);
+$id  = (int) ($_GET['id']  ?? 0);
 $mid = (int) ($_GET['mid'] ?? 0);
-$st = $pdo->prepare('SELECT * FROM v_stagiaires_detail WHERE id_stagiaire=?');
+$st  = $pdo->prepare('SELECT * FROM v_stagiaires_detail WHERE id_stagiaire=?');
 $st->execute([$id]);
 $s = $st->fetch();
 if (!$s || $mid <= 0) {
@@ -13,12 +13,21 @@ if (!$s || $mid <= 0) {
 $mod = $pdo->prepare('SELECT nom_module FROM modules WHERE id_module=?');
 $mod->execute([$mid]);
 $mname = (string) ($mod->fetchColumn() ?: '');
-$notes = $pdo->prepare('SELECT * FROM g_notes WHERE id_stagiaire=? AND id_module=? AND moyenne_synthese IS NOT NULL ORDER BY date_enregistrement');
+
+// Use evaluer as the single source of truth (g_notes removed)
+$notes = $pdo->prepare(
+    'SELECT valeur_note, type_evaluation AS libelle, date_evaluation, commentaire
+       FROM evaluer
+      WHERE id_stagiaire=? AND id_module=?
+      ORDER BY date_evaluation'
+);
 $notes->execute([$id, $mid]);
 $rows = $notes->fetchAll();
-$moy = $pdo->prepare('SELECT ROUND(AVG(moyenne_synthese),2) FROM g_notes WHERE id_stagiaire=? AND id_module=? AND moyenne_synthese IS NOT NULL');
+
+$moy = $pdo->prepare('SELECT ROUND(AVG(valeur_note),2) FROM evaluer WHERE id_stagiaire=? AND id_module=?');
 $moy->execute([$id, $mid]);
 $mm = $moy->fetchColumn();
+
 log_document_gen($pdo, 'bulletin', $id, (string) $s['matricule'] . '-M' . $mid);
 $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
 ?><!DOCTYPE html>
@@ -69,13 +78,13 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
             <tbody>
                 <?php foreach ($rows as $r): ?>
                     <tr>
-                        <td><?= h((string) $r['date_enregistrement']) ?></td>
-                        <td><?= h((string) ($r['libelle'] ?? '')) ?></td>
-                        <td><?= h((string) $r['moyenne_synthese']) ?></td>
+                        <td><?= h((string) $r['date_evaluation']) ?></td>
+                        <td><?= h(ucfirst((string) ($r['libelle'] ?? ''))) ?></td>
+                        <td><?= h((string) $r['valeur_note']) ?></td>
                         <td><?= h((string) ($r['commentaire'] ?? '')) ?></td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$rows): ?><tr><td colspan="4"><em>Aucune note enregistrée.</em></td></tr><?php endif; ?>
+                <?php if (!$rows): ?><tr><td colspan="4"><em>Aucune évaluation enregistrée.</em></td></tr><?php endif; ?>
             </tbody>
             <tfoot>
                 <tr><th colspan="2">Moyenne du module</th><th colspan="2"><?= h((string) ($mm ?? '—')) ?> / 20</th></tr>
