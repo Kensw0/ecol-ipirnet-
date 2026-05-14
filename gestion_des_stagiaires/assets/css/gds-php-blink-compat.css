@@ -342,11 +342,17 @@ form.inline {
 }
 
 .sidebar-footer .btn-outline {
+  background: transparent !important;
   color: #fafafa !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+}
+.sidebar-footer .btn-outline i,
+.sidebar-footer .btn-outline span {
+  color: #fafafa !important;
 }
 .sidebar-footer .btn-outline:hover {
   background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.48) !important;
 }
 
 /* Sidebar logo image */
