@@ -50,7 +50,7 @@ if (isset($_GET['edit'])) {
     $edit = $st->fetch();
 }
 
-$rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
+$rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.id_filiere, f.nom_filiere, m.nom_module FROM g_notes g JOIN stagiaires s ON s.id_stagiaire=g.id_stagiaire JOIN classes c ON c.id_classe = s.id_classe JOIN filieres f ON f.id_filiere = c.id_filiere LEFT JOIN modules m ON m.id_module=g.id_module ORDER BY g.date_enregistrement DESC')->fetchAll();
 ?>
 <div class="card">
 <form method="post" class="compact" data-filiere-form="true">
@@ -95,16 +95,65 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.
 </form>
 </div>
 <div class="card">
-<table class="data">
+<fieldset class="compact no-print" style="margin-bottom:1rem;">
+    <legend>Filtrer les notes</legend>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
+        <select id="flt-not-filiere">
+            <option value="">— Toutes —</option>
+            <?php foreach ($filieres as $fi): ?>
+                <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
+        <input id="flt-not-search" type="search" placeholder="Nom, prénom, matricule ou libellé…" style="min-width:240px;">
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Note
+        <select id="flt-not-level">
+            <option value="">— Toutes —</option>
+            <option value="0-9.99">Faible (&lt; 10)</option>
+            <option value="10-13.99">Passable (10 – 13.99)</option>
+            <option value="14-15.99">Bien (14 – 15.99)</option>
+            <option value="16-20">Très bien (≥ 16)</option>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
+        <select id="flt-not-sort">
+            <option value="date_desc"  data-sort-key="date"      data-sort-dir="desc">Date d'enregistrement ↓</option>
+            <option value="date_asc"   data-sort-key="date"      data-sort-dir="asc">Date d'enregistrement ↑</option>
+            <option value="name"       data-sort-key="name">Ordre alphabétique (Nom)</option>
+            <option value="matricule"  data-sort-key="matricule">Par matricule</option>
+            <option value="note_desc"  data-sort-key="note"      data-sort-num="1" data-sort-dir="desc">Note ↓ (haut → bas)</option>
+            <option value="note_asc"   data-sort-key="note"      data-sort-num="1" data-sort-dir="asc">Note ↑ (bas → haut)</option>
+        </select>
+    </label>
+    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichées : <span id="flt-not-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
+</fieldset>
+<table class="data" id="liste-not-table">
+    <thead>
     <tr><th>ID</th><th>Libellé</th><th>Année</th><th>Moy.</th><th>Stagiaire</th><th>Module</th><th class="no-print"></th></tr>
+    </thead>
+    <tbody>
     <?php foreach ($rows as $r): ?>
-        <tr>
+        <?php
+        $rowName = (string) $r['nom'] . ' ' . (string) $r['prenom'];
+        $noteVal = $r['moyenne_synthese'] !== null ? (float) $r['moyenne_synthese'] : null;
+        ?>
+        <tr data-filterable="1"
+            data-id="<?= (int) $r['id_g_note'] ?>"
+            data-filiere="<?= (int) ($r['id_filiere'] ?? 0) ?>"
+            data-name="<?= h($rowName) ?>"
+            data-matricule="<?= h((string) $r['matricule']) ?>"
+            data-libelle="<?= h((string) $r['libelle']) ?>"
+            data-note="<?= $noteVal !== null ? h(number_format($noteVal, 2, '.', '')) : '' ?>"
+            data-level="<?= $noteVal !== null ? h(number_format($noteVal, 2, '.', '')) : '-1' ?>"
+            data-date="<?= h((string) $r['date_enregistrement']) ?>">
             <td><?= (int) $r['id_g_note'] ?></td>
             <td><?= h((string) $r['libelle']) ?></td>
             <td><?= h((string) $r['annee_scolaire']) ?></td>
             <td><?= h((string) ($r['moyenne_synthese'] ?? '')) ?></td>
-            <td><?= h((string) $r['matricule']) ?></td>
-            <td><?= h((string) ($r['nom_module'] ?? '—')) ?></td>
+            <td><?= h((string) $r['matricule'] . ' — ' . $rowName) ?></td>
+            <td><?= h(gds_module_label((string) ($r['nom_module'] ?? '—'))) ?></td>
             <td class="link-row no-print">
                 <a href="g_notes.php?edit=<?= (int) $r['id_g_note'] ?>">Modifier</a>
                 <form class="inline" method="post" onsubmit="return confirm('Supprimer ?');">
@@ -114,6 +163,22 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.nom_filiere, m.
             </td>
         </tr>
     <?php endforeach; ?>
+    </tbody>
 </table>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.gdsTableFilter) return;
+    window.gdsTableFilter({
+        table: '#liste-not-table',
+        counter: '#flt-not-count',
+        controls: [
+            { selector: '#flt-not-filiere', field: 'filiere', type: 'equals' },
+            { selector: '#flt-not-level',   field: 'level',   type: 'range' },
+            { selector: '#flt-not-search',  field: 'search',  type: 'contains', searchFields: ['name', 'matricule', 'libelle'] },
+            { selector: '#flt-not-sort',    field: 'sort',    type: 'sort' }
+        ]
+    });
+});
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

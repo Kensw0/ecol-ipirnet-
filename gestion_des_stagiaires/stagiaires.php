@@ -102,7 +102,8 @@ if (isset($_GET['edit'])) {
     $st->execute([(int) $_GET['edit']]);
     $edit = $st->fetch();
 }
-$rows = $pdo->query('SELECT * FROM v_stagiaires_detail ORDER BY nom, prenom')->fetchAll();
+$filieresList = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere')->fetchAll();
+$rows = $pdo->query('SELECT v.*, c.id_filiere FROM v_stagiaires_detail v JOIN classes c ON c.id_classe = v.id_classe ORDER BY v.nom, v.prenom')->fetchAll();
 $mensPaid = [];
 if ($rows) {
     $ids = array_map(static fn ($r) => (int) $r['id_stagiaire'], $rows);
@@ -181,23 +182,65 @@ if ($rows) {
 <div class="card" id="liste-stagiaires">
 <h2 class="no-print" style="margin:0 0 0.5rem;font-size:1.1rem;">Liste des stagiaires</h2>
 <p class="no-print" style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem;">
-    Cotisation mensuelle (sans échéances Merise) : choisissez le mois, puis indiquez pour chaque stagiaire s’il a payé ce mois-ci.
+    Cotisation mensuelle (sans échéances Merise) : choisissez le mois à afficher, filtrez et triez la liste librement.
 </p>
-<form method="get" action="stagiaires.php#liste-stagiaires" class="compact no-print" style="margin-bottom:1rem;">
-    <label>Mois affiché <input type="month" name="mois" value="<?= h($listMoisNav) ?>"></label>
-    <button type="submit" class="btn secondary">Afficher la liste pour ce mois</button>
-</form>
-<table class="data">
+<fieldset class="compact no-print" style="margin-bottom:1rem;">
+    <legend>Filtrer la liste</legend>
+    <form method="get" action="stagiaires.php#liste-stagiaires" class="inline" style="display:inline-flex;align-items:center;gap:.4rem;margin-right:.75rem;">
+        <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Mois affiché <input type="month" name="mois" value="<?= h($listMoisNav) ?>" onchange="this.form.submit()"></label>
+    </form>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
+        <select id="flt-stag-filiere">
+            <option value="">— Toutes —</option>
+            <?php foreach ($filieresList as $fp): ?>
+                <option value="<?= (int) $fp['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Classe
+        <select id="flt-stag-classe">
+            <option value="">— Toutes —</option>
+            <?php foreach ($classes as $cp): ?>
+                <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
+        <input id="flt-stag-search" type="search" placeholder="Nom, prénom ou matricule…" style="min-width:220px;">
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
+        <select id="flt-stag-sort">
+            <option value="nom" data-sort-key="name">Ordre alphabétique (Nom)</option>
+            <option value="matricule" data-sort-key="matricule">Par matricule (Code)</option>
+            <option value="id" data-sort-key="id" data-sort-num="1">Par ID</option>
+            <option value="filiere" data-sort-key="filierename">Par filière</option>
+            <option value="classe" data-sort-key="classename">Par classe</option>
+        </select>
+    </label>
+    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichés : <span id="flt-stag-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
+</fieldset>
+<table class="data" id="liste-stagiaires-table">
+    <thead>
     <tr><th>ID</th><th>Matricule</th><th>Nom</th><th>Classe</th><th>Filière</th><th>Cotisation <?= h($listMoisNav) ?></th><th class="no-print"></th></tr>
+    </thead>
+    <tbody>
     <?php foreach ($rows as $r): ?>
         <?php
         $sid = (int) $r['id_stagiaire'];
         $paid = $mensPaid[$sid] ?? false;
+        $rowName = (string) $r['nom'] . ' ' . (string) $r['prenom'];
         ?>
-        <tr>
+        <tr data-filterable="1"
+            data-id="<?= $sid ?>"
+            data-filiere="<?= (int) ($r['id_filiere'] ?? 0) ?>"
+            data-filierename="<?= h((string) $r['nom_filiere']) ?>"
+            data-classe="<?= (int) ($r['id_classe'] ?? 0) ?>"
+            data-classename="<?= h((string) $r['nom_classe']) ?>"
+            data-name="<?= h($rowName) ?>"
+            data-matricule="<?= h((string) $r['matricule']) ?>">
             <td><?= $sid ?></td>
             <td><?= h((string) $r['matricule']) ?></td>
-            <td><?= h((string) $r['nom'] . ' ' . (string) $r['prenom']) ?></td>
+            <td><?= h($rowName) ?></td>
             <td><?= h((string) $r['nom_classe']) ?></td>
             <td><?= h((string) $r['nom_filiere']) ?></td>
             <td class="no-print">
@@ -224,6 +267,22 @@ if ($rows) {
             </td>
         </tr>
     <?php endforeach; ?>
+    </tbody>
 </table>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.gdsTableFilter) return;
+    window.gdsTableFilter({
+        table: '#liste-stagiaires-table',
+        counter: '#flt-stag-count',
+        controls: [
+            { selector: '#flt-stag-filiere', field: 'filiere', type: 'equals' },
+            { selector: '#flt-stag-classe',  field: 'classe',  type: 'equals' },
+            { selector: '#flt-stag-search',  field: 'search',  type: 'contains', searchFields: ['name', 'matricule'] },
+            { selector: '#flt-stag-sort',    field: 'sort',    type: 'sort' }
+        ]
+    });
+});
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
