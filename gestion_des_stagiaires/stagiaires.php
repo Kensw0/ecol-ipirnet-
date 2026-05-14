@@ -80,10 +80,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare($sql)->execute($params);
             flash_set('Stagiaire mis à jour.');
         } else {
+            // Auto-generate matricule if left empty: INS-YYYY-NNNNN
+            if ($mat === '') {
+                $year = date('Y', strtotime($di));
+                $st = $pdo->prepare(
+                    "SELECT COUNT(*) FROM stagiaires
+                     WHERE matricule LIKE ?
+                       AND matricule REGEXP '^INS-[0-9]{4}-[0-9]{5}$'"
+                );
+                $st->execute(['INS-' . $year . '-%']);
+                $count = (int) $st->fetchColumn();
+                $mat = 'INS-' . $year . '-' . str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
+            }
             $hash = $pwHash ?? password_hash('changeme', PASSWORD_DEFAULT);
             $pdo->prepare('INSERT INTO stagiaires (matricule, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                 ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telpNull, $tuteurNull, $hash, $photo === '' ? null : $photo, $di, $cid]);
-            flash_set('Stagiaire créé (matricule vide = auto). Mot de passe par défaut « changeme » si vide.');
+            flash_set('Stagiaire créé avec matricule « ' . $mat . ' ». Mot de passe par défaut « changeme » si vide.');
         }
         $lm = (string) ($_POST['list_mois'] ?? '');
         $redirMois = preg_match('/^\d{4}-\d{2}$/', $lm) ? $lm : $listMoisNav;
@@ -95,7 +107,7 @@ $curPage = 'stagiaires';
 $pageTitle = 'Stagiaires';
 require __DIR__ . '/includes/header.php';
 
-$classes = $pdo->query('SELECT c.id_classe, c.nom_classe, c.annee_scolaire, f.nom_filiere FROM classes c JOIN filieres f ON f.id_filiere=c.id_filiere ORDER BY c.annee_scolaire, c.nom_classe')->fetchAll();
+$classes = $pdo->query('SELECT c.id_classe, c.nom_classe, c.annee_scolaire, f.id_filiere, f.nom_filiere FROM classes c JOIN filieres f ON f.id_filiere=c.id_filiere ORDER BY f.nom_filiere, c.annee_scolaire, c.nom_classe')->fetchAll();
 $edit = null;
 if (isset($_GET['edit'])) {
     $st = $pdo->prepare('SELECT * FROM stagiaires WHERE id_stagiaire = ?');
@@ -112,6 +124,24 @@ if ($rows) {
     $st->execute(array_merge([$listMoisNav], $ids));
     foreach ($st->fetchAll() as $m) {
         $mensPaid[(int) $m['id_stagiaire']] = (int) $m['est_paye'] === 1;
+    }
+}
+
+// Build classes JSON for JS filtering (filiere -> classes)
+$classesJson = json_encode(array_map(static fn($c) => [
+    'id'       => (int) $c['id_classe'],
+    'nom'      => $c['nom_classe'] . ' — ' . $c['annee_scolaire'],
+    'filiere'  => (int) $c['id_filiere'],
+], $classes));
+
+// Determine current filiere for edit mode
+$editFiliereId = 0;
+if ($edit) {
+    foreach ($classes as $c) {
+        if ((int)$c['id_classe'] === (int)$edit['id_classe']) {
+            $editFiliereId = (int)$c['id_filiere'];
+            break;
+        }
     }
 }
 ?>
@@ -134,11 +164,23 @@ if ($rows) {
         <label>Mot de passe <?= $edit ? '(vide = inchangé)' : '(vide = changeme)' ?> <input name="mot_de_passe" type="password" autocomplete="new-password"></label>
         <label>Photo (chemin/URL) <input name="photo" value="<?= h((string) ($edit['photo'] ?? '')) ?>"></label>
         <label>Date inscription <input type="date" name="date_inscription" required value="<?= h((string) ($edit['date_inscription'] ?? date('Y-m-d'))) ?>"></label>
+        <label>Filière
+            <select id="form-filiere-select">
+                <option value="">— Choisir une filière —</option>
+                <?php foreach ($filieresList as $fp): ?>
+                    <option value="<?= (int) $fp['id_filiere'] ?>" <?= $editFiliereId === (int)$fp['id_filiere'] ? 'selected' : '' ?>><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label>Classe
-            <select name="id_classe" required>
-                <option value=""></option>
+            <select name="id_classe" id="form-classe-select" required>
+                <option value="">— Choisir une classe —</option>
                 <?php foreach ($classes as $c): ?>
-                    <option value="<?= (int) $c['id_classe'] ?>" <?= ($edit && (int)$edit['id_classe'] === (int)$c['id_classe']) ? 'selected' : '' ?>><?= h($c['nom_classe'] . ' — ' . $c['annee_scolaire'] . ' (' . $c['nom_filiere'] . ')') ?></option>
+                    <option value="<?= (int) $c['id_classe'] ?>"
+                            data-filiere="<?= (int) $c['id_filiere'] ?>"
+                            <?= ($edit && (int)$edit['id_classe'] === (int)$c['id_classe']) ? 'selected' : '' ?>>
+                        <?= h($c['nom_classe'] . ' — ' . $c['annee_scolaire']) ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -147,23 +189,56 @@ if ($rows) {
     </fieldset>
 </form>
 </div>
+
+<script>
+(function () {
+    var filiereSelect = document.getElementById('form-filiere-select');
+    var classeSelect  = document.getElementById('form-classe-select');
+    if (!filiereSelect || !classeSelect) return;
+
+    var allOptions = Array.from(classeSelect.querySelectorAll('option[data-filiere]'));
+
+    function filterClasses() {
+        var fid = filiereSelect.value;
+        var currentVal = classeSelect.value;
+        // Show/hide options based on selected filiere
+        allOptions.forEach(function (opt) {
+            var match = fid === '' || opt.dataset.filiere === fid;
+            opt.style.display = match ? '' : 'none';
+            opt.disabled = !match;
+        });
+        // Reset if current selection no longer valid
+        if (currentVal && classeSelect.querySelector('option[value="' + currentVal + '"]')?.disabled) {
+            classeSelect.value = '';
+        }
+    }
+
+    filiereSelect.addEventListener('change', filterClasses);
+    // Run on load to set correct state when editing
+    filterClasses();
+})();
+</script>
+
 <div class="card no-print">
-    <form method="get" action="print_liste_stagiaires.php" target="_blank" class="compact">
+    <form method="get" action="print_liste_stagiaires.php" target="_blank" class="compact" id="print-form">
         <fieldset>
             <legend>Imprimer la liste des stagiaires</legend>
             <label>Filière
-                <select name="id_filiere">
+                <select name="id_filiere" id="print-filiere-select">
                     <option value="">— Toutes —</option>
-                    <?php foreach ($pdo->query('SELECT id_filiere, nom_filiere FROM filieres ORDER BY nom_filiere') as $fp): ?>
+                    <?php foreach ($filieresList as $fp): ?>
                         <option value="<?= (int) $fp['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
             <label>Classe
-                <select name="id_classe">
+                <select name="id_classe" id="print-classe-select">
                     <option value="">— Toutes —</option>
                     <?php foreach ($classes as $cp): ?>
-                        <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
+                        <option value="<?= (int) $cp['id_classe'] ?>"
+                                data-filiere="<?= (int) $cp['id_filiere'] ?>">
+                            <?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -179,6 +254,32 @@ if ($rows) {
         </fieldset>
     </form>
 </div>
+
+<script>
+(function () {
+    var filiereSelect = document.getElementById('print-filiere-select');
+    var classeSelect  = document.getElementById('print-classe-select');
+    if (!filiereSelect || !classeSelect) return;
+
+    var allOptions = Array.from(classeSelect.querySelectorAll('option[data-filiere]'));
+
+    function filterClasses() {
+        var fid = filiereSelect.value;
+        allOptions.forEach(function (opt) {
+            var match = fid === '' || opt.dataset.filiere === fid;
+            opt.style.display = match ? '' : 'none';
+            opt.disabled = !match;
+        });
+        if (fid !== '' && classeSelect.querySelector('option[value="' + classeSelect.value + '"]')?.disabled) {
+            classeSelect.value = '';
+        }
+    }
+
+    filiereSelect.addEventListener('change', filterClasses);
+    filterClasses();
+})();
+</script>
+
 <div class="card" id="liste-stagiaires">
 <h2 class="no-print" style="margin:0 0 0.5rem;font-size:1.1rem;">Liste des stagiaires</h2>
 <p class="no-print" style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem;">
@@ -204,7 +305,10 @@ if ($rows) {
             <select id="flt-stag-classe">
                 <option value="">— Toutes —</option>
                 <?php foreach ($classes as $cp): ?>
-                    <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
+                    <option value="<?= (int) $cp['id_classe'] ?>"
+                            data-filiere="<?= (int) $cp['id_filiere'] ?>">
+                        <?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -230,6 +334,30 @@ if ($rows) {
         </label>
     </div>
 </section>
+
+<script>
+(function () {
+    var fltFiliere = document.getElementById('flt-stag-filiere');
+    var fltClasse  = document.getElementById('flt-stag-classe');
+    if (!fltFiliere || !fltClasse) return;
+
+    var allOpts = Array.from(fltClasse.querySelectorAll('option[data-filiere]'));
+
+    fltFiliere.addEventListener('change', function () {
+        var fid = fltFiliere.value;
+        allOpts.forEach(function (opt) {
+            var match = fid === '' || opt.dataset.filiere === fid;
+            opt.style.display = match ? '' : 'none';
+            opt.disabled = !match;
+        });
+        if (fid !== '' && fltClasse.querySelector('option[value="' + fltClasse.value + '"]')?.disabled) {
+            fltClasse.value = '';
+            fltClasse.dispatchEvent(new Event('change'));
+        }
+    });
+})();
+</script>
+
 <table class="data" id="liste-stagiaires-table">
     <thead>
     <tr><th>ID</th><th>Matricule</th><th>Nom</th><th>Classe</th><th>Filière</th><th>Cotisation <?= h($listMoisNav) ?></th><th class="no-print"></th></tr>
