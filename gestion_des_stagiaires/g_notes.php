@@ -95,40 +95,48 @@ $rows = $pdo->query('SELECT g.*, s.matricule, s.nom, s.prenom, f.id_filiere, f.n
 </form>
 </div>
 <div class="card">
-<fieldset class="compact no-print" style="margin-bottom:1rem;">
-    <legend>Filtrer les notes</legend>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
-        <select id="flt-not-filiere">
-            <option value="">— Toutes —</option>
-            <?php foreach ($filieres as $fi): ?>
-                <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
-        <input id="flt-not-search" type="search" placeholder="Nom, prénom, matricule ou libellé…" style="min-width:240px;">
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Note
-        <select id="flt-not-level">
-            <option value="">— Toutes —</option>
-            <option value="0-9.99">Faible (&lt; 10)</option>
-            <option value="10-13.99">Passable (10 – 13.99)</option>
-            <option value="14-15.99">Bien (14 – 15.99)</option>
-            <option value="16-20">Très bien (≥ 16)</option>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
-        <select id="flt-not-sort">
-            <option value="date_desc"  data-sort-key="date"      data-sort-dir="desc">Date d'enregistrement ↓</option>
-            <option value="date_asc"   data-sort-key="date"      data-sort-dir="asc">Date d'enregistrement ↑</option>
-            <option value="name"       data-sort-key="name">Ordre alphabétique (Nom)</option>
-            <option value="matricule"  data-sort-key="matricule">Par matricule</option>
-            <option value="note_desc"  data-sort-key="note"      data-sort-num="1" data-sort-dir="desc">Note ↓ (haut → bas)</option>
-            <option value="note_asc"   data-sort-key="note"      data-sort-num="1" data-sort-dir="asc">Note ↑ (bas → haut)</option>
-        </select>
-    </label>
-    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichées : <span id="flt-not-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
-</fieldset>
+<section class="gds-filter-bar no-print">
+    <header class="gds-filter-bar__header">
+        <h3 class="gds-filter-bar__title">Filtrer les notes</h3>
+        <span class="gds-filter-bar__count">Affichées : <strong id="flt-not-count"><?= count($rows) ?></strong> / <?= count($rows) ?></span>
+    </header>
+    <div class="gds-filter-bar__grid">
+        <label class="gds-filter-bar__field">
+            <span>Filière</span>
+            <select id="flt-not-filiere">
+                <option value="">— Toutes —</option>
+                <?php foreach ($filieres as $fi): ?>
+                    <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Recherche</span>
+            <input id="flt-not-search" type="search" placeholder="Nom, prénom, matricule ou libellé…">
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Niveau de note</span>
+            <select id="flt-not-level">
+                <option value="">— Toutes —</option>
+                <option value="0-9.99">Faible (&lt; 10)</option>
+                <option value="10-13.99">Passable (10 – 13.99)</option>
+                <option value="14-15.99">Bien (14 – 15.99)</option>
+                <option value="16-20">Très bien (≥ 16)</option>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Tri</span>
+            <select id="flt-not-sort">
+                <option value="date_desc" data-sort-key="date" data-sort-dir="desc">Date d'enregistrement ↓</option>
+                <option value="date_asc"  data-sort-key="date" data-sort-dir="asc">Date d'enregistrement ↑</option>
+                <option value="name"      data-sort-key="name">Ordre alphabétique (Nom)</option>
+                <option value="matricule" data-sort-key="matricule">Par matricule</option>
+                <option value="note_desc" data-sort-key="note" data-sort-num="1" data-sort-dir="desc">Note ↓ (haut → bas)</option>
+                <option value="note_asc"  data-sort-key="note" data-sort-num="1" data-sort-dir="asc">Note ↑ (bas → haut)</option>
+            </select>
+        </label>
+    </div>
+</section>
 <table class="data" id="liste-not-table">
     <thead>
     <tr><th>ID</th><th>Libellé</th><th>Année</th><th>Moy.</th><th>Stagiaire</th><th>Module</th><th class="no-print"></th></tr>

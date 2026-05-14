@@ -23,7 +23,7 @@ $gdsFrenchDate = static function (): string {
     <title><?= h($pageTitle) ?> — IPIRNET</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="assets/css/app.css?v=3">
-    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=3">
+    <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=4">
     <script defer src="assets/js/filiere-filter.js?v=1"></script>
     <script defer src="assets/js/gds-table-filter.js?v=1"></script>
     <?php if ($isPublic): ?>
