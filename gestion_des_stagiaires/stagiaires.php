@@ -184,41 +184,52 @@ if ($rows) {
 <p class="no-print" style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem;">
     Cotisation mensuelle (sans échéances Merise) : choisissez le mois à afficher, filtrez et triez la liste librement.
 </p>
-<fieldset class="compact no-print" style="margin-bottom:1rem;">
-    <legend>Filtrer la liste</legend>
-    <form method="get" action="stagiaires.php#liste-stagiaires" class="inline" style="display:inline-flex;align-items:center;gap:.4rem;margin-right:.75rem;">
-        <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Mois affiché <input type="month" name="mois" value="<?= h($listMoisNav) ?>" onchange="this.form.submit()"></label>
-    </form>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
-        <select id="flt-stag-filiere">
-            <option value="">— Toutes —</option>
-            <?php foreach ($filieresList as $fp): ?>
-                <option value="<?= (int) $fp['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Classe
-        <select id="flt-stag-classe">
-            <option value="">— Toutes —</option>
-            <?php foreach ($classes as $cp): ?>
-                <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
-        <input id="flt-stag-search" type="search" placeholder="Nom, prénom ou matricule…" style="min-width:220px;">
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
-        <select id="flt-stag-sort">
-            <option value="nom" data-sort-key="name">Ordre alphabétique (Nom)</option>
-            <option value="matricule" data-sort-key="matricule">Par matricule (Code)</option>
-            <option value="id" data-sort-key="id" data-sort-num="1">Par ID</option>
-            <option value="filiere" data-sort-key="filierename">Par filière</option>
-            <option value="classe" data-sort-key="classename">Par classe</option>
-        </select>
-    </label>
-    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichés : <span id="flt-stag-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
-</fieldset>
+<section class="gds-filter-bar no-print">
+    <header class="gds-filter-bar__header">
+        <h3 class="gds-filter-bar__title">Filtrer la liste</h3>
+        <span class="gds-filter-bar__count">Affichés : <strong id="flt-stag-count"><?= count($rows) ?></strong> / <?= count($rows) ?></span>
+    </header>
+    <div class="gds-filter-bar__grid">
+        <label class="gds-filter-bar__field">
+            <span>Filière</span>
+            <select id="flt-stag-filiere">
+                <option value="">— Toutes —</option>
+                <?php foreach ($filieresList as $fp): ?>
+                    <option value="<?= (int) $fp['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fp['nom_filiere']) . ' — ' . gds_fix_text((string) $fp['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Classe</span>
+            <select id="flt-stag-classe">
+                <option value="">— Toutes —</option>
+                <?php foreach ($classes as $cp): ?>
+                    <option value="<?= (int) $cp['id_classe'] ?>"><?= h($cp['nom_classe'] . ' — ' . $cp['annee_scolaire'] . ' (' . gds_filiere_code((string) $cp['nom_filiere']) . ')') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Recherche</span>
+            <input id="flt-stag-search" type="search" placeholder="Nom, prénom ou matricule…">
+        </label>
+        <form method="get" action="stagiaires.php#liste-stagiaires" class="gds-filter-bar__form">
+            <label class="gds-filter-bar__field">
+                <span>Mois affiché (cotisation)</span>
+                <input type="month" name="mois" value="<?= h($listMoisNav) ?>" onchange="this.form.submit()">
+            </label>
+        </form>
+        <label class="gds-filter-bar__field">
+            <span>Tri</span>
+            <select id="flt-stag-sort">
+                <option value="nom"       data-sort-key="name">Ordre alphabétique (Nom)</option>
+                <option value="matricule" data-sort-key="matricule">Par matricule (Code)</option>
+                <option value="id"        data-sort-key="id" data-sort-num="1">Par ID</option>
+                <option value="filiere"   data-sort-key="filierename">Par filière</option>
+                <option value="classe"    data-sort-key="classename">Par classe</option>
+            </select>
+        </label>
+    </div>
+</section>
 <table class="data" id="liste-stagiaires-table">
     <thead>
     <tr><th>ID</th><th>Matricule</th><th>Nom</th><th>Classe</th><th>Filière</th><th>Cotisation <?= h($listMoisNav) ?></th><th class="no-print"></th></tr>

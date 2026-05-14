@@ -796,3 +796,95 @@ body.paper-page {
   margin: 14px 0 0;
   line-height: 1.55;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Reusable filter bar (Stagiaires / Notes / Absences tables)
+   ───────────────────────────────────────────────────────────── */
+.gds-filter-bar {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.gds-filter-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.gds-filter-bar__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(250, 250, 250, 0.78);
+}
+.gds-filter-bar__count {
+  font-size: 0.82rem;
+  color: rgba(244, 244, 245, 0.55);
+  white-space: nowrap;
+}
+.gds-filter-bar__count strong {
+  color: rgba(250, 250, 250, 0.88);
+  font-weight: 700;
+}
+.gds-filter-bar__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.85rem 0.9rem;
+  align-items: end;
+}
+.gds-filter-bar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+}
+.gds-filter-bar__field > span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 245, 0.6);
+}
+.gds-filter-bar__field select,
+.gds-filter-bar__field input {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.32);
+  color: #fafafa;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.gds-filter-bar__field input::placeholder {
+  color: rgba(244, 244, 245, 0.35);
+}
+.gds-filter-bar__field select:focus,
+.gds-filter-bar__field input:focus {
+  outline: none;
+  border-color: rgba(236, 72, 153, 0.65);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.18);
+}
+.gds-filter-bar__field input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 0.4rem;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.gds-filter-bar__form {
+  display: contents;
+}

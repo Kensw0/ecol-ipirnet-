@@ -94,45 +94,54 @@ foreach ($pdo->query('SELECT id_stagiaire, COUNT(*) AS n FROM absences GROUP BY 
 </form>
 </div>
 <div class="card">
-<fieldset class="compact no-print" style="margin-bottom:1rem;">
-    <legend>Filtrer les absences</legend>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Filière
-        <select id="flt-abs-filiere">
-            <option value="">— Toutes —</option>
-            <?php foreach ($filieres as $fi): ?>
-                <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Recherche
-        <input id="flt-abs-search" type="search" placeholder="Nom, prénom ou matricule…" style="min-width:220px;">
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Statut
-        <select id="flt-abs-statut">
-            <option value="">— Toutes —</option>
-            <option value="1">Justifiées</option>
-            <option value="0">Non justifiées</option>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0 .75rem 0 0;">Absentéisme
-        <select id="flt-abs-level">
-            <option value="">— Tous —</option>
-            <option value="0-2">Peu (&lt; 3)</option>
-            <option value="3-6">Moyen (3 – 6)</option>
-            <option value="7-99999">Beaucoup (&gt; 6)</option>
-        </select>
-    </label>
-    <label style="display:inline-flex;align-items:center;gap:.4rem;margin:0;">Tri
-        <select id="flt-abs-sort">
-            <option value="date_desc" data-sort-key="date" data-sort-dir="desc">Plus récentes d'abord</option>
-            <option value="date_asc"  data-sort-key="date" data-sort-dir="asc">Plus anciennes d'abord</option>
-            <option value="name"      data-sort-key="name">Nom du stagiaire</option>
-            <option value="count_desc" data-sort-key="abscount" data-sort-num="1" data-sort-dir="desc">Volume d'absences (haut → bas)</option>
-            <option value="count_asc"  data-sort-key="abscount" data-sort-num="1" data-sort-dir="asc">Volume d'absences (bas → haut)</option>
-        </select>
-    </label>
-    <span class="no-print" style="margin-left:.75rem;color:var(--muted);font-size:.9rem;">Affichées : <span id="flt-abs-count"><?= count($rows) ?></span> / <?= count($rows) ?></span>
-</fieldset>
+<section class="gds-filter-bar no-print">
+    <header class="gds-filter-bar__header">
+        <h3 class="gds-filter-bar__title">Filtrer les absences</h3>
+        <span class="gds-filter-bar__count">Affichées : <strong id="flt-abs-count"><?= count($rows) ?></strong> / <?= count($rows) ?></span>
+    </header>
+    <div class="gds-filter-bar__grid">
+        <label class="gds-filter-bar__field">
+            <span>Filière</span>
+            <select id="flt-abs-filiere">
+                <option value="">— Toutes —</option>
+                <?php foreach ($filieres as $fi): ?>
+                    <option value="<?= (int) $fi['id_filiere'] ?>"><?= h(gds_filiere_code((string) $fi['nom_filiere']) . ' — ' . gds_fix_text((string) $fi['nom_filiere'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Recherche</span>
+            <input id="flt-abs-search" type="search" placeholder="Nom, prénom ou matricule…">
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Statut</span>
+            <select id="flt-abs-statut">
+                <option value="">— Toutes —</option>
+                <option value="1">Justifiées</option>
+                <option value="0">Non justifiées</option>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Absentéisme</span>
+            <select id="flt-abs-level">
+                <option value="">— Tous —</option>
+                <option value="0-2">Peu (&lt; 3)</option>
+                <option value="3-6">Moyen (3 – 6)</option>
+                <option value="7-99999">Beaucoup (&gt; 6)</option>
+            </select>
+        </label>
+        <label class="gds-filter-bar__field">
+            <span>Tri</span>
+            <select id="flt-abs-sort">
+                <option value="date_desc"  data-sort-key="date" data-sort-dir="desc">Plus récentes d'abord</option>
+                <option value="date_asc"   data-sort-key="date" data-sort-dir="asc">Plus anciennes d'abord</option>
+                <option value="name"       data-sort-key="name">Nom du stagiaire</option>
+                <option value="count_desc" data-sort-key="abscount" data-sort-num="1" data-sort-dir="desc">Volume d'absences ↓</option>
+                <option value="count_asc"  data-sort-key="abscount" data-sort-num="1" data-sort-dir="asc">Volume d'absences ↑</option>
+            </select>
+        </label>
+    </div>
+</section>
 <table class="data" id="liste-abs-table">
     <thead>
     <tr><th>ID</th><th>Date</th><th>Filière</th><th>Module</th><th>Justifiée</th><th>Stagiaire</th><th class="no-print"></th></tr>
