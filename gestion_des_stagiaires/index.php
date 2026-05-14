@@ -17,7 +17,7 @@ $nbDemandes = (int) $pdo->query("SELECT COUNT(*) FROM demandes_inscription WHERE
 $stats = [
     ['k' => 'Stagiaires', 'n' => $nbStag],
     ['k' => 'Demandes inscription (attente)', 'n' => $nbDemandes],
-    ['k' => 'Notes (synthèse)', 'n' => (int) $pdo->query('SELECT COUNT(*) FROM g_notes')->fetchColumn()],
+    ['k' => 'Évaluations (notes)', 'n' => (int) $pdo->query('SELECT COUNT(*) FROM evaluer')->fetchColumn()],
     ['k' => 'Cotisations payées (' . $moisCourant . ')', 'n' => $nbPayeCeMois],
     ['k' => 'Sans cotisation ce mois', 'n' => $nbSansCotisation],
     ['k' => 'Absences (30j)', 'n' => (int) $pdo->query("SELECT COUNT(*) FROM absences WHERE date_absence >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)")->fetchColumn()],
