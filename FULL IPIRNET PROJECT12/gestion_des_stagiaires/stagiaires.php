@@ -144,6 +144,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('stagiaires.php?id=' . $sid);
     }
 
+    // QUICK SAVE STAGE
+    if (isset($_POST['quick_save_stage'])) {
+        $sid  = (int)($_POST['id_stagiaire'] ?? 0);
+        $ts   = (string)($_POST['type_stage'] ?? 'stage_entreprise');
+        if (!in_array($ts, ['stage_entreprise', 'pfe'], true)) $ts = 'stage_entreprise';
+        $su   = trim((string)($_POST['sujet'] ?? ''));
+        $en   = trim((string)($_POST['entreprise'] ?? ''));
+        $dd   = ($_POST['date_debut'] ?? '') === '' ? null : (string)$_POST['date_debut'];
+        $df   = ($_POST['date_fin']   ?? '') === '' ? null : (string)$_POST['date_fin'];
+        $ns   = ($_POST['note_stage'] ?? '') === '' ? null : (float)str_replace(',', '.', (string)$_POST['note_stage']);
+        $cu   = trim((string)($_POST['convention_url'] ?? ''));
+        $ru   = trim((string)($_POST['rapport_url'] ?? ''));
+        $ev   = trim((string)($_POST['evaluation_entreprise'] ?? ''));
+        $ds   = ($_POST['date_soutenance'] ?? '') === '' ? null : (string)$_POST['date_soutenance'];
+        $ju   = trim((string)($_POST['jury'] ?? ''));
+        if ($sid > 0) {
+            $stg_id = (int)($_POST['id_stage'] ?? 0);
+            if ($stg_id > 0) {
+                $pdo->prepare('UPDATE stages SET type_stage=?,sujet=?,entreprise=?,date_debut=?,date_fin=?,note_stage=?,convention_url=?,rapport_url=?,evaluation_entreprise=?,date_soutenance=?,jury=? WHERE id_stage=? AND id_stagiaire=?')
+                    ->execute([$ts,$su===''?null:$su,$en===''?null:$en,$dd,$df,$ns,$cu===''?null:$cu,$ru===''?null:$ru,$ev===''?null:$ev,$ds,$ju===''?null:$ju,$stg_id,$sid]);
+                flash_set('Stage mis à jour.');
+            } else {
+                $pdo->prepare('INSERT INTO stages (type_stage,sujet,entreprise,date_debut,date_fin,note_stage,convention_url,rapport_url,evaluation_entreprise,date_soutenance,jury,id_stagiaire) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$ts,$su===''?null:$su,$en===''?null:$en,$dd,$df,$ns,$cu===''?null:$cu,$ru===''?null:$ru,$ev===''?null:$ev,$ds,$ju===''?null:$ju,$sid]);
+                flash_set('Stage ajouté avec succès.');
+            }
+        }
+        redirect('stagiaires.php?id=' . $sid . '&hub_tab=hub-stages');
+    }
+
+    // QUICK DELETE STAGE
+    if (isset($_POST['quick_delete_stage'])) {
+        $sid    = (int)($_POST['id_stagiaire'] ?? 0);
+        $stg_id = (int)($_POST['id_stage'] ?? 0);
+        if ($sid > 0 && $stg_id > 0) {
+            $pdo->prepare('DELETE FROM stages WHERE id_stage = ? AND id_stagiaire = ?')->execute([$stg_id, $sid]);
+            flash_set('Stage supprimé.');
+        }
+        redirect('stagiaires.php?id=' . $sid . '&hub_tab=hub-stages');
+    }
+
+    // QUICK DELETE ABSENCE
+    if (isset($_POST['quick_delete_absence'])) {
+        $sid    = (int)($_POST['id_stagiaire'] ?? 0);
+        $abs_id = (int)($_POST['id_absence'] ?? 0);
+        if ($sid > 0 && $abs_id > 0) {
+            $pdo->prepare('DELETE FROM absences WHERE id_absence = ? AND id_stagiaire = ?')->execute([$abs_id, $sid]);
+            flash_set('Absence supprimée.');
+        }
+        redirect('stagiaires.php?id=' . $sid . '&hub_tab=hub-absences');
+    }
+
+    // QUICK DELETE NOTE
+    if (isset($_POST['quick_delete_note'])) {
+        $sid = (int)($_POST['id_stagiaire'] ?? 0);
+        $mid = (int)($_POST['id_module'] ?? 0);
+        if ($sid > 0 && $mid > 0) {
+            $pdo->prepare('DELETE FROM module_notes WHERE id_stagiaire = ? AND id_module = ?')->execute([$sid, $mid]);
+            flash_set('Notes supprimées.');
+        }
+        redirect('stagiaires.php?id=' . $sid . '&hub_tab=hub-bulletin');
+    }
+
     redirect('stagiaires.php?mois=' . urlencode($listMoisNav));
 }
 
@@ -366,6 +429,21 @@ if (isset($_GET['id'])) {
         $stMod = $pdo->prepare('SELECT id_module, nom_module FROM modules WHERE id_filiere = ? ORDER BY nom_module');
         $stMod->execute([(int)$selectedStudent['id_filiere']]);
         $mods = $stMod->fetchAll();
+
+        // FETCH STAGES for hub
+        $stStages = $pdo->prepare('SELECT * FROM stages WHERE id_stagiaire = ? ORDER BY date_debut DESC');
+        $stStages->execute([$targetId]);
+        $hubStages = $stStages->fetchAll();
+
+        // FETCH DOCUMENTS HISTORY for hub
+        $stDocHist = $pdo->prepare('SELECT id_gen, type_document, reference, genere_le FROM documents_generes WHERE id_stagiaire = ? ORDER BY genere_le DESC LIMIT 15');
+        $stDocHist->execute([$targetId]);
+        $hubDocHistory = $stDocHist->fetchAll();
+
+        // ACTIVE HUB TAB (from redirect after save)
+        $activeHubTab = isset($_GET['hub_tab']) ? preg_replace('/[^a-z\-]/', '', (string)$_GET['hub_tab']) : 'hub-overview';
+        $validHubTabs = ['hub-overview','hub-absences','hub-bulletin','hub-stages','hub-docs'];
+        if (!in_array($activeHubTab, $validHubTabs)) $activeHubTab = 'hub-overview';
     }
 }
 
@@ -527,15 +605,16 @@ if (isset($_GET['id'])) {
 
         <!-- HUB TAB NAVIGATION -->
         <div class="hub-tabs">
-            <button class="hub-tab-btn active" onclick="switchHubTab(event, 'hub-overview')">Vue d'ensemble</button>
-            <button class="hub-tab-btn" onclick="switchHubTab(event, 'hub-absences')">Absences</button>
-            <button class="hub-tab-btn" onclick="switchHubTab(event, 'hub-bulletin')">Bulletin & Notes</button>
-            <button class="hub-tab-btn" onclick="switchHubTab(event, 'hub-docs')">Documents</button>
+            <button class="hub-tab-btn <?= $activeHubTab === 'hub-overview' ? 'active' : '' ?>" onclick="switchHubTab(event, 'hub-overview')">Vue d'ensemble</button>
+            <button class="hub-tab-btn <?= $activeHubTab === 'hub-absences' ? 'active' : '' ?>" onclick="switchHubTab(event, 'hub-absences')">Absences</button>
+            <button class="hub-tab-btn <?= $activeHubTab === 'hub-bulletin' ? 'active' : '' ?>" onclick="switchHubTab(event, 'hub-bulletin')">Bulletin & Notes</button>
+            <button class="hub-tab-btn <?= $activeHubTab === 'hub-stages' ? 'active' : '' ?>" onclick="switchHubTab(event, 'hub-stages')">Stages & PFE</button>
+            <button class="hub-tab-btn <?= $activeHubTab === 'hub-docs' ? 'active' : '' ?>" onclick="switchHubTab(event, 'hub-docs')">Documents</button>
         </div>
         <!-- HUB TAB CONTENT -->
         <div class="hub-content" style="padding: 0 2rem 2rem;">
             <!-- TAB: OVERVIEW -->
-            <div id="hub-overview" class="hub-tab-pane active" style="display:block;">
+            <div id="hub-overview" class="hub-tab-pane <?= $activeHubTab === 'hub-overview' ? 'active' : '' ?>" style="<?= $activeHubTab === 'hub-overview' ? 'display:block;' : 'display:none;' ?>">
                 <div class="hub-dashboard-grid-v2">
                     <div class="mini-card red" onclick="switchHubTab(null, 'hub-absences')">
                         <div class="mini-card-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
@@ -601,7 +680,7 @@ if (isset($_GET['id'])) {
             </div>
 
             <!-- TAB: ABSENCES -->
-            <div id="hub-absences" class="hub-tab-pane">
+            <div id="hub-absences" class="hub-tab-pane <?= $activeHubTab === 'hub-absences' ? 'active' : '' ?>" style="<?= $activeHubTab === 'hub-absences' ? 'display:block;' : 'display:none;' ?>">
                 <div class="detailed-tab-header">
                     <h2>Registre des Absences</h2>
                     <button type="button" onclick="document.getElementById('modal-quick-absence').style.display='flex'" class="btn-hub-action primary small"><i class="fa-solid fa-plus"></i> Ajouter</button>
@@ -615,6 +694,7 @@ if (isset($_GET['id'])) {
                                 <th style="text-align:center;">Horaires</th>
                                 <th style="text-align:center;">Statut</th>
                                 <th>Justificatif</th>
+                                <th style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -622,17 +702,24 @@ if (isset($_GET['id'])) {
                                 <tr>
                                     <td style="font-weight:700; color:#000;"><?= date('d/m/Y', strtotime($abs['date_absence'])) ?></td>
                                     <td style="color:#000;"><?= h($abs['nom_module'] ?: 'Hors module') ?></td>
-                                    <td style="text-align:center; color:#71717a;"><?= substr($abs['heure_debut'], 0, 5) ?> - <?= substr($abs['heure_fin'], 0, 5) ?></td>
+                                    <td style="text-align:center; color:#71717a;"><?= substr($abs['heure_debut'] ?? '', 0, 5) ?> - <?= substr($abs['heure_fin'] ?? '', 0, 5) ?></td>
                                     <td style="text-align:center;">
                                         <span class="badge <?= $abs['est_justifiee'] ? 'badge-success' : 'badge-danger' ?>">
                                             <?= $abs['est_justifiee'] ? 'Justifiée' : 'Non justifiée' ?>
                                         </span>
                                     </td>
                                     <td style="color:#71717a; font-style:italic; font-size:0.85rem;"><?= h((string)($abs['justificatif'] ?? '—')) ?></td>
+                                    <td style="text-align:center;">
+                                        <form method="post" onsubmit="return confirm('Supprimer cette absence ?');" style="display:inline;">
+                                            <input type="hidden" name="id_stagiaire" value="<?= (int)$selectedStudent['id_stagiaire'] ?>">
+                                            <input type="hidden" name="id_absence" value="<?= (int)$abs['id_absence'] ?>">
+                                            <button type="submit" name="quick_delete_absence" value="1" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             <?php if (!$absences): ?>
-                                <tr><td colspan="5" style="text-align:center; padding:3rem; color:#71717a;">Aucune absence pour ce stagiaire.</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:3rem; color:#71717a;">Aucune absence pour ce stagiaire.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -640,7 +727,7 @@ if (isset($_GET['id'])) {
             </div>
 
             <!-- TAB: BULLETIN (Notes) -->
-            <div id="hub-bulletin" class="hub-tab-pane">
+            <div id="hub-bulletin" class="hub-tab-pane <?= $activeHubTab === 'hub-bulletin' ? 'active' : '' ?>" style="<?= $activeHubTab === 'hub-bulletin' ? 'display:block;' : 'display:none;' ?>">
                 <div class="detailed-tab-header">
                     <h2>Bulletin de Notes & Évaluations</h2>
                     <button type="button" onclick="document.getElementById('modal-quick-note').style.display='flex'" class="btn-hub-action primary small"><i class="fa-solid fa-plus"></i></button>
@@ -654,14 +741,18 @@ if (isset($_GET['id'])) {
                                 <th style="text-align:center;">Théorique (30%)</th>
                                 <th style="text-align:center;">Pratique (30%)</th>
                                 <th style="text-align:center;">Moyenne</th>
+                                <th style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($notes)): ?>
-                                <tr><td colspan="5" style="text-align:center; padding:3rem; color:var(--muted);">Aucune note enregistrée pour le moment.</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:3rem; color:var(--muted);">Aucune note enregistrée pour le moment.</td></tr>
                             <?php else: ?>
-                                <?php foreach ($notes as $n): 
-                                    $m_note = ($n['note_controle'] ?? 0) * 0.4 + ($n['note_theorique'] ?? 0) * 0.3 + ($n['note_pratique'] ?? 0) * 0.3;
+                                <?php 
+                                    $sumMoy = 0; $cntMoy = 0;
+                                    foreach ($notes as $n): 
+                                        $m_note = ($n['note_controle'] ?? 0) * 0.4 + ($n['note_theorique'] ?? 0) * 0.3 + ($n['note_pratique'] ?? 0) * 0.3;
+                                        $sumMoy += $m_note; $cntMoy++;
                                 ?>
                                     <tr>
                                         <td style="font-weight:700; color:#000;"><?= h($n['nom_module']) ?></td>
@@ -669,8 +760,22 @@ if (isset($_GET['id'])) {
                                         <td style="text-align:center;"><?= isset($n['note_theorique']) ? number_format((float)$n['note_theorique'], 2) : '—' ?></td>
                                         <td style="text-align:center;"><?= isset($n['note_pratique']) ? number_format((float)$n['note_pratique'], 2) : '—' ?></td>
                                         <td style="text-align:center; font-weight:bold; color:var(--primary);"><?= number_format($m_note, 2) ?></td>
+                                        <td style="text-align:center;">
+                                            <form method="post" onsubmit="return confirm('Supprimer les notes de ce module ?');" style="display:inline;">
+                                                <input type="hidden" name="id_stagiaire" value="<?= (int)$selectedStudent['id_stagiaire'] ?>">
+                                                <input type="hidden" name="id_module" value="<?= (int)$n['id_module'] ?>">
+                                                <button type="submit" name="quick_delete_note" value="1" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
+                                <?php if ($cntMoy > 0): ?>
+                                    <tr style="background:#f0fdf4;">
+                                        <td colspan="4" style="font-weight:800; color:#166534; text-align:right; padding-right:2rem;">MOYENNE GÉNÉRALE</td>
+                                        <td style="text-align:center; font-weight:900; color:#16a34a; font-size:1.1rem;"><?= number_format($sumMoy/$cntMoy, 2) ?> / 20</td>
+                                        <td></td>
+                                    </tr>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -678,7 +783,84 @@ if (isset($_GET['id'])) {
             </div>
 
             <!-- TAB: DOCUMENTS -->
-            <div id="hub-docs" class="hub-tab-pane">
+            <!-- TAB: STAGES & PFE -->
+            <div id="hub-stages" class="hub-tab-pane <?= $activeHubTab === 'hub-stages' ? 'active' : '' ?>" style="<?= $activeHubTab === 'hub-stages' ? 'display:block;' : 'display:none;' ?>">
+                <div class="detailed-tab-header">
+                    <h2>Stages & PFE</h2>
+                    <button type="button" onclick="openStageModal(null)" class="btn-hub-action primary small"><i class="fa-solid fa-plus"></i> Ajouter un stage</button>
+                </div>
+                <?php if (empty($hubStages)): ?>
+                    <div style="text-align:center; padding:3rem; color:#71717a; background:rgba(255,255,255,0.02); border-radius:12px; border:1px dashed rgba(255,255,255,0.08);">
+                        <i class="fa-solid fa-building-columns" style="font-size:2rem; margin-bottom:1rem; display:block; color:#3f3f46;"></i>
+                        Aucun stage ou PFE enregistré pour ce stagiaire.
+                    </div>
+                <?php else: ?>
+                <div class="card detail-table-card">
+                    <table class="data-v2">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Entreprise / Sujet</th>
+                                <th style="text-align:center;">Période</th>
+                                <th style="text-align:center;">Note</th>
+                                <th style="text-align:center;">Statut</th>
+                                <th style="text-align:center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($hubStages as $stg):
+                            $today_s = date('Y-m-d');
+                            $dd_s = $stg['date_debut'] ?? '';
+                            $df_s = $stg['date_fin']   ?? '';
+                            $ds_s = $stg['date_soutenance'] ?? '';
+                            if ($ds_s && $ds_s < $today_s) { $stageBadge = '<span class="badge" style="background:rgba(139,92,246,0.1);color:#8b5cf6;">Soutenu</span>'; }
+                            elseif ($df_s && $today_s > $df_s) {
+                                $stageBadge = empty($stg['rapport_url'])
+                                    ? '<span class="badge badge-danger">Rapport manquant</span>'
+                                    : '<span class="badge badge-success">Terminé</span>';
+                            } elseif ($dd_s && $df_s && $today_s >= $dd_s && $today_s <= $df_s) {
+                                $stageBadge = '<span class="badge" style="background:rgba(59,130,246,0.1);color:#3b82f6;">En cours</span>';
+                            } else {
+                                $stageBadge = '<span class="badge" style="background:rgba(250,204,21,0.1);color:#ca8a04;">Planifié</span>';
+                            }
+                        ?>
+                            <tr>
+                                <td><span class="badge" style="<?= $stg['type_stage']==='pfe'?'background:rgba(168,85,247,0.1);color:#a855f7;':'background:rgba(20,184,166,0.1);color:#14b8a6;' ?>">
+                                    <?= $stg['type_stage'] === 'pfe' ? 'PFE' : 'Stage Entreprise' ?>
+                                </span></td>
+                                <td>
+                                    <strong style="color:#000;"><?= h((string)($stg['entreprise'] ?? '—')) ?></strong>
+                                    <?php if ($stg['sujet']): ?><br><small style="color:#71717a;"><?= h((string)$stg['sujet']) ?></small><?php endif; ?>
+                                </td>
+                                <td style="text-align:center; color:#71717a; font-size:0.85rem;">
+                                    <?= $dd_s ? date('d/m/Y', strtotime($dd_s)) : '—' ?><br>
+                                    <?= $df_s ? '→ '.date('d/m/Y', strtotime($df_s)) : '' ?>
+                                </td>
+                                <td style="text-align:center; font-weight:700; color:<?= $stg['note_stage'] !== null ? ($stg['note_stage'] >= 10 ? '#16a34a' : '#ef4444') : '#a1a1aa' ?>;">
+                                    <?= $stg['note_stage'] !== null ? number_format((float)$stg['note_stage'], 2).' / 20' : '—' ?>
+                                </td>
+                                <td style="text-align:center;"><?= $stageBadge ?></td>
+                                <td style="text-align:center;">
+                                    <?php if ($stg['convention_url']): ?>
+                                        <a href="<?= h((string)$stg['convention_url']) ?>" target="_blank" title="Convention" style="color:#3b82f6; margin-right:6px;"><i class="fa-solid fa-file-contract"></i></a>
+                                    <?php endif; ?>
+                                    <a href="print_convention_stage.php?id=<?= (int)$stg['id_stage'] ?>" target="_blank" title="Imprimer convention" style="color:#a855f7; margin-right:6px;"><i class="fa-solid fa-print"></i></a>
+                                    <button type="button" onclick="openStageModal(<?= htmlspecialchars(json_encode($stg), ENT_QUOTES) ?>)" title="Modifier" style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:#3b82f6;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;margin-right:4px;"><i class="fa-solid fa-pen"></i></button>
+                                    <form method="post" onsubmit="return confirm('Supprimer ce stage ?');" style="display:inline;">
+                                        <input type="hidden" name="id_stagiaire" value="<?= (int)$selectedStudent['id_stagiaire'] ?>">
+                                        <input type="hidden" name="id_stage" value="<?= (int)$stg['id_stage'] ?>">
+                                        <button type="submit" name="quick_delete_stage" value="1" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+
+                        <div id="hub-docs" class="hub-tab-pane <?= $activeHubTab === 'hub-docs' ? 'active' : '' ?>" style="<?= $activeHubTab === 'hub-docs' ? 'display:block;' : 'display:none;' ?>">
                 <div class="detailed-tab-header">
                     <h2>Documents Administratifs</h2>
                 </div>
@@ -693,6 +875,35 @@ if (isset($_GET['id'])) {
                     <a href="print_etat_paiement.php?id=<?= $sid_doc ?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon red"><i class="fa-solid fa-file-invoice-dollar"></i></div><span>État Cotisations</span></a>
                     <a href="print_recu_paiement.php?id=<?= $sid_doc ?>&mois=<?=h(date('Y-m'))?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon pink"><i class="fa-solid fa-receipt"></i></div><span>Reçu de Paiement</span></a>
                 </div>
+
+                <!-- DOCUMENTS HISTORY -->
+                <?php if (!empty($hubDocHistory)): ?>
+                <div style="margin-top:2rem;">
+                    <div class="detailed-tab-header" style="margin-bottom:1rem;">
+                        <h2 style="font-size:1.2rem;">Historique des documents édités</h2>
+                    </div>
+                    <div class="card detail-table-card">
+                        <table class="data-v2">
+                            <thead>
+                                <tr>
+                                    <th>Date & Heure</th>
+                                    <th>Type de Document</th>
+                                    <th>Référence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($hubDocHistory as $dh): ?>
+                                    <tr>
+                                        <td style="color:#71717a; font-size:0.85rem;"><?= date('d/m/Y H:i', strtotime($dh['genere_le'])) ?></td>
+                                        <td style="font-weight:700; color:#000;"><?= h((string)$dh['type_document']) ?></td>
+                                        <td style="color:#71717a;"><?= h((string)($dh['reference'] ?? '—')) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -1034,6 +1245,33 @@ function saveInlineNote(sid, mid, field, val) {
         console.error(err);
     });
 }
+
+function openStageModal(stg) {
+    const modal = document.getElementById('modal-quick-stage');
+    if (!modal) return;
+    const form = modal.querySelector('form');
+    form.reset();
+    const titleEl = modal.querySelector('.modal-header h2');
+    if (stg) {
+        titleEl.textContent = 'Modifier le stage';
+        form.querySelector('[name="id_stage"]').value = stg.id_stage || '';
+        form.querySelector('[name="type_stage"]').value = stg.type_stage || 'stage_entreprise';
+        form.querySelector('[name="sujet"]').value = stg.sujet || '';
+        form.querySelector('[name="entreprise"]').value = stg.entreprise || '';
+        form.querySelector('[name="date_debut"]').value = stg.date_debut || '';
+        form.querySelector('[name="date_fin"]').value = stg.date_fin || '';
+        form.querySelector('[name="date_soutenance"]').value = stg.date_soutenance || '';
+        form.querySelector('[name="note_stage"]').value = stg.note_stage !== null ? stg.note_stage : '';
+        form.querySelector('[name="convention_url"]').value = stg.convention_url || '';
+        form.querySelector('[name="rapport_url"]').value = stg.rapport_url || '';
+        form.querySelector('[name="evaluation_entreprise"]').value = stg.evaluation_entreprise || '';
+        form.querySelector('[name="jury"]').value = stg.jury || '';
+    } else {
+        titleEl.textContent = 'Ajouter un stage / PFE';
+        form.querySelector('[name="id_stage"]').value = '';
+    }
+    modal.style.display = 'flex';
+}
 </script>
 
 <?php if ($selectedStudent): ?>
@@ -1134,6 +1372,60 @@ function saveInlineNote(sid, mid, field, val) {
                     <button type="submit" name="quick_save_note" value="1" class="btn btn-primary">
                         <i class="fa-solid fa-floppy-disk"></i> Créer la fiche de notes
                     </button>
+                </div>
+            </form>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php endif; ?>
+
+<?php if ($selectedStudent): ?>
+    <!-- STAGE MODAL -->
+    <div id="modal-quick-stage" class="modal-overlay" style="display:none; z-index:10000;">
+        <div class="modal-card" style="max-width:700px;">
+            <div class="modal-header">
+                <h2>Ajouter un stage / PFE</h2>
+                <button type="button" class="icon-btn" onclick="document.getElementById('modal-quick-stage').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form method="post" class="modal-form">
+                <input type="hidden" name="id_stagiaire" value="<?= (int)$selectedStudent['id_stagiaire'] ?>">
+                <input type="hidden" name="id_stage" value="">
+                <div class="modal-body">
+                    <fieldset class="modal-fieldset" style="grid-template-columns:1fr 1fr;">
+                        <label style="grid-column:span 2;">Type
+                            <select name="type_stage">
+                                <option value="stage_entreprise">Stage Entreprise</option>
+                                <option value="pfe">PFE</option>
+                            </select>
+                        </label>
+                        <label style="grid-column:span 2;">Entreprise / Organisme
+                            <input type="text" name="entreprise" placeholder="Ex: Maroc Telecom">
+                        </label>
+                        <label style="grid-column:span 2;">Sujet / Mission
+                            <input type="text" name="sujet" placeholder="Ex: Développement d'une application web">
+                        </label>
+                        <label>Date début <input type="date" name="date_debut"></label>
+                        <label>Date fin <input type="date" name="date_fin"></label>
+                        <label>Date soutenance (PFE) <input type="date" name="date_soutenance"></label>
+                        <label>Note de stage (/20) <input type="number" name="note_stage" min="0" max="20" step="0.01" placeholder="Ex: 15.50"></label>
+                        <label style="grid-column:span 2;">Jury / Modalités
+                            <input type="text" name="jury" placeholder="Ex: M. Dupont, Mme Martin">
+                        </label>
+                        <label style="grid-column:span 2;">URL Convention
+                            <input type="url" name="convention_url" placeholder="https://...">
+                        </label>
+                        <label style="grid-column:span 2;">URL Rapport PDF
+                            <input type="url" name="rapport_url" placeholder="https://...">
+                        </label>
+                        <label style="grid-column:span 2;">Appréciation Entreprise
+                            <input type="text" name="evaluation_entreprise" placeholder="Ex: Très bon stagiaire, motivé...">
+                        </label>
+                    </fieldset>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-quick-stage').style.display='none'">Annuler</button>
+                    <button type="submit" name="quick_save_stage" value="1" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
                 </div>
             </form>
         </div>
