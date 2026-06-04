@@ -1,0 +1,47 @@
+PROJET DE FIN D'ÉTUDES
+Gestion des Stagiaires – IPIRNET
+
+Contenu du dossier
+───────────────────
+• Dossier gestion_des_stagiaires   → Code source (PHP, HTML, CSS, JS)
+• Fichier gestion_des_stagiaires.sql → Base de données complète
+• Fichier INSTALL_IPIRNET.bat      → Script d'installation automatique
+• Dossier ANALYZE FINALE           → MCD, MLD, Dictionnaire, Schéma
+• Dossier screenshots              → Captures d'écran de l'application
+
+═══════════════════════════════════════════════════════════════
+  PROCÉDURE D'INSTALLATION
+═══════════════════════════════════════════════════════════════
+
+Méthode 1 : Installation automatique (RECOMMANDÉE)
+───────────────────────────────────────────────────
+  1. Installer XAMPP depuis : https://www.apachefriends.org
+     → Choisir le répertoire par défaut (C:\xampp)
+  2. Double-cliquer sur INSTALL_IPIRNET.bat
+     Le script fait TOUT automatiquement :
+       ✓ Détecte XAMPP (C:\, D:\, Program Files)
+       ✓ Copie le projet dans htdocs
+       ✓ Démarre Apache et MySQL
+       ✓ Crée la base de données
+       ✓ Importe le fichier SQL
+       ✓ Ouvre l'application dans le navigateur
+  3. Accéder au projet via :
+     http://localhost/gestion_des_stagiaires/
+
+Méthode 2 : Installation manuelle
+───────────────────────────────────
+  1. Installer XAMPP (https://www.apachefriends.org)
+  2. Démarrer Apache et MySQL via le panneau XAMPP
+  3. Copier le dossier gestion_des_stagiaires vers :
+     C:\xampp\htdocs\
+  4. Accéder à : http://localhost/phpmyadmin/
+  5. Créer une base nommée : gestion_des_stagiaires
+  6. Importer le fichier gestion_des_stagiaires.sql
+  7. Accéder au projet via :
+     http://localhost/gestion_des_stagiaires/
+
+═══════════════════════════════════════════════════════════════
+  Réalisé par : EL MEHDI BERGAM
+  Encadré par : Mr Abdoussi
+  Année scolaire : 2025 / 2026
+═══════════════════════════════════════════════════════════════
