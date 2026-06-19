@@ -1,0 +1,652 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/helpers.php';
+gds_require_admin_session();
+
+$pageTitle = 'Gestion des notes';
+$curPage   = 'notes';
+
+// ── UPDATE nb_controles ───────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_nb_controles'])) {
+    csrf_verify();
+    $id_module    = (int)($_POST['id_module']    ?? 0);
+    $nb_controles = max(1, min(10, (int)($_POST['nb_controles'] ?? 1)));
+    if ($id_module > 0) {
+        $pdo->prepare('UPDATE modules SET nb_controles = ? WHERE id_module = ?')
+            ->execute([$nb_controles, $id_module]);
+        flash_set("Nombre de contrôles mis à jour ($nb_controles).", 'success');
+    }
+    $qs = http_build_query([
+        'id_classe'  => $_POST['id_classe']  ?? '',
+        'id_module'  => $_POST['id_module']  ?? '',
+        'annee'      => $_POST['annee']      ?? '',
+        'id_filiere' => $_POST['id_filiere'] ?? '',
+        'niveau'     => $_POST['niveau']     ?? '',
+    ]);
+    header("Location: notes.php?$qs");
+    exit;
+}
+
+// ── BULK SAVE ────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_save_notes'])) {
+    csrf_verify();
+    $id_module    = (int)($_POST['id_module']    ?? 0);
+    $nb_controles = max(1, min(10, (int)($_POST['nb_controles'] ?? 1)));
+    $rows         = $_POST['notes'] ?? [];
+    $saved        = 0;
+
+    if ($id_module > 0 && is_array($rows)) {
+        $stmt = $pdo->prepare(
+            'INSERT INTO module_notes (id_stagiaire, id_module, note, type)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE note = VALUES(note)'
+        );
+        foreach ($rows as $sid => $vals) {
+            $sid = (int)$sid;
+            if ($sid <= 0) continue;
+
+            // Contrôles 1..nb_controles
+            for ($i = 1; $i <= $nb_controles; $i++) {
+                $key = "controle_$i";
+                $raw = $vals[$key] ?? '';
+                $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
+                $stmt->execute([$sid, $id_module, $val, $key]);
+            }
+            // Théorique
+            $raw = $vals['theorique'] ?? '';
+            $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
+            $stmt->execute([$sid, $id_module, $val, 'theorique']);
+            // Pratique
+            $raw = $vals['pratique'] ?? '';
+            $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
+            $stmt->execute([$sid, $id_module, $val, 'pratique']);
+
+            $saved++;
+        }
+    }
+    flash_set("Notes enregistrées pour $saved stagiaire(s).", 'success');
+    $qs = http_build_query([
+        'id_classe'  => $_POST['id_classe']  ?? '',
+        'id_module'  => $_POST['id_module']  ?? '',
+        'annee'      => $_POST['annee']      ?? '',
+        'id_filiere' => $_POST['id_filiere'] ?? '',
+        'niveau'     => $_POST['niveau']     ?? '',
+    ]);
+    header("Location: notes.php?$qs");
+    exit;
+}
+
+// ── FILTER PARAMS ─────────────────────────────────────────────────────────
+$selAnnee   = trim((string)($_GET['annee']      ?? ''));
+$selFiliere = (int)($_GET['id_filiere'] ?? 0);
+$selNiveau  = trim((string)($_GET['niveau']     ?? ''));
+$selClasse  = (int)($_GET['id_classe']  ?? 0);
+$selModule  = (int)($_GET['id_module']  ?? 0);
+$highlightSid = (int)($_GET['highlight'] ?? 0);
+
+// ── DATA LOADS ────────────────────────────────────────────────────────────
+$allAnnees = $pdo->query(
+    "SELECT DISTINCT annee_scolaire FROM classes WHERE annee_scolaire REGEXP '^[0-9]{4}/[0-9]{4}$' ORDER BY annee_scolaire DESC"
+)->fetchAll(PDO::FETCH_COLUMN);
+if ($selAnnee === '' && !empty($allAnnees)) { $selAnnee = $allAnnees[0]; }
+
+$allFilieres = $pdo->query(
+    "SELECT DISTINCT f.id_filiere, f.nom_filiere FROM filieres f INNER JOIN classes c ON c.id_filiere=f.id_filiere ORDER BY f.nom_filiere"
+)->fetchAll();
+
+$allNiveaux = [];
+if ($selFiliere > 0 && $selAnnee !== '') {
+    $st = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
+    $st->execute([$selFiliere, $selAnnee]);
+    $allNiveaux = $st->fetchAll(PDO::FETCH_COLUMN);
+}
+
+$allClasses = [];
+if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
+    $st = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
+    $st->execute([$selFiliere, $selAnnee, $selNiveau]);
+    $allClasses = $st->fetchAll();
+}
+
+$allModules = [];
+if ($selFiliere > 0) {
+    $st = $pdo->prepare("SELECT id_module, nom_module, nb_controles FROM modules WHERE id_filiere=? ORDER BY nom_module");
+    $st->execute([$selFiliere]);
+    $allModules = $st->fetchAll();
+}
+
+// Auto-select first module when arriving from hub
+if ($highlightSid > 0 && $selClasse > 0 && $selModule === 0 && !empty($allModules)) {
+    $qs = http_build_query([
+        'annee'      => $selAnnee,
+        'id_filiere' => $selFiliere,
+        'niveau'     => $selNiveau,
+        'id_classe'  => $selClasse,
+        'id_module'  => (int)$allModules[0]['id_module'],
+        'highlight'  => $highlightSid,
+    ]);
+    header("Location: notes.php?$qs");
+    exit;
+}
+
+// ── MODULE INFO + nb_controles ────────────────────────────────────────────
+$classeInfo   = null;
+$moduleInfo   = null;
+$nb_controles = 1;
+
+if ($selClasse > 0) {
+    $r = $pdo->prepare("SELECT c.nom_classe, f.nom_filiere, c.annee_scolaire FROM classes c JOIN filieres f ON f.id_filiere=c.id_filiere WHERE c.id_classe=?");
+    $r->execute([$selClasse]);
+    $classeInfo = $r->fetch();
+}
+if ($selModule > 0) {
+    $r = $pdo->prepare("SELECT nom_module, nb_controles FROM modules WHERE id_module=?");
+    $r->execute([$selModule]);
+    $moduleInfo = $r->fetch();
+    if ($moduleInfo) {
+        $nb_controles = max(1, (int)$moduleInfo['nb_controles']);
+    }
+}
+
+// ── STAGIAIRES + EVALUE ENTRIES ───────────────────────────────────────────
+$stagiaires  = [];
+$evalByStag  = []; // [id_stagiaire][type] = note
+
+if ($selClasse > 0 && $selModule > 0) {
+    $stSt = $pdo->prepare(
+        "SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom, s.cin
+         FROM stagiaires s
+         WHERE s.id_classe = ?
+         ORDER BY s.nom, s.prenom"
+    );
+    $stSt->execute([$selClasse]);
+    $stagiaires = $stSt->fetchAll();
+
+    if (!empty($stagiaires)) {
+        $sids = array_column($stagiaires, 'id_stagiaire');
+        $placeholders = implode(',', array_fill(0, count($sids), '?'));
+        $stEv = $pdo->prepare(
+            "SELECT id_stagiaire, type, note FROM module_notes
+             WHERE id_stagiaire IN ($placeholders) AND id_module = ?"
+        );
+        $stEv->execute([...$sids, $selModule]);
+        foreach ($stEv->fetchAll() as $ev) {
+            $evalByStag[(int)$ev['id_stagiaire']][$ev['type']] =
+                $ev['note'] !== null ? (string)$ev['note'] : '';
+        }
+    }
+}
+
+require_once __DIR__ . '/includes/header.php';
+?>
+<style>
+.notes-shell { max-width: 1200px; margin: 0 auto; padding-bottom: 3rem; }
+.notes-filter-card {
+    background: #16161e;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+.notes-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+.notes-filter-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.notes-filter-group label { font-size: 0.72rem; color: #71717a; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.notes-filter-group select {
+    background: #0d0d14;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fff;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.88rem;
+    cursor: pointer;
+    width: 100%;
+}
+.notes-filter-group select:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-afficher {
+    background: rgba(168,85,247,0.2);
+    color: #a855f7;
+    border: 1px solid rgba(168,85,247,0.4);
+    border-radius: 8px;
+    padding: 0.6rem 1.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+}
+.btn-afficher:hover { background: rgba(168,85,247,0.35); }
+.btn-afficher:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.notes-table-wrap { overflow-x: auto; }
+.notes-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.notes-table thead th {
+    background: rgba(255,255,255,0.03);
+    color: #71717a;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-weight: 800;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    text-align: left;
+    white-space: nowrap;
+}
+.notes-table thead th:not(:first-child):not(:nth-child(2)) { text-align: center; }
+.notes-table thead th.th-group-controle {
+    background: rgba(168,85,247,0.07);
+    color: #c084fc;
+    border-bottom-color: rgba(168,85,247,0.2);
+}
+.notes-table thead th.th-group-examen {
+    background: rgba(56,189,248,0.06);
+    color: #7dd3fc;
+    border-bottom-color: rgba(56,189,248,0.15);
+}
+.notes-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background .15s;
+}
+.notes-table tbody tr:hover { background: rgba(168,85,247,0.08); }
+.notes-table tbody td { padding: 0.7rem 1rem; }
+.notes-table tbody td:not(:first-child):not(:nth-child(2)) { text-align: center; }
+
+.stag-name { font-weight: 700; color: #fff; font-size: 0.88rem; }
+.stag-cin  { color: #71717a; font-size: 0.75rem; margin-top: 2px; }
+
+.note-input {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px;
+    color: #fff;
+    width: 72px;
+    padding: 0.45rem 0.5rem;
+    text-align: center;
+    font-size: 0.88rem;
+    transition: border-color .2s, background .2s;
+}
+.note-input:focus {
+    outline: none;
+    border-color: rgba(168,85,247,0.6);
+    background: rgba(168,85,247,0.08);
+}
+.note-input.has-value { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.07); }
+
+.btn-save-notes {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(16,185,129,0.2);
+    color: #10b981;
+    border: 1px solid rgba(16,185,129,0.4);
+    border-radius: 10px;
+    padding: 0.7rem 1.8rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+}
+.btn-save-notes:hover { background: rgba(16,185,129,0.35); }
+
+.notes-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+.notes-context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(168,85,247,0.12);
+    border: 1px solid rgba(168,85,247,0.25);
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.82rem;
+    color: #d8b4fe;
+    font-weight: 600;
+}
+.notes-context-badge span { color: #a1a1aa; font-weight: 400; }
+
+/* nb_controles inline editor */
+.ctrl-editor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(168,85,247,0.1);
+    border: 1px solid rgba(168,85,247,0.28);
+    border-radius: 8px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.82rem;
+    color: #c084fc;
+    font-weight: 600;
+}
+.ctrl-editor input[type=number] {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(168,85,247,0.35);
+    border-radius: 5px;
+    color: #fff;
+    width: 48px;
+    padding: 0.2rem 0.35rem;
+    text-align: center;
+    font-size: 0.85rem;
+}
+.ctrl-editor button {
+    background: rgba(168,85,247,0.3);
+    color: #e9d5ff;
+    border: 1px solid rgba(168,85,247,0.5);
+    border-radius: 5px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ctrl-editor button:hover { background: rgba(168,85,247,0.5); }
+
+.notes-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #52525b;
+    font-size: 0.95rem;
+}
+.notes-empty i { font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #3f3f46; }
+</style>
+
+<div class="notes-shell">
+
+    <div style="margin-bottom:1rem;">
+        <a href="index.php" style="color:#a855f7;font-size:0.85rem;font-weight:600;text-decoration:none;">
+            <i class="fa-solid fa-arrow-left"></i> Retour au tableau de bord
+        </a>
+    </div>
+
+    <!-- ── Filter card ── -->
+    <div class="notes-filter-card">
+        <form method="get" action="notes.php" id="notes-filter-form">
+        <div class="notes-filter-grid">
+
+            <div class="notes-filter-group">
+                <label>Année scolaire</label>
+                <select name="annee" id="nf-annee">
+                    <option value="">— Choisir —</option>
+                    <?php foreach ($allAnnees as $ay): ?>
+                    <option value="<?= h($ay) ?>" <?= $ay === $selAnnee ? 'selected' : '' ?>><?= h($ay) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="notes-filter-group">
+                <label>Filière</label>
+                <select name="id_filiere" id="nf-filiere" <?= $selAnnee === '' ? 'disabled' : '' ?>>
+                    <option value="">— Choisir —</option>
+                    <?php foreach ($allFilieres as $f): ?>
+                    <option value="<?= (int)$f['id_filiere'] ?>" <?= (int)$f['id_filiere'] === $selFiliere ? 'selected' : '' ?>><?= h((string)$f['nom_filiere']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="notes-filter-group">
+                <label>Niveau</label>
+                <select name="niveau" id="nf-niveau" <?= ($selFiliere === 0 || $selAnnee === '') ? 'disabled' : '' ?>>
+                    <option value="">— Choisir —</option>
+                    <?php foreach ($allNiveaux as $nv): ?>
+                    <option value="<?= h($nv) ?>" <?= $nv === $selNiveau ? 'selected' : '' ?>><?= h($nv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="notes-filter-group">
+                <label>Classe</label>
+                <select name="id_classe" id="nf-classe" <?= ($selNiveau === '' || $selFiliere === 0) ? 'disabled' : '' ?>>
+                    <option value="">— Choisir —</option>
+                    <?php foreach ($allClasses as $cl): ?>
+                    <option value="<?= (int)$cl['id_classe'] ?>" <?= (int)$cl['id_classe'] === $selClasse ? 'selected' : '' ?>><?= h((string)$cl['nom_classe']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="notes-filter-group">
+                <label>Module</label>
+                <select name="id_module" id="nf-module" <?= ($selFiliere === 0 || $selClasse === 0) ? 'disabled' : '' ?>>
+                    <option value="">— Choisir —</option>
+                    <?php foreach ($allModules as $m): ?>
+                    <option value="<?= (int)$m['id_module'] ?>" <?= (int)$m['id_module'] === $selModule ? 'selected' : '' ?>><?= h((string)$m['nom_module']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="notes-filter-group">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn-afficher"
+                    <?= ($selClasse === 0 || $selModule === 0) ? 'disabled' : '' ?>>
+                    <i class="fa-solid fa-table-list"></i> Afficher
+                </button>
+            </div>
+
+        </div>
+        </form>
+    </div>
+
+    <!-- ── Notes grid ── -->
+    <?php if ($selClasse > 0 && $selModule > 0): ?>
+
+    <form method="post" action="notes.php">
+        <?= csrf_hidden() ?>
+        <input type="hidden" name="bulk_save_notes" value="1">
+        <input type="hidden" name="id_module"    value="<?= $selModule ?>">
+        <input type="hidden" name="id_classe"    value="<?= $selClasse ?>">
+        <input type="hidden" name="annee"        value="<?= h($selAnnee) ?>">
+        <input type="hidden" name="id_filiere"   value="<?= $selFiliere ?>">
+        <input type="hidden" name="niveau"       value="<?= h($selNiveau) ?>">
+        <input type="hidden" name="nb_controles" value="<?= $nb_controles ?>">
+
+        <div class="notes-header-bar">
+            <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;">
+                <?php if ($classeInfo): ?>
+                <div class="notes-context-badge">
+                    <i class="fa-solid fa-users"></i>
+                    <?= h((string)$classeInfo['nom_classe']) ?>
+                    <span>·</span><?= h((string)$classeInfo['nom_filiere']) ?>
+                    <span>·</span><?= h((string)$classeInfo['annee_scolaire']) ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($moduleInfo): ?>
+                <div class="notes-context-badge" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25);color:#6ee7b7;">
+                    <i class="fa-solid fa-book-open"></i>
+                    <?= h((string)$moduleInfo['nom_module']) ?>
+                </div>
+                <?php endif; ?>
+                <div class="notes-context-badge" style="background:rgba(250,204,21,0.08);border-color:rgba(250,204,21,0.2);color:#fde047;">
+                    <i class="fa-solid fa-user-graduate"></i>
+                    <?= count($stagiaires) ?> stagiaire<?= count($stagiaires) !== 1 ? 's' : '' ?>
+                </div>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                <?php
+                $bulQs   = http_build_query(['annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule]);
+                $printQs = http_build_query(['id_classe'=>$selClasse,'id_module'=>$selModule]);
+                ?>
+                <a href="bulletins.php?<?= $bulQs ?>" class="btn-save-notes" style="text-decoration:none;background:rgba(56,189,248,0.15);color:#7dd3fc;border-color:rgba(56,189,248,0.3);">
+                    <i class="fa-solid fa-chart-bar"></i> Voir les bulletins
+                </a>
+                <a href="print_tableau_notes_controle.php?<?= $printQs ?>" target="_blank" class="btn-save-notes" style="text-decoration:none;background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.3);">
+                    <i class="fa-solid fa-print"></i> Tableau de Contrôle
+                </a>
+                <button type="submit" class="btn-save-notes">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+
+        <!-- nb_controles editor -->
+        <?php if ($moduleInfo): ?>
+        <div style="margin-bottom:1rem;">
+            <form method="post" action="notes.php" style="display:inline;">
+                <?= csrf_hidden() ?>
+                <input type="hidden" name="save_nb_controles" value="1">
+                <input type="hidden" name="id_module"    value="<?= $selModule ?>">
+                <input type="hidden" name="id_classe"    value="<?= $selClasse ?>">
+                <input type="hidden" name="annee"        value="<?= h($selAnnee) ?>">
+                <input type="hidden" name="id_filiere"   value="<?= $selFiliere ?>">
+                <input type="hidden" name="niveau"       value="<?= h($selNiveau) ?>">
+                <div class="ctrl-editor">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Nb. contrôles :</span>
+                    <input type="number" name="nb_controles" value="<?= $nb_controles ?>" min="1" max="10">
+                    <button type="submit">Mettre à jour</button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+
+        <?php if (count($stagiaires) === 0): ?>
+        <div class="notes-empty">
+            <i class="fa-solid fa-user-slash"></i>
+            Aucun stagiaire dans cette classe.
+        </div>
+        <?php else: ?>
+        <div class="card" style="padding:0;overflow:hidden;">
+            <div class="notes-table-wrap">
+                <table class="notes-table">
+                    <thead>
+                        <tr>
+                            <th style="width:8%;white-space:nowrap;">Code</th>
+                            <th style="width:25%;">Stagiaire</th>
+                            <?php if ($nb_controles === 1): ?>
+                                <th class="th-group-controle">Contrôle</th>
+                            <?php else: ?>
+                                <?php for ($i = 1; $i <= $nb_controles; $i++): ?>
+                                    <th class="th-group-controle">Contrôle <?= $i ?></th>
+                                <?php endfor; ?>
+                            <?php endif; ?>
+                            <th class="th-group-examen">Théorique</th>
+                            <th class="th-group-examen">Pratique</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($stagiaires as $s):
+                        $sid = (int)$s['id_stagiaire'];
+                        $ev  = $evalByStag[$sid] ?? [];
+                    ?>
+                    <tr id="row-<?= $sid ?>">
+                        <td style="font-size:0.75rem;color:#a1a1aa;font-weight:600;white-space:nowrap;"><?= h((string)($s['num_inscri'] ?? '')) ?></td>
+                        <td>
+                            <div class="stag-name"><?= h(trim($s['nom'].' '.$s['prenom'])) ?></div>
+                            <?php if (!empty($s['cin'])): ?>
+                            <div class="stag-cin"><?= h((string)$s['cin']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <?php for ($i = 1; $i <= $nb_controles; $i++):
+                            $key = "controle_$i";
+                            $val = $ev[$key] ?? '';
+                        ?>
+                        <td>
+                            <input type="number" class="note-input<?= $val !== '' ? ' has-value' : '' ?>"
+                                name="notes[<?= $sid ?>][<?= $key ?>]"
+                                value="<?= h($val) ?>"
+                                min="0" max="20" step="0.25"
+                                placeholder="—">
+                        </td>
+                        <?php endfor; ?>
+                        <td>
+                            <?php $nt = $ev['theorique'] ?? ''; ?>
+                            <input type="number" class="note-input<?= $nt !== '' ? ' has-value' : '' ?>"
+                                name="notes[<?= $sid ?>][theorique]"
+                                value="<?= h($nt) ?>"
+                                min="0" max="20" step="0.25"
+                                placeholder="—">
+                        </td>
+                        <td>
+                            <?php $np = $ev['pratique'] ?? ''; ?>
+                            <input type="number" class="note-input<?= $np !== '' ? ' has-value' : '' ?>"
+                                name="notes[<?= $sid ?>][pratique]"
+                                value="<?= h($np) ?>"
+                                min="0" max="20" step="0.25"
+                                placeholder="—">
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
+    </form>
+
+    <?php else: ?>
+    <div class="notes-empty">
+        <i class="fa-solid fa-graduation-cap"></i>
+        Sélectionnez une classe et un module, puis cliquez sur <strong>Afficher</strong>.
+    </div>
+    <?php endif; ?>
+
+</div>
+
+<script>
+(function () {
+    const form    = document.getElementById('notes-filter-form');
+    const annee   = document.getElementById('nf-annee');
+    const filiere = document.getElementById('nf-filiere');
+    const niveau  = document.getElementById('nf-niveau');
+    const classe  = document.getElementById('nf-classe');
+    const module_ = document.getElementById('nf-module');
+    const btn     = form.querySelector('.btn-afficher');
+
+    function cascade(changed) {
+        const order = [annee, filiere, niveau, classe, module_];
+        const idx   = order.indexOf(changed);
+        for (let i = idx + 1; i < order.length; i++) {
+            order[i].value    = '';
+            order[i].disabled = true;
+        }
+        form.submit();
+    }
+
+    if (annee.value)   { filiere.disabled = false; }
+    if (filiere.value) { niveau.disabled  = false; }
+    if (niveau.value)  { classe.disabled  = false; }
+    if (classe.value)  { module_.disabled = false; }
+
+    function syncBtn() { btn.disabled = !(classe.value && module_.value); }
+    syncBtn();
+
+    annee.addEventListener('change',   () => cascade(annee));
+    filiere.addEventListener('change', () => cascade(filiere));
+    niveau.addEventListener('change',  () => cascade(niveau));
+    classe.addEventListener('change',  () => cascade(classe));
+    module_.addEventListener('change', () => { syncBtn(); form.submit(); });
+
+    document.querySelectorAll('.note-input').forEach(function(inp) {
+        inp.addEventListener('input', function() {
+            this.classList.toggle('has-value', this.value !== '');
+        });
+    });
+
+    var hlSid = <?= $highlightSid ?>;
+    if (hlSid > 0) {
+        var tr = document.getElementById('row-' + hlSid);
+        if (tr) {
+            setTimeout(function(){
+                tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                tr.style.transition  = 'background 0.2s, outline 0.2s';
+                tr.style.background  = 'rgba(168,85,247,0.22)';
+                tr.style.outline     = '2px solid rgba(168,85,247,0.6)';
+                tr.style.borderRadius = '6px';
+                setTimeout(function(){ tr.style.background = ''; tr.style.outline = ''; }, 2800);
+            }, 300);
+        }
+    }
+})();
+</script>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
