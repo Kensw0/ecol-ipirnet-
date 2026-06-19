@@ -46,8 +46,14 @@ if ($selClasse > 0) {
     // Note: We filter by annee_scolaire added recently
     foreach ($tempStag as $s) {
         $sid = (int)$s['id_stagiaire'];
-        $stStages = $pdo->prepare("SELECT * FROM stages WHERE id_stagiaire = ? AND annee_scolaire = ? ORDER BY type_stage");
-        $stStages->execute([$sid, $selAnnee]);
+        $stStages = $pdo->prepare(
+              "SELECT st.* FROM stages st
+               JOIN stagiaires s ON s.id_stagiaire = st.id_stagiaire
+               JOIN classes c ON c.id_classe = s.id_classe
+               WHERE st.id_stagiaire = ? AND c.annee_scolaire = ?
+               ORDER BY st.type_stage"
+          );
+          $stStages->execute([$sid, $selAnnee]);
         $s['stages_data'] = $stStages->fetchAll(PDO::FETCH_ASSOC);
         
         // Logical Analysis
