@@ -478,12 +478,8 @@ require_once __DIR__ . '/includes/header.php';
             </div>
             <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
                 <?php
-                $bulQs   = http_build_query(['annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule]);
                 $printQs = http_build_query(['id_classe'=>$selClasse,'id_module'=>$selModule]);
                 ?>
-                <a href="bulletins.php?<?= $bulQs ?>" class="btn-save-notes" style="text-decoration:none;background:rgba(56,189,248,0.15);color:#7dd3fc;border-color:rgba(56,189,248,0.3);">
-                    <i class="fa-solid fa-chart-bar"></i> Voir les bulletins
-                </a>
                 <?php if ($nb_controles <= 1): ?>
                 <a href="print_tableau_notes_controle.php?<?= $printQs ?>&controle_no=1" target="_blank" class="btn-save-notes" style="text-decoration:none;background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.3);">
                     <i class="fa-solid fa-print"></i> Tableau de Contrôle
