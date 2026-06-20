@@ -1277,26 +1277,15 @@ if (isset($_GET['id'])) {
                 // Build a lookup of notes by module id
                 $notesMap = [];
                 foreach ($notes as $n) { $notesMap[(int)$n['id_module']] = $n; }
-                // Moyenne générale calculation
-                $gmSum = 0; $gmCnt = 0;
-                foreach ($mods as $mod) {
-                    $n = $notesMap[(int)$mod['id_module']] ?? null;
-                    if (!$n) continue;
-                    $nc_h = $n['note_controle']  !== null ? (float)$n['note_controle']  : null;
-                    $nt_h = $n['note_theorique'] !== null ? (float)$n['note_theorique'] : null;
-                    $np_h = $n['note_pratique']  !== null ? (float)$n['note_pratique']  : null;
-                    if ($nc_h !== null && $nt_h !== null && $np_h !== null) {
-                        $mn = $nc_h*0.4 + $nt_h*0.3 + $np_h*0.3;
-                    } elseif ($nc_h !== null && ($nt_h !== null || $np_h !== null)) {
-                        $mn = $nc_h*0.4 + ($nt_h ?? 0.0)*0.3 + ($np_h ?? 0.0)*0.3;
-                    } elseif ($nc_h !== null) {
-                        $mn = $nc_h;
-                    } else {
-                        continue;
-                    }
-                    $gmSum += $mn; $gmCnt++;
+                // Moyenne générale — coefficient-weighted, using view's moyenne_module
+                $gmSum = 0.0; $gmCoef = 0;
+                foreach ($notes as $n) {
+                    if ($n['moyenne_module'] === null) continue;
+                    $coef    = max(1, (int)$n['coefficient']);
+                    $gmSum  += (float)$n['moyenne_module'] * $coef;
+                    $gmCoef += $coef;
                 }
-                $moyenneGenerale = $gmCnt > 0 ? round($gmSum / $gmCnt, 2) : null;
+                $moyenneGenerale = $gmCoef > 0 ? round($gmSum / $gmCoef, 2) : null;
                 $modulesWithNotes = 0;
                 foreach ($mods as $mod) {
                     $n = $notesMap[(int)$mod['id_module']] ?? null;
@@ -1348,19 +1337,8 @@ if (isset($_GET['id'])) {
                         </thead>
                         <tbody>
                             <?php foreach ($mods as $mod):
-                                $n        = $notesMap[(int)$mod['id_module']] ?? null;
-                                $hasNotes = $n && ($n['note_controle'] !== null || $n['note_theorique'] !== null || $n['note_pratique'] !== null);
-                                if (!$hasNotes) {
-                                    $m_note = null;
-                                } elseif ($n['note_controle'] !== null && $n['note_theorique'] !== null && $n['note_pratique'] !== null) {
-                                    $m_note = round((float)$n['note_controle']*0.4 + (float)$n['note_theorique']*0.3 + (float)$n['note_pratique']*0.3, 2);
-                                } elseif ($n['note_controle'] !== null && ($n['note_theorique'] !== null || $n['note_pratique'] !== null)) {
-                                    $m_note = round((float)$n['note_controle']*0.4 + ((float)($n['note_theorique'] ?? 0))*0.3 + ((float)($n['note_pratique'] ?? 0))*0.3, 2);
-                                } elseif ($n['note_controle'] !== null) {
-                                    $m_note = round((float)$n['note_controle'], 2);
-                                } else {
-                                    $m_note = null;
-                                }
+                                $n      = $notesMap[(int)$mod['id_module']] ?? null;
+                                $m_note = ($n && $n['moyenne_module'] !== null) ? round((float)$n['moyenne_module'], 2) : null;
                             ?>
                             <tr data-mid="<?= (int)$mod['id_module'] ?>">
                                 <td style="font-weight:600; color:#e4e4e7;"><?= h($mod['nom_module']) ?></td>
