@@ -355,16 +355,36 @@ require __DIR__ . '/includes/header.php';
   </div>
 
   <?php if ($selClasse > 0 && $classeInfo): ?>
-  <!-- Summary stats — only Total stagiaires + Impayés -->
-  <div class="cot-stats-row" style="grid-template-columns:repeat(2,minmax(150px,220px));">
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:#e4e4e7;"><?= count($stagiaires) ?></div>
-      <div class="cot-stat-lbl">Total stagiaires</div>
+  <!-- Summary stats + print button row -->
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+    <div class="cot-stats-row" style="grid-template-columns:repeat(2,minmax(150px,220px));margin-bottom:0;flex:0 0 auto;">
+      <div class="cot-stat-card">
+        <div class="cot-stat-val" style="color:#e4e4e7;"><?= count($stagiaires) ?></div>
+        <div class="cot-stat-lbl">Total stagiaires</div>
+      </div>
+      <div class="cot-stat-card" style="border-color:rgba(248,113,113,.25);">
+        <div class="cot-stat-val" style="color:#f87171;"><?= $nbImpaye ?></div>
+        <div class="cot-stat-lbl">Impayés</div>
+      </div>
     </div>
-    <div class="cot-stat-card" style="border-color:rgba(248,113,113,.25);">
-      <div class="cot-stat-val" style="color:#f87171;"><?= $nbImpaye ?></div>
-      <div class="cot-stat-lbl">Impayés</div>
-    </div>
+    <?php if ($nbImpaye > 0): ?>
+    <?php
+      $printUrl = 'print_liste_impayes.php?' . http_build_query([
+        'id_filiere'    => $selFiliere,
+        'id_classe'     => $selClasse,
+        'annee_scolaire'=> $selAnnee,
+        'niveau'        => $selNiveau,
+        'mois'          => $selMois,
+        'impaye'        => '1',
+        'auto'          => '1',
+      ]);
+    ?>
+    <a href="<?= h($printUrl) ?>" target="_blank"
+       style="display:inline-flex;align-items:center;gap:.5rem;padding:.55rem 1.2rem;background:rgba(248,113,113,.13);color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:9px;font-size:.85rem;font-weight:700;text-decoration:none;white-space:nowrap;transition:background .15s;"
+       onmouseover="this.style.background='rgba(248,113,113,.22)'" onmouseout="this.style.background='rgba(248,113,113,.13)'">
+        <i class="fa-solid fa-print"></i> Imprimer liste des impayés
+    </a>
+    <?php endif; ?>
   </div>
 
   <!-- Table -->
