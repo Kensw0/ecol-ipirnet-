@@ -354,6 +354,20 @@ if (!$isPublic && isset($pdo)) {
             </div>
 
         </nav>
+        <?php if (!empty($__globalAnnees)): ?>
+        <div class="gds-year-selector no-print" style="padding:.6rem .75rem .5rem;border-top:1px solid rgba(255,255,255,0.05);">
+            <div style="font-size:.65rem;color:rgba(168,85,247,.6);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:.4rem;">Année scolaire</div>
+            <form method="get" action="<?= h(basename($_SERVER['PHP_SELF'])) ?>">
+                <input type="hidden" name="set_global_annee" value="1">
+                <select name="global_annee_value" onchange="this.form.submit()"
+                    style="width:100%;background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.4);border-radius:6px;padding:.3rem .5rem;font-size:.82rem;cursor:pointer;outline:none;">
+                    <?php foreach ($__globalAnnees as $__ay): ?>
+                    <option value="<?= h($__ay) ?>" <?= (isset($_SESSION['global_annee_scolaire']) && $_SESSION['global_annee_scolaire'] === $__ay) ? 'selected' : '' ?>><?= h($__ay) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+        </div>
+        <?php endif; ?>
         <div class="sidebar-footer">
             <?php
             $__role = gds_user_role();
@@ -410,20 +424,6 @@ if (!$isPublic && isset($pdo)) {
                     <h1 class="page-title-dash"><?= h($pageTitle) ?></h1>
                     <p class="page-sub-dash">Espace administratif — Groupe IPIRNET</p>
                 </div>
-                <?php if (!empty($__globalAnnees)): ?>
-                <form method="get" action="<?= h(basename($_SERVER['PHP_SELF'])) ?>" style="display:flex;align-items:center;gap:.4rem;margin:0;" title="Année scolaire globale">
-                    <input type="hidden" name="set_global_annee" value="1">
-                    <label for="gds-global-annee" style="font-size:.75rem;color:#a1a1aa;white-space:nowrap;cursor:pointer;">
-                        <i class="fa-solid fa-calendar-days" style="margin-right:.2rem;color:#a855f7;"></i>Année :
-                    </label>
-                    <select id="gds-global-annee" name="global_annee_value" onchange="this.form.submit()"
-                        style="background:#1e1e2e;color:#e4e4e7;border:1px solid rgba(168,85,247,.4);border-radius:6px;padding:.2rem .55rem;font-size:.82rem;cursor:pointer;outline:none;">
-                        <?php foreach ($__globalAnnees as $__ay): ?>
-                        <option value="<?= h($__ay) ?>" <?= (isset($_SESSION['global_annee_scolaire']) && $_SESSION['global_annee_scolaire'] === $__ay) ? 'selected' : '' ?>><?= h($__ay) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <div class="dash-date"><?= h($gdsFrenchDate()) ?></div>
             </div>
 <?php endif; ?>
