@@ -2,50 +2,75 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$SCHOOL_ORG         = 'Groupe IPIRNET';
-$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique, Réseau et Nouvelles Etudes de Télécommunication";
-$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N°: 03/02/2003   Du : 19/02/2003";
-$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N°: 21/DFP/F0301/199 du 21/11/2021";
+$SCHOOL_ORG          = 'Groupe IPIRNET';
+$SCHOOL_TAGLINE_1    = "Institut Privé d'Informatique, Réseau et Nouvelles Etudes de Télécommunication";
+$SCHOOL_TAGLINE_2    = '';
+$SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N°: 03/02/2003   Du : 19/02/2003";
+$SCHOOL_AUTH_LINE_2  = "Accrédité par l'Etat sous N°: 21/DFP/F0301/199 du 21/11/2021";
 
-$id = (int)($_GET['id'] ?? 0);
+$id   = (int) ($_GET['id'] ?? 0);
+$mode = $_GET['mode'] ?? 'combined'; // 'controle', 'examen', 'combined'
 
 $st = $pdo->prepare('SELECT * FROM v_stagiaires_detail WHERE id_stagiaire=?');
 $st->execute([$id]);
 $s = $st->fetch();
-if (!$s) { http_response_code(404); exit('Stagiaire introuvable'); }
+if (!$s) {
+    http_response_code(404);
+    exit('Stagiaire introuvable');
+}
+log_document_gen($pdo, 'releve_notes', $id, (string) $s['num_inscri']);
 
-log_document_gen($pdo, 'releve_notes', $id, (string)$s['num_inscri']);
+$notesStmt = $pdo->prepare('SELECT * FROM v_moyennes_par_module WHERE id_stagiaire = ? ORDER BY nom_module');
+$notesStmt->execute([$id]);
+$rows = $notesStmt->fetchAll();
 
-// ── Modules for this student's filière ───────────────────────────────────
-$stModules = $pdo->prepare('
-    SELECT id_module, nom_module, coefficient, nb_controles
-    FROM modules
-    WHERE id_filiere = ?
-    ORDER BY nom_module
-');
-$stModules->execute([(int)$s['id_filiere']]);
-$modules = $stModules->fetchAll();
+$sumCoef = 0;
+$sumNotes = 0;
+$totC = 0; $cntC = 0;
+$totT = 0; $cntT = 0;
+$totP = 0; $cntP = 0;
 
-// ── All notes for this student (keyed by module then type) ────────────────
-$stNotes = $pdo->prepare('SELECT id_module, type, note FROM module_notes WHERE id_stagiaire = ?');
-$stNotes->execute([$id]);
-$notesByModule = [];
-foreach ($stNotes->fetchAll() as $n) {
-    $notesByModule[(int)$n['id_module']][$n['type']] = $n['note'] !== null ? (float)$n['note'] : null;
+foreach ($rows as $r) {
+    if ($r['note_controle'] !== null) { $totC += (float)$r['note_controle']; $cntC++; }
+    if ($r['note_theorique'] !== null) { $totT += (float)$r['note_theorique']; $cntT++; }
+    if ($r['note_pratique'] !== null) { $totP += (float)$r['note_pratique']; $cntP++; }
+
+    if ($r['moyenne_module'] !== null) {
+        $c = (int) $r['coefficient'];
+        $sumCoef += $c;
+        $sumNotes += ((float) $r['moyenne_module'] * $c);
+    }
+}
+$avgC = $cntC > 0 ? $totC / $cntC : null;
+$avgT = $cntT > 0 ? $totT / $cntT : null;
+$avgP = $cntP > 0 ? $totP / $cntP : null;
+
+$gm = $sumCoef > 0 ? round($sumNotes / $sumCoef, 2) : null;
+$decision = $gm !== null ? ($gm >= 10 ? 'Admis(e)' : 'Ajourné(e)') : 'En attente';
+
+// FIX: annee_scolaire = real academic year (e.g. "2025/2026")
+//      niveau         = "1ère année" or "2ème année" — from classes.niveau column
+$annee      = (string) ($s['annee_scolaire'] ?? ''); // e.g. "2025/2026"
+$niveau     = (string) ($s['niveau'] ?? '');          // e.g. "1ère année" / "2ème année"
+
+// Fallback if niveau is empty (for old data before migration)
+if ($niveau === '') {
+    $niveau = (string) ($s['nom_classe'] ?? '');
 }
 
-// ── Max number of controles across all modules (for column headers) ───────
-$maxC = 1;
-foreach ($modules as $m) { $maxC = max($maxC, (int)$m['nb_controles']); }
+$nomComplet  = trim((string) $s['nom'] . ' ' . (string) $s['prenom']);
+$num_inscri  = (string) $s['num_inscri'];
+$filiere     = mb_strtoupper((string) $s['nom_filiere'], 'UTF-8');
 
-// ── Helpers ───────────────────────────────────────────────────────────────
 $fmtNote = static function ($v): string {
-    if ($v === null || $v === false || $v === '') return '';
-    return number_format((float)$v, 2, ',', '');
+    if ($v === null || $v === '') return '';
+    $f = (float) $v;
+    return number_format($f, 2, ',', '');
 };
+
 $getObs = static function ($v): string {
-    if ($v === null || $v === false || $v === '') return '';
-    $f = (float)$v;
+    if ($v === null || $v === '') return '';
+    $f = (float) $v;
     if ($f >= 16) return 'Très Bien';
     if ($f >= 14) return 'Bien';
     if ($f >= 12) return 'A.Bien';
@@ -53,104 +78,18 @@ $getObs = static function ($v): string {
     return 'Faible';
 };
 
-// ── Build display rows + totals ───────────────────────────────────────────
-$rows        = [];
-$sumCoef     = 0;
-$sumWeighted = 0;
-// Column-level sums for footer averages
-$colSumsC    = array_fill(1, $maxC, ['sum' => 0.0, 'cnt' => 0]);
-$colSumT     = ['sum' => 0.0, 'cnt' => 0];
-$colSumP     = ['sum' => 0.0, 'cnt' => 0];
-
-foreach ($modules as $m) {
-    $mid  = (int)$m['id_module'];
-    $nbc  = (int)$m['nb_controles'];
-    $coef = (int)$m['coefficient'];
-    $notes = $notesByModule[$mid] ?? [];
-
-    // Individual controles: false = N/A for this module, null = not entered
-    $controles = [];
-    for ($i = 1; $i <= $maxC; $i++) {
-        if ($i <= $nbc) {
-            $v = $notes["controle_$i"] ?? null;
-            $controles[$i] = $v;
-            if ($v !== null) {
-                $colSumsC[$i]['sum'] += $v;
-                $colSumsC[$i]['cnt']++;
-            }
-        } else {
-            $controles[$i] = false; // not applicable
-        }
-    }
-
-    $theorique = $notes['theorique'] ?? null;
-    $pratique  = $notes['pratique']  ?? null;
-
-    if ($theorique !== null) { $colSumT['sum'] += $theorique; $colSumT['cnt']++; }
-    if ($pratique  !== null) { $colSumP['sum'] += $pratique;  $colSumP['cnt']++; }
-
-    // Average of entered controles
-    $validC = array_filter(
-        array_slice($controles, 0, $nbc, true),
-        fn($v) => $v !== null && $v !== false
-    );
-    $avgC = !empty($validC) ? (array_sum($validC) / count($validC)) : null;
-
-    // Moyenne UF — same weight formula as the DB view
-    $theo = $theorique;
-    $prat = $pratique;
-    if ($avgC !== null && $theo !== null && $prat !== null) {
-        $moyenne = round($avgC * 0.40 + $theo * 0.30 + $prat * 0.30, 2);
-    } elseif ($avgC !== null && ($theo !== null || $prat !== null)) {
-        $moyenne = round($avgC * 0.40 + ($theo ?? 0) * 0.30 + ($prat ?? 0) * 0.30, 2);
-    } elseif ($avgC !== null) {
-        $moyenne = round($avgC, 2);
-    } elseif ($theo !== null || $prat !== null) {
-        $cnt = ($theo !== null ? 1 : 0) + ($prat !== null ? 1 : 0);
-        $moyenne = round((($theo ?? 0) + ($prat ?? 0)) / $cnt, 2);
-    } else {
-        $moyenne = null;
-    }
-
-    if ($moyenne !== null) {
-        $sumCoef     += $coef;
-        $sumWeighted += $moyenne * $coef;
-    }
-
-    $rows[] = [
-        'nom_module'  => (string)$m['nom_module'],
-        'coefficient' => $coef,
-        'nb_controles'=> $nbc,
-        'controles'   => $controles,
-        'theorique'   => $theorique,
-        'pratique'    => $pratique,
-        'moyenne'     => $moyenne,
-    ];
-}
-
-$gm       = $sumCoef > 0 ? round($sumWeighted / $sumCoef, 2) : null;
-$decision = $gm !== null ? ($gm >= 10 ? 'Admis(e)' : 'Ajourné(e)') : 'En attente';
-
-// Footer column averages
-$footC = [];
-for ($i = 1; $i <= $maxC; $i++) {
-    $footC[$i] = $colSumsC[$i]['cnt'] > 0 ? $colSumsC[$i]['sum'] / $colSumsC[$i]['cnt'] : null;
-}
-$footT = $colSumT['cnt'] > 0 ? $colSumT['sum'] / $colSumT['cnt'] : null;
-$footP = $colSumP['cnt'] > 0 ? $colSumP['sum'] / $colSumP['cnt'] : null;
-
-// Student info
-$annee      = (string)($s['annee_scolaire'] ?? '');
-$niveau     = (string)($s['niveau_classe']  ?? ($s['niveau'] ?? ''));
-if ($niveau === '') $niveau = (string)($s['nom_classe'] ?? '');
-$nomComplet = trim((string)$s['nom'] . ' ' . (string)$s['prenom']);
-$num_inscri = (string)$s['num_inscri'];
-$filiere    = mb_strtoupper((string)$s['nom_filiere'], 'UTF-8');
-
 $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
 
-// Total columns: Module + Coef + maxC controles + Theorique + Pratique + Moyenne + Obs
-$totalCols = 2 + $maxC + 2 + 2;
+// Calculate colspans
+$totalCols = 1; // Module Name
+$totalCols += 1; // Coefficient
+if ($mode === 'controle' || $mode === 'combined') {
+    $totalCols += 1;
+}
+if ($mode === 'examen' || $mode === 'combined') {
+    $totalCols += 2; // Theo + Prac
+}
+$totalCols += 2; // Moyenne UF + Observations
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -159,62 +98,64 @@ $totalCols = 2 + $maxC + 2 + 2;
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Relevé de Notes — <?= h($nomComplet) ?></title>
     <style>
-        @page { size: A4 landscape; margin: 10mm; }
+        @page { size: A4; margin: 10mm; }
         * { box-sizing: border-box; }
         html, body { background: #e5e7eb; margin: 0; padding: 0; }
-        body { font-family: "Times New Roman", Times, serif; color: #000; font-size: 10.5pt; padding: 16px 0; }
+        body { font-family: "Times New Roman", Times, serif; color: #000; font-size: 11pt; padding: 20px 0; }
 
-        .cs-print-btns { text-align: center; margin: 0 auto 16px; max-width: 1000px; background: #fff; padding: 12px 16px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,.1); border: 1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
-        .cs-print-btns button, .cs-print-btns a { background: #f4f4f5; border: 1px solid #ccc; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; text-decoration: none; color: #111; font-family: sans-serif; transition: all .2s; }
-        .cs-print-btns button:hover, .cs-print-btns a:hover { background: #e4e4e7; }
+        .cs-print-btns { text-align: center; margin: 0 auto 20px auto; max-width: 800px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border:1px solid #ddd; }
+        .cs-print-btns button, .cs-print-btns a { background: #f4f4f5; border: 1px solid #ccc; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; text-decoration: none; color: #111; margin: 0 5px; font-family:sans-serif; transition:all 0.2s; }
+        .cs-print-btns a:hover, .cs-print-btns button:hover { background: #e4e4e7; }
 
-        .doc-wrapper { max-width: 1000px; margin: 0 auto; background: #fff; padding: 24px 28px; box-shadow: 0 0 10px rgba(0,0,0,.1); }
+        .doc-wrapper { max-width: 820px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
 
-        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         .header-table td { vertical-align: top; text-align: center; }
-        .school-name { font-weight: bold; font-size: 18px; margin-bottom: 4px; }
-        .school-desc { font-weight: bold; font-size: 12px; margin-bottom: 4px; }
-        .school-auth { font-size: 11px; margin-bottom: 2px; }
-        .logo-img { max-width: 80px; }
+        .school-name { font-weight: bold; font-size: 20px; margin-bottom: 5px; }
+        .school-desc { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        .school-auth { font-size: 12px; margin-bottom: 2px; }
+        .logo-img { max-width: 90px; }
+        .accredite-img { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #000; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; }
 
-        .eval-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 13px; text-decoration: underline; margin-bottom: 16px; line-height: 1.5; }
+        .eval-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 15px; text-decoration: underline; margin-bottom: 20px; line-height: 1.5; }
 
-        .info-table { width: 100%; border-collapse: collapse; border: 2px solid #000; margin-bottom: 16px; font-weight: bold; font-size: 12px; }
-        .info-table td { border: 1px solid #000; padding: 5px 8px; }
-        .info-table td:first-child { width: 200px; background: #f2f2f2; text-align: center; }
-        .info-table td:nth-child(2) { width: 10px; text-align: center; border-left: none; border-right: none; }
-        .info-table td:last-child { border-left: none; }
+        .info-table { width: 100%; border-collapse: collapse; border: 2px solid #000; margin-bottom: 20px; font-weight:bold; font-size:13px; }
+        .info-table td { border: 1px solid #000; padding: 6px 10px; }
+        .info-table td:first-child { width: 200px; background: #f2f2f2; text-align:center; }
+        .info-table td:nth-child(2) { width: 10px; text-align:center; border-left:none; border-right:none; }
+        .info-table td:last-child { border-left:none; }
 
-        .grades-table { width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 10pt; }
-        .grades-table th, .grades-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; vertical-align: middle; }
+        .grades-table { width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 12px; }
+        .grades-table th, .grades-table td { border: 1px solid #000; padding: 6px 8px; text-align: center; vertical-align: middle; }
         .grades-table thead th { background: #e8e8e8; font-weight: bold; }
-        .grades-table td.module-name { text-align: left; font-weight: bold; background: #f9f9f9; }
-        .grades-table td.coeff { font-weight: bold; }
-        .grades-table td.na { background: #f0f0f0; color: #aaa; font-size: 9pt; }
+        .grades-table td.module-name { text-align: left; font-weight: bold; background: #f9f9f9; width:300px; }
+        .grades-table td.coeff { font-weight: bold; width:30px; }
+
         .bottom-row { font-weight: bold; background: #e8e8e8; }
 
-        .signature-table { width: 100%; border-collapse: collapse; margin-top: 24px; }
-        .signature-table td { width: 50%; vertical-align: top; padding: 0 16px; }
-        .signature-box { border: 2px solid #000; height: 100px; padding: 8px; }
-        .signature-box .title { text-transform: uppercase; font-size: 10px; text-decoration: underline; }
+        .signature-table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        .signature-table td { width: 50%; vertical-align: top; padding: 0 20px; }
+        .signature-box { border: 2px solid #000; height: 120px; padding: 10px; position:relative; }
+        .signature-box .title { text-transform: uppercase; font-size: 11px; text-align: left; text-decoration: underline; }
 
         @media print {
-            html, body { background: #fff; margin: 0; padding: 0; }
-            .doc-wrapper { box-shadow: none; padding: 0; max-width: none; }
-            .cs-print-btns { display: none; }
-            .grades-table thead th { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .grades-table td.module-name { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .grades-table td.na { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .info-table td:first-child { background: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .bottom-row { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            html,body{background:#fff; margin:0; padding:0;}
+            .doc-wrapper{box-shadow:none; padding:10px 0;}
+            .cs-print-btns{display:none;}
+            .grades-table th { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; }
+            .info-table td:first-child { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; }
+            .bottom-row { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; }
         }
     </style>
 </head>
 <body>
 
 <div class="cs-print-btns">
-    <strong style="font-family:sans-serif;font-size:14px;">Relevé complet — <?= h($nomComplet) ?></strong>
-    <span style="border-left:1px solid #ccc;margin:0 8px;"></span>
+    <strong style="margin-right:10px; font-family:sans-serif; font-size:15px;">Affichage :</strong>
+    <a href="?id=<?= $id ?>&mode=combined" style="<?= $mode === 'combined' ? 'background:#000; color:#fff; border-color:#000;' : '' ?>">Complet (Contrôles + Examens)</a>
+    <a href="?id=<?= $id ?>&mode=controle" style="<?= $mode === 'controle' ? 'background:#000; color:#fff; border-color:#000;' : '' ?>">Contrôles Continus Uniquement</a>
+    <a href="?id=<?= $id ?>&mode=examen" style="<?= $mode === 'examen' ? 'background:#000; color:#fff; border-color:#000;' : '' ?>">Examens de fin de Cursus Uniquement</a>
+    <span style="border-left:1px solid #ccc; margin:0 15px;"></span>
     <button onclick="window.print()">🖨 Imprimer</button>
     <a href="stagiaires.php">← Retour</a>
 </div>
@@ -223,56 +164,64 @@ $totalCols = 2 + $maxC + 2 + 2;
 
     <table class="header-table">
         <tr>
-            <td style="width:18%;text-align:left;">
+            <td style="width: 20%; text-align:left;">
                 <img src="assets/img/logo.png" alt="Logo IPIRNET" class="logo-img" onerror="this.style.display='none'">
             </td>
-            <td style="width:64%;">
+            <td style="width: 60%;">
                 <div class="school-name"><?= $SCHOOL_ORG ?></div>
                 <div class="school-desc"><?= $SCHOOL_TAGLINE_1 ?></div>
                 <div class="school-auth"><?= $SCHOOL_AUTH_LINE_1 ?></div>
                 <div class="school-auth"><?= $SCHOOL_AUTH_LINE_2 ?></div>
             </td>
-            <td style="width:18%;text-align:right;">
-                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:72px;height:72px;object-fit:contain;border-radius:50%;">
+            <td style="width: 20%; text-align:right;">
+                <div align="right">
+                    <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
+                </div>
             </td>
         </tr>
     </table>
 
     <div class="eval-title">
-        RELEVÉ DE NOTES — <?= h(strtoupper($niveau)) ?> DE FORMATION
+        SYSTEME D'EVALUATION EN <?= h(strtoupper($niveau)) ?> DE FORMATION<br>
+        ET MODALITE DE PASSAGE EN ANNEE SUPERIEURE DE LA FILIERE DE FORMATION
     </div>
 
     <table class="info-table">
-        <tr><td>N° d'inscription</td><td>:</td><td><?= h($num_inscri) ?></td></tr>
-        <tr><td>Prénom et nom du stagiaire</td><td>:</td><td><?= h(mb_strtoupper($nomComplet, 'UTF-8')) ?></td></tr>
-        <tr><td>Filière</td><td>:</td><td><?= h($filiere) ?></td></tr>
-        <tr><td>Niveau</td><td>:</td><td><?= h($niveau) ?></td></tr>
-        <tr><td>Année de Formation</td><td>:</td><td><?= h($annee) ?></td></tr>
+        <tr>
+            <td>N° d'inscription</td><td>:</td><td><?= h($num_inscri) ?></td>
+        </tr>
+        <tr>
+            <td>Prénom et nom du stagiaire</td><td>:</td><td><?= h(mb_strtoupper($nomComplet, 'UTF-8')) ?></td>
+        </tr>
+        <tr>
+            <td>Filière</td><td>:</td><td><?= h($filiere) ?></td>
+        </tr>
+        <tr>
+            <td>Niveau</td><td>:</td><td><?= h($niveau) ?></td>
+        </tr>
+        <tr>
+            <td>Année de Formation</td><td>:</td><td><?= h($annee) ?></td>
+        </tr>
     </table>
 
+    <?php /* grades table — unchanged from original below this point */ ?>
     <table class="grades-table">
         <thead>
             <tr>
-                <th rowspan="2" style="text-align:left;width:28%;">Unité de Formation</th>
-                <th rowspan="2" style="width:30px;">Coef</th>
-                <?php if ($maxC > 1): ?>
-                    <th colspan="<?= $maxC ?>">Contrôles Continus</th>
-                <?php else: ?>
-                    <th rowspan="2">Contrôle<br>Continu</th>
+                <th colspan="2" rowspan="2">Unités de formation et coefficient</th>
+
+                <?php if ($mode === 'controle' || $mode === 'combined'): ?>
+                    <th rowspan="2">Contrôles<br>Continus</th>
                 <?php endif; ?>
-                <th colspan="2">Examen Fin de Cursus</th>
+
+                <?php if ($mode === 'examen' || $mode === 'combined'): ?>
+                    <th colspan="2">Examen de fin de<br>Cursus de formation</th>
+                <?php endif; ?>
+
                 <th rowspan="2">Moyenne<br>U.F.</th>
                 <th rowspan="2">Observations</th>
             </tr>
-            <?php if ($maxC > 1): ?>
-            <tr>
-                <?php for ($i = 1; $i <= $maxC; $i++): ?>
-                    <th>C<?= $i ?></th>
-                <?php endfor; ?>
-                <th>Théorique</th>
-                <th>Pratique</th>
-            </tr>
-            <?php else: ?>
+            <?php if ($mode === 'examen' || $mode === 'combined'): ?>
             <tr>
                 <th>Théorique</th>
                 <th>Pratique</th>
@@ -282,34 +231,30 @@ $totalCols = 2 + $maxC + 2 + 2;
         <tbody>
         <?php foreach ($rows as $r): ?>
             <tr>
-                <td class="module-name"><?= h($r['nom_module']) ?></td>
-                <td class="coeff"><?= $r['coefficient'] ?></td>
-                <?php for ($i = 1; $i <= $maxC; $i++):
-                    $cv = $r['controles'][$i]; ?>
-                    <?php if ($cv === false): ?>
-                        <td class="na">—</td>
-                    <?php else: ?>
-                        <td><?= $fmtNote($cv) ?></td>
-                    <?php endif; ?>
-                <?php endfor; ?>
-                <td><?= $fmtNote($r['theorique']) ?></td>
-                <td><?= $fmtNote($r['pratique']) ?></td>
-                <td><?= $fmtNote($r['moyenne']) ?></td>
-                <td><?= $getObs($r['moyenne']) ?></td>
+                <td class="module-name"><?= h((string) $r['nom_module']) ?></td>
+                <td class="coeff"><?= h((string) $r['coefficient']) ?></td>
+                <?php if ($mode === 'controle' || $mode === 'combined'): ?>
+                    <td><?= $fmtNote($r['note_controle']) ?></td>
+                <?php endif; ?>
+                <?php if ($mode === 'examen' || $mode === 'combined'): ?>
+                    <td><?= $fmtNote($r['note_theorique']) ?></td>
+                    <td><?= $fmtNote($r['note_pratique']) ?></td>
+                <?php endif; ?>
+                <td><?= $fmtNote($r['moyenne_module']) ?></td>
+                <td><?= $getObs($r['moyenne_module']) ?></td>
             </tr>
         <?php endforeach; ?>
-        <?php if (empty($rows)): ?>
-            <tr><td colspan="<?= $totalCols ?>" style="text-align:center;font-style:italic;padding:12px;">Aucun module trouvé pour cette filière.</td></tr>
-        <?php endif; ?>
         </tbody>
         <tfoot>
             <tr class="bottom-row">
                 <td class="module-name" colspan="2">Moyennes</td>
-                <?php for ($i = 1; $i <= $maxC; $i++): ?>
-                    <td><?= $fmtNote($footC[$i]) ?></td>
-                <?php endfor; ?>
-                <td><?= $fmtNote($footT) ?></td>
-                <td><?= $fmtNote($footP) ?></td>
+                <?php if ($mode === 'controle' || $mode === 'combined'): ?>
+                    <td><?= $fmtNote($avgC) ?></td>
+                <?php endif; ?>
+                <?php if ($mode === 'examen' || $mode === 'combined'): ?>
+                    <td><?= $fmtNote($avgT) ?></td>
+                    <td><?= $fmtNote($avgP) ?></td>
+                <?php endif; ?>
                 <td colspan="2"><?= $fmtNote($gm) ?></td>
             </tr>
             <tr class="bottom-row">
