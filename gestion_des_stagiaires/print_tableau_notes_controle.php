@@ -11,7 +11,7 @@ $idClasse   = (int)($_GET['id_classe']   ?? 0);
 $idModule   = (int)($_GET['id_module']   ?? 0);
 $controleNo = max(1, (int)($_GET['controle_no'] ?? 1));
 
-// ── Class info ────────────────────────────────────────────────────────────
+// ── Class info ─────────────────────────────────────────────────────────────
 $classeInfo = null;
 if ($idClasse > 0) {
     $st = $pdo->prepare(
@@ -23,7 +23,7 @@ if ($idClasse > 0) {
     $classeInfo = $st->fetch();
 }
 
-// ── Module info + nb_controles ────────────────────────────────────────────
+// ── Module info + nb_controles ─────────────────────────────────────────────
 $moduleName   = '';
 $nb_controles = 1;
 if ($idModule > 0) {
@@ -35,43 +35,61 @@ if ($idModule > 0) {
         $nb_controles = max(1, (int)$mod['nb_controles']);
     }
 }
-// Clamp requested controle_no to what the module declares
-$controleNo = max(1, min($nb_controles, $controleNo));
+$controleNo   = max(1, min($nb_controles, $controleNo));
 $controleType = "controle_$controleNo";
 
-// ── Stagiaires + note for the requested controle ──────────────────────────
+// ── Stagiaires + contrôle + théorique + pratique ───────────────────────────
 $stagiaires = [];
 if ($idClasse > 0) {
-    $sql = 'SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom, ev.note'
-         . ' FROM stagiaires s'
-         . ' LEFT JOIN module_notes ev'
-         . '   ON ev.id_stagiaire = s.id_stagiaire'
-         . '  AND ev.id_module = ?'
-         . '  AND ev.type = ?'
-         . ' WHERE s.id_classe = ?'
-         . ' ORDER BY s.nom, s.prenom';
+    $sql = '
+        SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom,
+               ev_c.note  AS note_controle,
+               ev_t.note  AS note_theorique,
+               ev_p.note  AS note_pratique
+        FROM stagiaires s
+        LEFT JOIN module_notes ev_c
+               ON ev_c.id_stagiaire = s.id_stagiaire
+              AND ev_c.id_module    = ?
+              AND ev_c.type         = ?
+        LEFT JOIN module_notes ev_t
+               ON ev_t.id_stagiaire = s.id_stagiaire
+              AND ev_t.id_module    = ?
+              AND ev_t.type         = \'theorique\'
+        LEFT JOIN module_notes ev_p
+               ON ev_p.id_stagiaire = s.id_stagiaire
+              AND ev_p.id_module    = ?
+              AND ev_p.type         = \'pratique\'
+        WHERE s.id_classe = ?
+        ORDER BY s.nom, s.prenom
+    ';
     $st = $pdo->prepare($sql);
-    $st->execute([$idModule ?: 0, $controleType, $idClasse]);
-    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $row) {
+    $st->execute([$idModule ?: 0, $controleType, $idModule ?: 0, $idModule ?: 0, $idClasse]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $stagiaires[] = [
-            'num_inscri' => $row['num_inscri'],
-            'full_name'  => strtoupper(trim(($row['prenom'] ?? '') . ' ' . ($row['nom'] ?? ''))),
-            'note'       => $row['note'],
+            'num_inscri'     => $row['num_inscri'],
+            'full_name'      => strtoupper(trim(($row['prenom'] ?? '') . ' ' . ($row['nom'] ?? ''))),
+            'note_controle'  => $row['note_controle'],
+            'note_theorique' => $row['note_theorique'],
+            'note_pratique'  => $row['note_pratique'],
         ];
     }
 }
+
+$fmtNote = static function ($v): string {
+    if ($v === null) return '';
+    return number_format((float)$v, 2, '.', '');
+};
 ?><!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Tableau de Notes de Contrôle <?= $controleNo > 1 ? "N°$controleNo" : '' ?> — IPIRNET</title>
+    <title>Tableau de Notes — Contrôle <?= $controleNo ?> — IPIRNET</title>
     <style>
         @page { size: A4 portrait; margin: 12mm 14mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #f1f3f5; }
-        body { padding: 18px 0 40px; font-family: "Arial", "Helvetica", sans-serif; color: #111; font-size: 11pt; }
+        body { padding: 18px 0 40px; font-family: "Arial", "Helvetica", sans-serif; color: #111; font-size: 10.5pt; }
         .doc { max-width: 800px; margin: 0 auto; background: #fff; padding: 22px 28px 24px; box-shadow: 0 4px 14px rgba(0,0,0,.08); border: 1px solid #cdd0d4; }
 
         .print-btns { text-align: center; margin-bottom: 14px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
@@ -83,53 +101,53 @@ if ($idClasse > 0) {
         }
         .print-btns button:hover, .print-btns a:hover { background: #e4e4e7; }
 
+        .controle-tab { border: 1px solid #bbb; border-radius: 6px; padding: .28rem .75rem; font-size: .82rem; text-decoration: none; color: #444; background: #f6f6f6; }
+        .controle-tab.active { background: #111; color: #fff; border-color: #111; font-weight: 700; }
+
         .lh-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
         .lh-table td { border: 1px solid #111; padding: 7px 10px; vertical-align: middle; }
         .lh-left, .lh-right { width: 16%; text-align: center; }
         .lh-mid  { text-align: center; }
         .lh-logo { max-width: 80px; max-height: 80px; }
-        .lh-org  { font-weight: 700; font-size: 1.3rem; letter-spacing: .03em; }
-        .lh-tag  { font-size: .82rem; margin-top: 2px; }
-        .lh-auth { font-size: .75rem; margin-top: 3px; }
+        .lh-org  { font-weight: 700; font-size: 1.2rem; letter-spacing: .03em; }
+        .lh-tag  { font-size: .8rem; margin-top: 2px; }
+        .lh-auth { font-size: .73rem; margin-top: 3px; }
 
-        .doc-title { text-align: center; font-size: 1.2rem; font-weight: 700; margin: 14px 0 4px; letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; }
-        .doc-subtitle { text-align: center; font-size: .95rem; margin-bottom: 10px; color: #333; }
+        .doc-title    { text-align: center; font-size: 1.15rem; font-weight: 700; margin: 12px 0 3px; letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; }
+        .doc-subtitle { text-align: center; font-size: .9rem; margin-bottom: 10px; color: #333; }
 
-        .controle-tabs { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; flex-wrap: wrap; }
-        .controle-tab { border: 1px solid #bbb; border-radius: 6px; padding: .28rem .75rem; font-size: .82rem; text-decoration: none; color: #444; background: #f6f6f6; }
-        .controle-tab.active { background: #111; color: #fff; border-color: #111; font-weight: 700; }
-
-        .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: .92rem; }
+        .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: .9rem; }
         .meta-table td { padding: 3px 4px; vertical-align: middle; white-space: nowrap; }
         .meta-table .lbl { font-weight: 700; padding-right: 4px; }
-        .meta-table .val { border-bottom: 1px solid #111; min-width: 160px; padding: 0 4px 1px; }
-        .meta-table .val.wide { min-width: 220px; }
+        .meta-table .val { border-bottom: 1px solid #111; min-width: 140px; padding: 0 4px 1px; }
+        .meta-table .val.wide { min-width: 200px; }
         .meta-table .spacer { width: 30px; }
 
-        .notes-table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 10.5pt; }
-        .notes-table th, .notes-table td { border: 1px solid #111; padding: 4px 8px; vertical-align: middle; }
-        .notes-table thead th { background: #f0f0f0; font-weight: 700; text-align: center; font-size: 10pt; }
-        .notes-table td.code-col { text-align: center; width: 130px; font-size: 9.5pt; }
+        .notes-table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 10pt; }
+        .notes-table th, .notes-table td { border: 1px solid #111; padding: 4px 6px; vertical-align: middle; }
+        .notes-table thead th { background: #f0f0f0; font-weight: 700; text-align: center; font-size: 9.5pt; }
+        .notes-table td.code-col { text-align: center; width: 110px; font-size: 9pt; }
         .notes-table td.name-col { font-weight: 600; }
-        .notes-table td.note-col { text-align: center; width: 80px; }
-        .notes-table td.obs-col  { width: 35%; }
+        .notes-table td.note-col { text-align: center; width: 72px; }
+        .notes-table td.obs-col  { width: 26%; }
         .notes-table tbody tr { height: 22px; }
 
         .sign-table { width: 100%; border-collapse: collapse; margin-top: 22px; }
-        .sign-table th { border: 1px solid #111; padding: 5px 10px; text-align: center; font-weight: 400; font-style: italic; font-size: .92rem; background: #fafafa; width: 50%; }
+        .sign-table th { border: 1px solid #111; padding: 5px 10px; text-align: center; font-weight: 400; font-style: italic; font-size: .9rem; background: #fafafa; width: 50%; }
         .sign-table td { border: 1px solid #111; height: 80px; width: 50%; }
 
         @media print {
             html, body { background: #fff; padding: 0; }
             .doc { box-shadow: none; border: none; padding: 0; max-width: none; margin: 0; }
             .no-print { display: none !important; }
+            .notes-table thead th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
 <body>
 <div class="doc">
 
-    <!-- Print buttons -->
+    <!-- Print / nav buttons -->
     <div class="print-btns no-print">
         <?php if ($nb_controles > 1): ?>
             <?php for ($i = 1; $i <= $nb_controles; $i++): ?>
@@ -138,7 +156,7 @@ if ($idClasse > 0) {
                Contrôle <?= $i ?>
             </a>
             <?php endfor; ?>
-            <span style="border-left:1px solid #ccc; margin:0 4px;"></span>
+            <span style="border-left:1px solid #ccc;margin:0 4px;"></span>
         <?php endif; ?>
         <button onclick="window.print()">🖨️ Imprimer</button>
         <a href="javascript:history.back()">← Retour</a>
@@ -157,7 +175,7 @@ if ($idClasse > 0) {
                 <div class="lh-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
             </td>
             <td class="lh-right">
-                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
+                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:76px;height:76px;object-fit:contain;border-radius:50%;">
             </td>
         </tr>
     </table>
@@ -171,10 +189,10 @@ if ($idClasse > 0) {
             <td class="lbl">Filière :</td>
             <td class="val wide"><?= h((string)($classeInfo['nom_filiere'] ?? '')) ?></td>
             <td class="spacer"></td>
-            <td class="lbl">Niveau</td>
+            <td class="lbl">Niveau :</td>
             <td class="val"><?= h((string)($classeInfo['niveau'] ?? '')) ?></td>
         </tr>
-        <tr style="height:6px;"></tr>
+        <tr style="height:5px;"></tr>
         <tr>
             <td class="lbl">U.F. :</td>
             <td class="val wide"><?= h($moduleName) ?></td>
@@ -182,10 +200,13 @@ if ($idClasse > 0) {
             <td class="lbl">Formateur :</td>
             <td class="val"></td>
         </tr>
-        <tr style="height:6px;"></tr>
+        <tr style="height:5px;"></tr>
         <tr>
-            <td class="lbl">Année:</td>
-            <td colspan="4"><?= h((string)($classeInfo['annee_scolaire'] ?? '')) ?></td>
+            <td class="lbl">Classe :</td>
+            <td class="val"><?= h((string)($classeInfo['nom_classe'] ?? '')) ?></td>
+            <td class="spacer"></td>
+            <td class="lbl">Année :</td>
+            <td class="val"><?= h((string)($classeInfo['annee_scolaire'] ?? '')) ?></td>
         </tr>
     </table>
 
@@ -193,30 +214,34 @@ if ($idClasse > 0) {
     <table class="notes-table">
         <thead>
             <tr>
-                <th style="width:130px;">Code</th>
-                <th>Prénom &amp; Nom stagiaire</th>
-                <th style="width:80px;">Note</th>
+                <th style="width:110px;">Code</th>
+                <th>Prénom &amp; Nom Stagiaire</th>
+                <th style="width:72px;">Contrôle <?= $controleNo ?></th>
+                <th style="width:72px;">Théorique</th>
+                <th style="width:72px;">Pratique</th>
                 <th>Observation</th>
             </tr>
         </thead>
         <tbody>
         <?php if (empty($stagiaires)): ?>
-            <tr><td colspan="4" style="text-align:center;font-style:italic;padding:14px;">Aucun stagiaire.</td></tr>
+            <tr><td colspan="6" style="text-align:center;font-style:italic;padding:14px;">Aucun stagiaire.</td></tr>
         <?php else: ?>
-            <?php foreach ($stagiaires as $s):
-                $note = $s['note'] !== null ? number_format((float)$s['note'], 2) : '';
-            ?>
+            <?php foreach ($stagiaires as $s): ?>
             <tr>
                 <td class="code-col"><?= h((string)($s['num_inscri'] ?? '')) ?></td>
                 <td class="name-col"><?= h(trim((string)($s['full_name'] ?? ''))) ?></td>
-                <td class="note-col"><?= h($note) ?></td>
+                <td class="note-col"><?= $fmtNote($s['note_controle']) ?></td>
+                <td class="note-col"><?= $fmtNote($s['note_theorique']) ?></td>
+                <td class="note-col"><?= $fmtNote($s['note_pratique']) ?></td>
                 <td class="obs-col"></td>
             </tr>
             <?php endforeach; ?>
-            <?php for ($i = 0; $i < max(0, 30 - count($stagiaires)); $i++): ?>
+            <?php for ($i = 0; $i < max(0, 28 - count($stagiaires)); $i++): ?>
             <tr>
                 <td class="code-col">&nbsp;</td>
                 <td class="name-col">&nbsp;</td>
+                <td class="note-col">&nbsp;</td>
+                <td class="note-col">&nbsp;</td>
                 <td class="note-col">&nbsp;</td>
                 <td class="obs-col">&nbsp;</td>
             </tr>
