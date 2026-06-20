@@ -27,16 +27,20 @@
       }
 
       if (isset($_POST['save_module_fields'])) {
-          $idModule    = (int)($_POST['id_module']    ?? 0);
-          $coefficient = (float)str_replace(',', '.', (string)($_POST['coefficient'] ?? 0));
-          $semestre    = (int)($_POST['semestre']     ?? 0);
-          if ($idModule <= 0 || $coefficient < 0 || $coefficient > 99 || $semestre < 1 || $semestre > 10) {
-              echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
+          $idModule      = (int)($_POST['id_module']      ?? 0);
+          $coefficient   = (float)str_replace(',', '.', (string)($_POST['coefficient']   ?? 0));
+          $semestre      = (int)($_POST['semestre']       ?? 0);
+          $masseHoraire  = (float)str_replace(',', '.', (string)($_POST['masse_horaire'] ?? 0));
+          if ($idModule <= 0
+              || $coefficient < 1 || $coefficient > 7
+              || $semestre < 1   || $semestre > 2
+              || $masseHoraire < 0 || $masseHoraire > 9999) {
+              echo json_encode(['success' => false, 'error' => 'Données invalides. Coeff. 1–7, semestre 1–2.']); exit;
           }
           try {
-              $pdo->prepare("UPDATE modules SET coefficient=?, semestre=? WHERE id_module=?")
-                  ->execute([$coefficient, $semestre, $idModule]);
-              echo json_encode(['success' => true, 'msg' => 'Module mis à jour.', 'coefficient' => $coefficient, 'semestre' => $semestre]);
+              $pdo->prepare("UPDATE modules SET coefficient=?, semestre=?, masse_horaire=? WHERE id_module=?")
+                  ->execute([$coefficient, $semestre, $masseHoraire, $idModule]);
+              echo json_encode(['success' => true, 'msg' => 'Module mis à jour.']);
           } catch (\Throwable $e) {
               echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
           }
@@ -184,7 +188,6 @@
       <h2><i data-lucide="layers" width="18" height="18" style="vertical-align:-3px;margin-right:.4rem;stroke:#a855f7;"></i><?= h($moduleInfo['nom_module']) ?></h2>
       <div class="mod-meta-grid">
           <div class="mod-meta-item"><div class="label">Filière</div><div class="value"><?= h($moduleInfo['nom_filiere']) ?></div></div>
-          <div class="mod-meta-item"><div class="label">Masse horaire</div><div class="value"><?= h((string)($moduleInfo['masse_horaire'] ?? '—')) ?> h</div></div>
       </div>
 
       <div class="mod-nb-form" style="flex-wrap:wrap;gap:1.25rem;align-items:flex-end;">
@@ -202,24 +205,34 @@
           </div>
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
-              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Coefficient</label>
+              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Coefficient <span style="font-weight:400;opacity:.6;">(1–7)</span></label>
               <div style="display:flex;align-items:center;gap:.5rem;">
-                  <input type="number" id="mod-coefficient-input" class="mod-nb-input" min="0" max="99" step="0.5"
-                         style="width:80px;" value="<?= h((string)($moduleInfo['coefficient'] ?? 0)) ?>">
+                  <input type="number" id="mod-coefficient-input" class="mod-nb-input" min="1" max="7" step="0.5"
+                         style="width:80px;" value="<?= h((string)($moduleInfo['coefficient'] ?? 1)) ?>">
               </div>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
               <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Semestre</label>
               <div style="display:flex;align-items:center;gap:.5rem;">
-                  <input type="number" id="mod-semestre-input" class="mod-nb-input" min="1" max="10"
-                         style="width:80px;" value="<?= h((string)($moduleInfo['semestre'] ?? 1)) ?>">
+                  <select id="mod-semestre-input" class="mod-nb-input" style="width:80px;padding:.35rem .5rem;cursor:pointer;">
+                      <option value="1" <?= ($moduleInfo['semestre'] ?? 1) == 1 ? 'selected' : '' ?>>1</option>
+                      <option value="2" <?= ($moduleInfo['semestre'] ?? 1) == 2 ? 'selected' : '' ?>>2</option>
+                  </select>
+              </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Masse horaire <span style="font-weight:400;opacity:.6;">(h)</span></label>
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                  <input type="number" id="mod-masse-horaire-input" class="mod-nb-input" min="0" max="9999" step="0.5"
+                         style="width:90px;" value="<?= h((string)($moduleInfo['masse_horaire'] ?? 0)) ?>">
               </div>
           </div>
 
           <div>
               <button class="btn-save-nb" onclick="saveModuleFields()" style="padding:.45rem 1.25rem;">
-                  <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer coeff. &amp; semestre
+                  <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer
               </button>
               <span id="save-fields-msg" class="mod-save-msg"></span>
           </div>
@@ -313,12 +326,23 @@
   }
 
   function saveModuleFields() {
-      const idModule    = <?= (int)$selModule ?>;
-      const coefficient = parseFloat(document.getElementById('mod-coefficient-input')?.value ?? '');
-      const semestre    = parseInt(document.getElementById('mod-semestre-input')?.value ?? '', 10);
-      const msgEl       = document.getElementById('save-fields-msg');
-      if (isNaN(coefficient) || coefficient < 0 || isNaN(semestre) || semestre < 1 || semestre > 10) {
-          msgEl.textContent = 'Valeurs invalides.';
+      const idModule     = <?= (int)$selModule ?>;
+      const coefficient  = parseFloat(document.getElementById('mod-coefficient-input')?.value ?? '');
+      const semestre     = parseInt(document.getElementById('mod-semestre-input')?.value ?? '', 10);
+      const masseHoraire = parseFloat(document.getElementById('mod-masse-horaire-input')?.value ?? '');
+      const msgEl        = document.getElementById('save-fields-msg');
+      if (isNaN(coefficient) || coefficient < 1 || coefficient > 7) {
+          msgEl.textContent = 'Coefficient invalide (1–7).';
+          msgEl.style.color = '#fca5a5';
+          return;
+      }
+      if (isNaN(semestre) || semestre < 1 || semestre > 2) {
+          msgEl.textContent = 'Semestre invalide (1 ou 2).';
+          msgEl.style.color = '#fca5a5';
+          return;
+      }
+      if (isNaN(masseHoraire) || masseHoraire < 0) {
+          msgEl.textContent = 'Masse horaire invalide.';
           msgEl.style.color = '#fca5a5';
           return;
       }
@@ -327,10 +351,11 @@
 
       const fd = new FormData();
       fd.append('save_module_fields', '1');
-      fd.append('id_module',    idModule);
-      fd.append('coefficient',  coefficient);
-      fd.append('semestre',     semestre);
-      fd.append('csrf_token',   document.querySelector('meta[name="csrf-token"]').content);
+      fd.append('id_module',     idModule);
+      fd.append('coefficient',   coefficient);
+      fd.append('semestre',      semestre);
+      fd.append('masse_horaire', masseHoraire);
+      fd.append('csrf_token',    document.querySelector('meta[name="csrf-token"]').content);
 
       fetch('gestion_modules.php', { method: 'POST', body: fd })
           .then(r => r.json())
