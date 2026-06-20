@@ -128,9 +128,36 @@ require __DIR__ . '/includes/header.php';
     opacity:0; transform:translateY(12px); transition:all .25s; pointer-events:none; max-width:380px;
 }
 .gc-toast.show { opacity:1; transform:translateY(0); pointer-events:auto; }
+/* ── Filter bar ── */
+.gc-filters {
+    display:flex; flex-wrap:wrap; gap:0.55rem; align-items:center;
+    background:#12122a; border:1px solid rgba(168,85,247,0.15);
+    border-radius:10px; padding:0.75rem 1rem; margin-bottom:1rem;
+}
+.gc-filter-input, .gc-filter-sel {
+    background:#0d0d1f; border:1.5px solid rgba(255,255,255,0.09); border-radius:7px;
+    color:#e4e4e7; padding:0.45rem 0.75rem; font-size:0.83rem; outline:none;
+    transition:border-color .15s;
+}
+.gc-filter-input { width:180px; }
+.gc-filter-input:focus, .gc-filter-sel:focus { border-color:#a855f7; }
+.gc-filter-input::placeholder { color:#52525b; }
+.gc-filter-sel { cursor:pointer; }
+.gc-filter-reset {
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+    color:#71717a; border-radius:7px; padding:0.45rem 0.8rem; font-size:0.8rem;
+    cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.gc-filter-reset:hover { background:rgba(255,255,255,0.1); color:#a1a1aa; }
+.gc-filter-count {
+    margin-left:auto; font-size:0.78rem; color:#71717a; white-space:nowrap;
+}
+.gc-filter-count span { color:#a855f7; font-weight:700; }
 @media (max-width:680px) {
     .gc-table th:nth-child(4), .gc-table td:nth-child(4) { display:none; }
     .gc-table th:nth-child(6), .gc-table td:nth-child(6) { display:none; }
+    .gc-filter-input { width:100%; }
+    .gc-filters { gap:0.45rem; }
 }
 </style>
 
@@ -156,7 +183,53 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php else: ?>
 
-<div class="gc-card">
+<!-- ── Filter bar ── -->
+<div class="gc-filters">
+    <input type="search" id="gc-f-name" class="gc-filter-input" placeholder="&#128269; Rechercher une classe…" oninput="gcFilter()" autocomplete="off">
+
+    <select id="gc-f-filiere" class="gc-filter-sel" onchange="gcFilter()">
+        <option value="">Toutes les filières</option>
+        <?php foreach ($filieres as $f): ?>
+        <option value="<?= (int)$f['id_filiere'] ?>"><?= h($f['nom_filiere']) ?></option>
+        <?php endforeach; ?>
+    </select>
+
+    <select id="gc-f-niveau" class="gc-filter-sel" onchange="gcFilter()">
+        <option value="">Tous les niveaux</option>
+        <option value="1ère année">1ère année</option>
+        <option value="2ème année">2ème année</option>
+    </select>
+
+    <select id="gc-f-annee" class="gc-filter-sel" onchange="gcFilter()">
+        <option value="">Toutes les années</option>
+        <?php foreach ($annees as $ay): ?>
+        <option value="<?= h($ay) ?>"><?= h($ay) ?></option>
+        <?php endforeach; ?>
+    </select>
+
+    <select id="gc-f-status" class="gc-filter-sel" onchange="gcFilter()">
+        <option value="">Tous les statuts</option>
+        <option value="ok">Places disponibles</option>
+        <option value="low">Bientôt pleine (≤5)</option>
+        <option value="full">Pleine</option>
+    </select>
+
+    <button type="button" class="gc-filter-reset" onclick="gcResetFilters()">
+        <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+    </button>
+
+    <div class="gc-filter-count">
+        <span id="gc-f-visible"><?= count($classes) ?></span> / <?= count($classes) ?> classe(s)
+    </div>
+</div>
+
+<div id="gc-no-results" style="display:none;text-align:center;padding:2.5rem 1rem;color:#71717a;font-size:0.9rem;">
+    <i class="fa-solid fa-filter-circle-xmark" style="font-size:1.8rem;display:block;margin-bottom:0.75rem;opacity:0.3;"></i>
+    Aucune classe ne correspond aux filtres.
+    <br><button type="button" onclick="gcResetFilters()" style="margin-top:0.75rem;background:none;border:none;color:#a855f7;cursor:pointer;font-size:0.85rem;text-decoration:underline;">Réinitialiser les filtres</button>
+</div>
+
+<div class="gc-card" id="gc-table-card">
     <div style="overflow-x:auto;">
     <table class="gc-table">
         <thead>
@@ -179,8 +252,14 @@ require __DIR__ . '/includes/header.php';
                 $pct    = $cap > 0 ? min(100, (int)round($eff / $cap * 100)) : 0;
                 $barCol = $pct >= 100 ? '#ef4444' : ($pct >= 80 ? '#fb923c' : '#10b981');
                 $libres = max(0, $cap - $eff);
+                $rowStatus = $libres === 0 ? 'full' : ($libres <= 5 ? 'low' : 'ok');
             ?>
-            <tr>
+            <tr class="gc-row"
+                data-nom="<?= strtolower(h($cls['nom_classe'])) ?>"
+                data-filiere="<?= (int)$cls['id_filiere'] ?>"
+                data-niveau="<?= h($cls['niveau']) ?>"
+                data-annee="<?= h($cls['annee_scolaire']) ?>"
+                data-status="<?= $rowStatus ?>">
                 <td>
                     <span style="font-weight:700;color:#fff;"><?= h($cls['nom_classe']) ?></span>
                 </td>
@@ -441,6 +520,45 @@ document.addEventListener('keydown', function(e) {
         document.getElementById('gc-add-modal').style.display  = 'none';
     }
 });
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function gcFilter() {
+    var name    = (document.getElementById('gc-f-name').value    || '').toLowerCase().trim();
+    var filiere = (document.getElementById('gc-f-filiere').value || '');
+    var niveau  = (document.getElementById('gc-f-niveau').value  || '');
+    var annee   = (document.getElementById('gc-f-annee').value   || '');
+    var status  = (document.getElementById('gc-f-status').value  || '');
+
+    var rows    = document.querySelectorAll('.gc-row');
+    var visible = 0;
+
+    rows.forEach(function(row) {
+        var ok = true;
+        if (name    && row.dataset.nom.indexOf(name) === -1)        ok = false;
+        if (filiere && row.dataset.filiere !== filiere)              ok = false;
+        if (niveau  && row.dataset.niveau  !== niveau)              ok = false;
+        if (annee   && row.dataset.annee   !== annee)               ok = false;
+        if (status  && row.dataset.status  !== status)              ok = false;
+        row.style.display = ok ? '' : 'none';
+        if (ok) visible++;
+    });
+
+    document.getElementById('gc-f-visible').textContent = visible;
+
+    var card = document.getElementById('gc-table-card');
+    var none = document.getElementById('gc-no-results');
+    if (card) card.style.display = visible === 0 ? 'none' : '';
+    if (none) none.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function gcResetFilters() {
+    document.getElementById('gc-f-name').value    = '';
+    document.getElementById('gc-f-filiere').value = '';
+    document.getElementById('gc-f-niveau').value  = '';
+    document.getElementById('gc-f-annee').value   = '';
+    document.getElementById('gc-f-status').value  = '';
+    gcFilter();
+}
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
