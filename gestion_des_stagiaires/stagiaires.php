@@ -2264,7 +2264,7 @@ document.addEventListener('DOMContentLoaded', function () {
     rebuildFilterClasses();
     // Step 4: restore pre-selected classe from URL (?c=) — overrides auto-select if provided
     const _savedClasse = fltClasse ? fltClasse.dataset.selectedClasse : '';
-    if (_savedClasse && fltClasse) { fltClasse.value = _savedClasse; }
+    if (_savedClasse && _savedClasse !== '0' && fltClasse) { fltClasse.value = _savedClasse; }
     // Step 5: trigger gdsTableFilter with all pre-selected values.
     // Use 'input' (not 'change') so our cascade listeners do NOT fire and reset each other.
     if (fltAnnee)   fltAnnee.dispatchEvent(new Event('input', { bubbles: true }));
