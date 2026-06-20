@@ -134,7 +134,7 @@ foreach ($rows as $r) {
             display: inline-flex;
             align-items: center; justify-content: center;
             width: 88px; height: 88px; border-radius: 50%;
-            border: 2px solid #ef4444; color: #ef4444;
+            border: 2px solid #111; color: #111;
             font-family: "Times New Roman", serif; font-weight: 700;
             font-size: .8rem; text-align: center;
             background: radial-gradient(circle, #fff 55%, transparent 56%);
@@ -146,7 +146,7 @@ foreach ($rows as $r) {
         /* ===== Title in oval ===== */
         .cs-title-wrap { display: flex; justify-content: center; margin: 22px 0 16px; }
         .cs-title-oval {
-            border: 1.5px solid #ef4444;
+            border: 1.5px solid #111;
             border-radius: 50%;
             padding: 12px 50px;
             min-width: 60%;
@@ -154,7 +154,7 @@ foreach ($rows as $r) {
             font-family: "Monotype Corsiva", "Lucida Handwriting", cursive;
             font-style: italic;
             font-size: 1.6rem;
-            color: #ef4444;
+            color: #111;
             white-space: nowrap;
         }
 
@@ -167,7 +167,7 @@ foreach ($rows as $r) {
         /* ===== Table ===== */
         .ls-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .ls-table th, .ls-table td { border: 1px solid #111; padding: 6px 8px; text-align: left; }
-        .ls-table thead th { background: #fee2e2; color: #b91c1c; font-weight: 700; text-align: center; }
+        .ls-table thead th { background: #f4f4f5; color: #111; font-weight: 700; text-align: center; }
         .ls-table .cnt  { text-align: center; width: 40px; }
         .ls-table .mat  { text-align: center; width: 130px; }
         .ls-table .cls  { text-align: center; width: 100px; }
@@ -180,7 +180,7 @@ foreach ($rows as $r) {
             html, body { background: #fff; }
             .cs-doc { box-shadow: none; border: none; padding: 0; margin: 0; max-width: none; }
             .no-print { display: none !important; }
-            .ls-table thead th { background: #fee2e2 !important; -webkit-print-color-adjust: exact; }
+            .ls-table thead th { background: #f4f4f5 !important; -webkit-print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -188,7 +188,7 @@ foreach ($rows as $r) {
 <div class="cs-doc">
     <div class="cs-print-btns no-print">
         <button type="button" onclick="window.print()">Imprimer la liste</button>
-        <a href="stagiaires.php">Retour</a>
+        <a href="cotisations.php">Retour</a>
     </div>
 
     <!-- Letterhead -->
