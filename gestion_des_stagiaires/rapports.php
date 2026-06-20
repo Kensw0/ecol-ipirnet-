@@ -96,7 +96,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         if ($selDateDe !== '') { $pWhere[] = 'mn.mois_ref >= ?'; $pParams[] = substr($selDateDe,0,7); }
         if ($selDateA  !== '') { $pWhere[] = 'mn.mois_ref <= ?'; $pParams[] = substr($selDateA, 0,7); }
         $sql = "SELECT mn.mois_ref,
-                       SUM(mn.montant_total) as du, SUM(mn.montant_paye) as percu, SUM(mn.montant_restant) as restant,
+                       SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)))) as du,
+                       SUM(mn.montant_paye) as percu,
+                       SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)) - mn.montant_paye)) as restant,
                        SUM(mn.statut_paiement='payé') as paye, SUM(mn.statut_paiement='partiel') as partiel,
                        SUM(mn.statut_paiement='impayé') as impaye, COUNT(*) as total
                 FROM mensualites mn JOIN stagiaires s ON s.id_stagiaire=mn.id_stagiaire
@@ -253,9 +255,9 @@ if ($isDir) {
     $pWhere = $pw ? 'WHERE ' . implode(' AND ', $pw) : '';
 
     $st = $pdo->prepare(
-        "SELECT SUM(mn.montant_total)  as total_du,
-                SUM(mn.montant_paye)   as total_percu,
-                SUM(mn.montant_restant) as total_restant,
+        "SELECT SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)))) as total_du,
+                SUM(mn.montant_paye) as total_percu,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)) - mn.montant_paye)) as total_restant,
                 SUM(mn.statut_paiement='payé')    as nb_paye,
                 SUM(mn.statut_paiement='partiel') as nb_partiel,
                 SUM(mn.statut_paiement='impayé')  as nb_impaye,
@@ -268,8 +270,9 @@ if ($isDir) {
 
     $st = $pdo->prepare(
         "SELECT mn.mois_ref,
-                SUM(mn.montant_total)  as du,   SUM(mn.montant_paye) as percu,
-                SUM(mn.montant_restant) as restant,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)))) as du,
+                SUM(mn.montant_paye) as percu,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)) - mn.montant_paye)) as restant,
                 SUM(mn.statut_paiement='payé')    as nb_paye,
                 SUM(mn.statut_paiement='partiel') as nb_partiel,
                 SUM(mn.statut_paiement='impayé')  as nb_impaye,
@@ -1084,9 +1087,9 @@ if ($isDir) {
     $pWhere = $pw ? 'WHERE ' . implode(' AND ', $pw) : '';
 
     $st = $pdo->prepare(
-        "SELECT SUM(mn.montant_total)  as total_du,
-                SUM(mn.montant_paye)   as total_percu,
-                SUM(mn.montant_restant) as total_restant,
+        "SELECT SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)))) as total_du,
+                SUM(mn.montant_paye) as total_percu,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)) - mn.montant_paye)) as total_restant,
                 SUM(mn.statut_paiement='payé')    as nb_paye,
                 SUM(mn.statut_paiement='partiel') as nb_partiel,
                 SUM(mn.statut_paiement='impayé')  as nb_impaye,
@@ -1099,8 +1102,9 @@ if ($isDir) {
 
     $st = $pdo->prepare(
         "SELECT mn.mois_ref,
-                SUM(mn.montant_total)  as du,   SUM(mn.montant_paye) as percu,
-                SUM(mn.montant_restant) as restant,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)))) as du,
+                SUM(mn.montant_paye) as percu,
+                SUM(GREATEST(0, mn.montant_total - COALESCE(mn.remise, COALESCE(s.remise_mensuelle, 0)) - mn.montant_paye)) as restant,
                 SUM(mn.statut_paiement='payé')    as nb_paye,
                 SUM(mn.statut_paiement='partiel') as nb_partiel,
                 SUM(mn.statut_paiement='impayé')  as nb_impaye,
