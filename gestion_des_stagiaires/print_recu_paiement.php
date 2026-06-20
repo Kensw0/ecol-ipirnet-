@@ -35,7 +35,17 @@ $mode         = trim((string) ($_GET['mode'] ?? ''));
 $tarifsDefaut  = [2 => 700.0, 3 => 600.0, 4 => 800.0];
 $idFiliere     = (int)($s['id_filiere'] ?? 0);
 $tarifStd      = $tarifsDefaut[$idFiliere] ?? 700.0;
-$montantTotal  = $m && $m['montant_total']   !== null ? number_format((float)$m['montant_total'],   2, '.', ' ') : number_format($tarifStd, 2, '.', ' ');
+// Remise: per-payment remise from mensualites, or student's global remise_mensuelle
+$remisePmt = $m ? max(0.0, (float)($m['remise'] ?? 0)) : 0.0;
+if ($remisePmt === 0.0) {
+    // Fall back to student's global monthly discount
+    $stRem = $pdo->prepare('SELECT COALESCE(remise_mensuelle, 0) FROM stagiaires WHERE id_stagiaire = ?');
+    $stRem->execute([$id]);
+    $remisePmt = max(0.0, (float)($stRem->fetchColumn() ?: 0));
+}
+$tarifBrut     = $m && $m['montant_total'] !== null ? (float)$m['montant_total'] : $tarifStd;
+$tarifEffectif = max(0.0, $tarifBrut - $remisePmt);
+$montantTotal  = number_format($tarifEffectif, 2, '.', ' ');
 $montantPaye   = $m && $m['montant_paye']    !== null ? number_format((float)$m['montant_paye'],    2, '.', ' ') : '—';
 $montantRestant= $m && $m['montant_restant'] !== null ? number_format((float)$m['montant_restant'], 2, '.', ' ') : '—';
 $statutPay     = $m ? (string)($m['statut_paiement'] ?? '') : '';
@@ -323,9 +333,19 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
                 <th>Statut</th>
                 <td><strong><?= h($statutLabel) ?></strong></td>
             </tr>
+            <?php if ($remisePmt > 0): ?>
+            <tr>
+                <th>Tarif standard</th>
+                <td><?= number_format($tarifBrut, 2, '.', ' ') ?> MAD</td>
+            </tr>
+            <tr>
+                <th>Réduction accordée</th>
+                <td style="color:#1a7a1a; font-weight:700;">- <?= number_format($remisePmt, 2, '.', ' ') ?> MAD</td>
+            </tr>
+            <?php endif; ?>
             <tr>
                 <th>Montant mensuel dû</th>
-                <td><?= h($montantTotal) ?> MAD</td>
+                <td><strong><?= h($montantTotal) ?> MAD</strong></td>
             </tr>
             <tr>
                 <th>Montant payé</th>
