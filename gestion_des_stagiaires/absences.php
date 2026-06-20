@@ -157,21 +157,25 @@ if ($highlightAid > 0) {
 $allAnnees   = $pdo->query("SELECT DISTINCT annee_scolaire FROM classes WHERE annee_scolaire REGEXP '^[0-9]{4}/[0-9]{4}$' ORDER BY annee_scolaire DESC")->fetchAll(PDO::FETCH_COLUMN);
 if ($selAnnee === '') { $selAnnee = $_SESSION['global_annee_scolaire'] ?? ($allAnnees[0] ?? ''); }
 $allFilieres = $pdo->query("SELECT DISTINCT f.id_filiere, f.nom_filiere FROM filieres f INNER JOIN classes c ON c.id_filiere=f.id_filiere ORDER BY f.nom_filiere")->fetchAll();
+if ($selFiliere === 0 && !empty($allFilieres)) { $selFiliere = (int)$allFilieres[0]['id_filiere']; }
 
 $allNiveaux = [];
 if ($selFiliere > 0 && $selAnnee !== '') {
     $st = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
     $st->execute([$selFiliere,$selAnnee]); $allNiveaux = $st->fetchAll(PDO::FETCH_COLUMN);
+    if ($selNiveau === '' && !empty($allNiveaux)) { $selNiveau = $allNiveaux[0]; }
 }
 $allClasses = [];
 if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
     $st = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
     $st->execute([$selFiliere,$selAnnee,$selNiveau]); $allClasses = $st->fetchAll();
+    if ($selClasse === 0 && !empty($allClasses)) { $selClasse = (int)$allClasses[0]['id_classe']; }
 }
 $allModules = [];
 if ($selFiliere > 0) {
     $st = $pdo->prepare("SELECT id_module, nom_module FROM modules WHERE id_filiere=? ORDER BY nom_module");
     $st->execute([$selFiliere]); $allModules = $st->fetchAll();
+    if ($selModule === 0 && !empty($allModules)) { $selModule = (int)$allModules[0]['id_module']; }
 }
 
 // ── STUDENT DATA ──────────────────────────────────────────────────────────
