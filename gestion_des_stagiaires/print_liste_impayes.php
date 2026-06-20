@@ -69,8 +69,9 @@ if ($filterNiveau !== '')  { $where[] = 'c.niveau = ?';         $params[] = $fil
 if ($idClasse     > 0)    { $where[] = 's.id_classe = ?';      $params[] = $idClasse;     }
 
 $sql = "SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom,
-               c.nom_classe, f.nom_filiere,
-               m.montant_restant, m.montant_total
+               c.nom_classe, c.id_filiere, f.nom_filiere,
+               COALESCE(s.remise_mensuelle, 0) as remise_mensuelle,
+               m.montant_restant, m.montant_total, m.remise
         FROM stagiaires s
         JOIN classes  c ON c.id_classe  = s.id_classe
         JOIN filieres f ON f.id_filiere = c.id_filiere
@@ -82,10 +83,25 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
+// Filière tarif defaults
+$tarifsDefaut = [2 => 700.0, 3 => 600.0, 4 => 800.0];
+
 $total        = count($rows);
 $totalRestant = 0.0;
 foreach ($rows as $r) {
-    $totalRestant += (float)($r['montant_restant'] ?? $r['montant_total'] ?? 0);
+    $remiseMens = max(0.0, (float)($r['remise_mensuelle'] ?? 0));
+    $remisePmt  = max(0.0, (float)($r['remise'] ?? 0));
+    $eRemise    = $remisePmt > 0 ? $remisePmt : $remiseMens;
+    $tarifDef   = $tarifsDefaut[(int)($r['id_filiere'] ?? 0)] ?? 700.0;
+    if ($r['montant_restant'] !== null) {
+        // Record exists: restant is stored, but subtract remise if not already applied
+        $totalRestant += max(0.0, (float)$r['montant_restant']);
+    } elseif ($r['montant_total'] !== null) {
+        $totalRestant += max(0.0, (float)$r['montant_total'] - $eRemise);
+    } else {
+        // No record at all: full effective tarif is owed
+        $totalRestant += max(0.0, $tarifDef - $eRemise);
+    }
 }
 ?><!DOCTYPE html>
 <html lang="fr">
@@ -169,8 +185,9 @@ foreach ($rows as $r) {
         .ls-table th, .ls-table td { border: 1px solid #111; padding: 6px 8px; text-align: left; }
         .ls-table thead th { background: #f4f4f5; color: #111; font-weight: 700; text-align: center; }
         .ls-table .cnt  { text-align: center; width: 40px; }
-        .ls-table .mat  { text-align: center; width: 130px; }
-        .ls-table .cls  { text-align: center; width: 100px; }
+        .ls-table .mat  { text-align: center; width: 120px; }
+        .ls-table .cls  { text-align: center; width: 90px; }
+        .ls-table .amt  { text-align: right; width: 110px; }
         .ls-empty { text-align: center; font-style: italic; padding: 20px; }
 
         /* ===== Footer ===== */
@@ -239,23 +256,45 @@ foreach ($rows as $r) {
                 <th>Nom &amp; Prénom</th>
                 <th class="cls">Classe</th>
                 <th>Filière</th>
+                <th class="amt">Restant dû (MAD)</th>
             </tr>
         </thead>
         <tbody>
             <?php if (!$rows): ?>
-                <tr><td colspan="5" class="ls-empty">Aucun retard de paiement détecté pour ce mois. ✅</td></tr>
+                <tr><td colspan="6" class="ls-empty">Aucun retard de paiement détecté pour ce mois. ✅</td></tr>
             <?php else: ?>
-                <?php $i = 0; foreach ($rows as $r): $i++; ?>
+                <?php $i = 0; foreach ($rows as $r): $i++;
+                    $rRemiseMens = max(0.0, (float)($r['remise_mensuelle'] ?? 0));
+                    $rRemisePmt  = max(0.0, (float)($r['remise'] ?? 0));
+                    $rERemise    = $rRemisePmt > 0 ? $rRemisePmt : $rRemiseMens;
+                    $rTarifDef   = $tarifsDefaut[(int)($r['id_filiere'] ?? 0)] ?? 700.0;
+                    if ($r['montant_restant'] !== null) {
+                        $rRestant = max(0.0, (float)$r['montant_restant']);
+                    } elseif ($r['montant_total'] !== null) {
+                        $rRestant = max(0.0, (float)$r['montant_total'] - $rERemise);
+                    } else {
+                        $rRestant = max(0.0, $rTarifDef - $rERemise);
+                    }
+                ?>
                 <tr>
                     <td class="cnt"><?= $i ?></td>
                     <td class="mat"><?= h((string)($r['num_inscri'] ?? '')) ?></td>
                     <td><strong><?= h(strtoupper((string)($r['nom'] ?? ''))) ?></strong> <?= h(ucwords(mb_strtolower((string)($r['prenom'] ?? ''), 'UTF-8'))) ?></td>
                     <td class="cls"><?= h((string)($r['nom_classe'] ?? '')) ?></td>
                     <td style="font-size:0.9rem;"><?= h((string)($r['nom_filiere'] ?? '')) ?></td>
+                    <td class="amt" style="font-weight:700; color:#b91c1c;"><?= number_format($rRestant, 2, ',', ' ') ?></td>
                 </tr>
                 <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
+        <?php if ($rows): ?>
+        <tfoot>
+            <tr>
+                <th colspan="5" style="text-align:right; background:#f4f4f5; font-weight:700;">Total restant dû</th>
+                <th class="amt" style="background:#f4f4f5; font-weight:700; color:#b91c1c;"><?= number_format($totalRestant, 2, ',', ' ') ?> MAD</th>
+            </tr>
+        </tfoot>
+        <?php endif; ?>
     </table>
 
     <!-- Signature block -->
