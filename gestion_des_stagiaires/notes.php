@@ -52,21 +52,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_save_notes'])) {
             $sid = (int)$sid;
             if ($sid <= 0) continue;
 
-            // Contrôles 1..nb_controles
+            // Contrôles 1..nb_controles — skip blank (never insert NULL)
             for ($i = 1; $i <= $nb_controles; $i++) {
                 $key = "controle_$i";
-                $raw = $vals[$key] ?? '';
-                $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
+                $raw = trim((string)($vals[$key] ?? ''));
+                if ($raw === '') continue;
+                $val = (float)str_replace(',', '.', $raw);
+                if ($val < 0 || $val > 20) continue;
                 $stmt->execute([$sid, $id_module, $val, $key]);
             }
-            // Théorique
-            $raw = $vals['theorique'] ?? '';
-            $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
-            $stmt->execute([$sid, $id_module, $val, 'theorique']);
-            // Pratique
-            $raw = $vals['pratique'] ?? '';
-            $val = $raw === '' ? null : (float)str_replace(',', '.', $raw);
-            $stmt->execute([$sid, $id_module, $val, 'pratique']);
+            // Théorique — skip blank
+            $raw = trim((string)($vals['theorique'] ?? ''));
+            if ($raw !== '') {
+                $val = (float)str_replace(',', '.', $raw);
+                if ($val >= 0 && $val <= 20) $stmt->execute([$sid, $id_module, $val, 'theorique']);
+            }
+            // Pratique — skip blank
+            $raw = trim((string)($vals['pratique'] ?? ''));
+            if ($raw !== '') {
+                $val = (float)str_replace(',', '.', $raw);
+                if ($val >= 0 && $val <= 20) $stmt->execute([$sid, $id_module, $val, 'pratique']);
+            }
 
             $saved++;
         }
