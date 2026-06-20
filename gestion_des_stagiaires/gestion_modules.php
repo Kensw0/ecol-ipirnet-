@@ -5,42 +5,55 @@
   $pageTitle = 'Gestion des Modules';
   $curPage   = 'modules';
 
-  // ── POST: save module fields ──────────────────────────────────────────────
+  // ── POST ──────────────────────────────────────────────────────────────────
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       csrf_verify();
       header('Content-Type: application/json');
 
-      if (isset($_POST['save_nb_controles'])) {
-          $idModule    = (int)($_POST['id_module']    ?? 0);
-          $nbControles = (int)($_POST['nb_controles'] ?? 0);
-          if ($idModule <= 0 || $nbControles < 0 || $nbControles > 10) {
+      // ── Save all module fields (merged handler) ──────────────────────────
+      if (isset($_POST['save_all_fields'])) {
+          $idModule     = (int)($_POST['id_module']     ?? 0);
+          $nbControles  = (int)($_POST['nb_controles']  ?? 0);
+          $coefficient  = (float)str_replace(',', '.', (string)($_POST['coefficient']   ?? 0));
+          $semestre     = (int)($_POST['semestre']      ?? 0);
+          $masseHoraire = (float)str_replace(',', '.', (string)($_POST['masse_horaire'] ?? 0));
+          if ($idModule <= 0
+              || $nbControles  < 0  || $nbControles  > 10
+              || $coefficient  < 1  || $coefficient  > 7
+              || $semestre     < 1  || $semestre     > 2
+              || $masseHoraire < 0  || $masseHoraire > 9999) {
               echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
           }
           try {
-              $pdo->prepare("UPDATE modules SET nb_controles=? WHERE id_module=?")
-                  ->execute([$nbControles, $idModule]);
-              echo json_encode(['success' => true, 'msg' => 'Nombre de contrôles mis à jour.', 'nb_controles' => $nbControles]);
+              $pdo->prepare("UPDATE modules SET nb_controles=?, coefficient=?, semestre=?, masse_horaire=? WHERE id_module=?")
+                  ->execute([$nbControles, $coefficient, $semestre, $masseHoraire, $idModule]);
+              echo json_encode(['success' => true, 'msg' => 'Module mis à jour.']);
           } catch (\Throwable $e) {
               echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
           }
           exit;
       }
 
-      if (isset($_POST['save_module_fields'])) {
-          $idModule      = (int)($_POST['id_module']      ?? 0);
-          $coefficient   = (float)str_replace(',', '.', (string)($_POST['coefficient']   ?? 0));
-          $semestre      = (int)($_POST['semestre']       ?? 0);
-          $masseHoraire  = (float)str_replace(',', '.', (string)($_POST['masse_horaire'] ?? 0));
-          if ($idModule <= 0
-              || $coefficient < 1 || $coefficient > 7
-              || $semestre < 1   || $semestre > 2
-              || $masseHoraire < 0 || $masseHoraire > 9999) {
-              echo json_encode(['success' => false, 'error' => 'Données invalides. Coeff. 1–7, semestre 1–2.']); exit;
+      // ── Add new module ───────────────────────────────────────────────────
+      if (isset($_POST['add_module'])) {
+          $nomModule    = trim((string)($_POST['nom_module']    ?? ''));
+          $idFiliere    = (int)($_POST['id_filiere']            ?? 0);
+          $coefficient  = (float)str_replace(',', '.', (string)($_POST['coefficient']   ?? 0));
+          $semestre     = (int)($_POST['semestre']              ?? 0);
+          $masseHoraire = (float)str_replace(',', '.', (string)($_POST['masse_horaire'] ?? 0));
+          $nbControles  = (int)($_POST['nb_controles']          ?? 0);
+          if ($nomModule === '' || $idFiliere <= 0
+              || $coefficient  < 1 || $coefficient  > 7
+              || $semestre     < 1 || $semestre     > 2
+              || $masseHoraire < 0 || $masseHoraire > 9999
+              || $nbControles  < 0 || $nbControles  > 10) {
+              echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
           }
           try {
-              $pdo->prepare("UPDATE modules SET coefficient=?, semestre=?, masse_horaire=? WHERE id_module=?")
-                  ->execute([$coefficient, $semestre, $masseHoraire, $idModule]);
-              echo json_encode(['success' => true, 'msg' => 'Module mis à jour.']);
+              $pdo->prepare("INSERT INTO modules (nom_module, id_filiere, coefficient, semestre, masse_horaire, nb_controles) VALUES (?,?,?,?,?,?)")
+                  ->execute([$nomModule, $idFiliere, $coefficient, $semestre, $masseHoraire, $nbControles]);
+              $newId = (int)$pdo->lastInsertId();
+              echo json_encode(['success' => true, 'msg' => 'Module créé.', 'id_module' => $newId, 'id_filiere' => $idFiliere]);
           } catch (\Throwable $e) {
               echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
           }
@@ -181,6 +194,64 @@
           </select>
       </div>
       <?php endif; ?>
+      <div style="margin-left:auto;align-self:flex-end;">
+          <button class="btn-save-nb" onclick="openAddModal()" style="background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.4);color:#d8b4fe;padding:.5rem 1.2rem;">
+              <i class="fa-solid fa-plus" style="margin-right:.4rem;"></i>Ajouter un module
+          </button>
+      </div>
+  </div>
+
+  <!-- ── Add module modal ───────────────────────────────────────────────── -->
+  <div id="modal-add-module" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+      <div style="background:#12121f;border:1px solid rgba(168,85,247,.35);border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;">
+          <button onclick="closeAddModal()" style="position:absolute;top:.85rem;right:.85rem;background:none;border:none;color:#71717a;font-size:1.1rem;cursor:pointer;">✕</button>
+          <h3 style="margin:0 0 1.5rem;font-size:1.05rem;font-weight:700;color:#fff;">
+              <i class="fa-solid fa-plus" style="color:#a855f7;margin-right:.5rem;"></i>Ajouter un module
+          </h3>
+          <div style="display:flex;flex-direction:column;gap:1rem;">
+              <div>
+                  <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Nom du module *</label>
+                  <input type="text" id="add-nom-module" placeholder="ex: Techniques de Réseaux"
+                         style="width:100%;background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.5rem .85rem;font-size:.9rem;outline:none;box-sizing:border-box;">
+              </div>
+              <div>
+                  <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Filière *</label>
+                  <select id="add-filiere" style="width:100%;background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.5rem .85rem;font-size:.9rem;cursor:pointer;outline:none;box-sizing:border-box;">
+                      <?php foreach ($allFilieres as $f): ?>
+                      <option value="<?= h((string)$f['id_filiere']) ?>" <?= $selFiliere === (int)$f['id_filiere'] ? 'selected' : '' ?>><?= h($f['nom_filiere']) ?></option>
+                      <?php endforeach; ?>
+                  </select>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;">
+                  <div>
+                      <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Coefficient (1–7)</label>
+                      <input type="number" id="add-coefficient" min="1" max="7" step="0.5" value="1"
+                             class="mod-nb-input" style="width:100%;box-sizing:border-box;">
+                  </div>
+                  <div>
+                      <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Semestre</label>
+                      <select id="add-semestre" class="mod-nb-input" style="width:100%;padding:.4rem .5rem;cursor:pointer;box-sizing:border-box;">
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Masse horaire (h)</label>
+                      <input type="number" id="add-masse-horaire" min="0" max="9999" step="0.5" value="0"
+                             class="mod-nb-input" style="width:100%;box-sizing:border-box;">
+                  </div>
+                  <div>
+                      <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Nb. contrôles</label>
+                      <input type="number" id="add-nb-controles" min="0" max="10" value="0"
+                             class="mod-nb-input" style="width:100%;box-sizing:border-box;">
+                  </div>
+              </div>
+              <span id="add-module-msg" class="mod-save-msg" style="min-height:1.2rem;"></span>
+              <button class="btn-save-nb" onclick="submitAddModule()" style="width:100%;padding:.6rem;font-size:.95rem;">
+                  <i class="fa-solid fa-floppy-disk" style="margin-right:.4rem;"></i>Créer le module
+              </button>
+          </div>
+      </div>
   </div>
 
   <?php if ($moduleInfo): ?>
@@ -194,47 +265,35 @@
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
               <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Nb. contrôles</label>
-              <div style="display:flex;align-items:center;gap:.5rem;">
-                  <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10"
-                         value="<?= h((string)$nbControles) ?>">
-                  <button class="btn-save-nb" onclick="saveNbControles()">
-                      <i class="fa-solid fa-floppy-disk" style="margin-right:.3rem;"></i>Sauv.
-                  </button>
-                  <span id="save-nb-msg" class="mod-save-msg"></span>
-              </div>
+              <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10"
+                     value="<?= h((string)$nbControles) ?>">
           </div>
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
               <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Coefficient <span style="font-weight:400;opacity:.6;">(1–7)</span></label>
-              <div style="display:flex;align-items:center;gap:.5rem;">
-                  <input type="number" id="mod-coefficient-input" class="mod-nb-input" min="1" max="7" step="0.5"
-                         style="width:80px;" value="<?= h((string)($moduleInfo['coefficient'] ?? 1)) ?>">
-              </div>
+              <input type="number" id="mod-coefficient-input" class="mod-nb-input" min="1" max="7" step="0.5"
+                     style="width:80px;" value="<?= h((string)($moduleInfo['coefficient'] ?? 1)) ?>">
           </div>
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
               <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Semestre</label>
-              <div style="display:flex;align-items:center;gap:.5rem;">
-                  <select id="mod-semestre-input" class="mod-nb-input" style="width:80px;padding:.35rem .5rem;cursor:pointer;">
-                      <option value="1" <?= ($moduleInfo['semestre'] ?? 1) == 1 ? 'selected' : '' ?>>1</option>
-                      <option value="2" <?= ($moduleInfo['semestre'] ?? 1) == 2 ? 'selected' : '' ?>>2</option>
-                  </select>
-              </div>
+              <select id="mod-semestre-input" class="mod-nb-input" style="width:80px;padding:.35rem .5rem;cursor:pointer;">
+                  <option value="1" <?= ($moduleInfo['semestre'] ?? 1) == 1 ? 'selected' : '' ?>>1</option>
+                  <option value="2" <?= ($moduleInfo['semestre'] ?? 1) == 2 ? 'selected' : '' ?>>2</option>
+              </select>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:.35rem;">
               <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Masse horaire <span style="font-weight:400;opacity:.6;">(h)</span></label>
-              <div style="display:flex;align-items:center;gap:.5rem;">
-                  <input type="number" id="mod-masse-horaire-input" class="mod-nb-input" min="0" max="9999" step="0.5"
-                         style="width:90px;" value="<?= h((string)($moduleInfo['masse_horaire'] ?? 0)) ?>">
-              </div>
+              <input type="number" id="mod-masse-horaire-input" class="mod-nb-input" min="0" max="9999" step="0.5"
+                     style="width:90px;" value="<?= h((string)($moduleInfo['masse_horaire'] ?? 0)) ?>">
           </div>
 
-          <div>
-              <button class="btn-save-nb" onclick="saveModuleFields()" style="padding:.45rem 1.25rem;">
+          <div style="display:flex;align-items:flex-end;gap:.65rem;">
+              <button class="btn-save-nb" onclick="saveAllFields()" style="padding:.45rem 1.25rem;">
                   <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer
               </button>
-              <span id="save-fields-msg" class="mod-save-msg"></span>
+              <span id="save-all-msg" class="mod-save-msg"></span>
           </div>
 
       </div>
@@ -325,33 +384,26 @@
       window.location.href = url.toString();
   }
 
-  function saveModuleFields() {
+  function saveAllFields() {
       const idModule     = <?= (int)$selModule ?>;
+      const nbControles  = parseInt(document.getElementById('nb-controles-input')?.value  ?? '', 10);
       const coefficient  = parseFloat(document.getElementById('mod-coefficient-input')?.value ?? '');
-      const semestre     = parseInt(document.getElementById('mod-semestre-input')?.value ?? '', 10);
+      const semestre     = parseInt(document.getElementById('mod-semestre-input')?.value   ?? '', 10);
       const masseHoraire = parseFloat(document.getElementById('mod-masse-horaire-input')?.value ?? '');
-      const msgEl        = document.getElementById('save-fields-msg');
-      if (isNaN(coefficient) || coefficient < 1 || coefficient > 7) {
-          msgEl.textContent = 'Coefficient invalide (1–7).';
-          msgEl.style.color = '#fca5a5';
-          return;
-      }
-      if (isNaN(semestre) || semestre < 1 || semestre > 2) {
-          msgEl.textContent = 'Semestre invalide (1 ou 2).';
-          msgEl.style.color = '#fca5a5';
-          return;
-      }
-      if (isNaN(masseHoraire) || masseHoraire < 0) {
-          msgEl.textContent = 'Masse horaire invalide.';
-          msgEl.style.color = '#fca5a5';
-          return;
-      }
+      const msgEl        = document.getElementById('save-all-msg');
+
+      if (isNaN(nbControles)  || nbControles  < 0  || nbControles  > 10) { msgEl.textContent = 'Nb. contrôles invalide (0–10).'; msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(coefficient)  || coefficient  < 1  || coefficient  > 7)  { msgEl.textContent = 'Coefficient invalide (1–7).';    msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(semestre)     || semestre     < 1  || semestre     > 2)  { msgEl.textContent = 'Semestre invalide (1 ou 2).';    msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(masseHoraire) || masseHoraire < 0)                       { msgEl.textContent = 'Masse horaire invalide.';         msgEl.style.color = '#fca5a5'; return; }
+
       msgEl.textContent = 'Enregistrement…';
       msgEl.style.color = '#a1a1aa';
 
       const fd = new FormData();
-      fd.append('save_module_fields', '1');
+      fd.append('save_all_fields', '1');
       fd.append('id_module',     idModule);
+      fd.append('nb_controles',  nbControles);
       fd.append('coefficient',   coefficient);
       fd.append('semestre',      semestre);
       fd.append('masse_horaire', masseHoraire);
@@ -376,23 +428,53 @@
           });
   }
 
-  function saveNbControles() {
-      const idModule    = <?= (int)$selModule ?>;
-      const nbControles = parseInt(document.getElementById('nb-controles-input').value, 10);
-      const msgEl       = document.getElementById('save-nb-msg');
-      if (isNaN(nbControles) || nbControles < 0 || nbControles > 10) {
-          msgEl.textContent = 'Valeur invalide (0–10).';
-          msgEl.style.color = '#fca5a5';
-          return;
-      }
-      msgEl.textContent = 'Enregistrement…';
+  function openAddModal() {
+      const m = document.getElementById('modal-add-module');
+      m.style.display = 'flex';
+      document.getElementById('add-nom-module').focus();
+  }
+
+  function closeAddModal() {
+      document.getElementById('modal-add-module').style.display = 'none';
+      document.getElementById('add-module-msg').textContent = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeAddModal();
+  });
+
+  document.getElementById('modal-add-module').addEventListener('click', function(e) {
+      if (e.target === this) closeAddModal();
+  });
+
+  function submitAddModule() {
+      const nomModule    = document.getElementById('add-nom-module').value.trim();
+      const idFiliere    = parseInt(document.getElementById('add-filiere').value, 10);
+      const coefficient  = parseFloat(document.getElementById('add-coefficient').value);
+      const semestre     = parseInt(document.getElementById('add-semestre').value, 10);
+      const masseHoraire = parseFloat(document.getElementById('add-masse-horaire').value);
+      const nbControles  = parseInt(document.getElementById('add-nb-controles').value, 10);
+      const msgEl        = document.getElementById('add-module-msg');
+
+      if (!nomModule)                                                        { msgEl.textContent = 'Le nom du module est requis.';   msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(idFiliere)    || idFiliere    <= 0)                          { msgEl.textContent = 'Sélectionnez une filière.';       msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(coefficient)  || coefficient  < 1 || coefficient  > 7)      { msgEl.textContent = 'Coefficient invalide (1–7).';     msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(semestre)     || semestre     < 1 || semestre     > 2)      { msgEl.textContent = 'Semestre invalide (1 ou 2).';     msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(masseHoraire) || masseHoraire < 0)                          { msgEl.textContent = 'Masse horaire invalide.';          msgEl.style.color = '#fca5a5'; return; }
+      if (isNaN(nbControles)  || nbControles  < 0 || nbControles  > 10)    { msgEl.textContent = 'Nb. contrôles invalide (0–10).';  msgEl.style.color = '#fca5a5'; return; }
+
+      msgEl.textContent = 'Création en cours…';
       msgEl.style.color = '#a1a1aa';
 
       const fd = new FormData();
-      fd.append('save_nb_controles', '1');
-      fd.append('id_module',    idModule);
-      fd.append('nb_controles', nbControles);
-      fd.append('csrf_token',   document.querySelector('meta[name="csrf-token"]').content);
+      fd.append('add_module',    '1');
+      fd.append('nom_module',    nomModule);
+      fd.append('id_filiere',    idFiliere);
+      fd.append('coefficient',   coefficient);
+      fd.append('semestre',      semestre);
+      fd.append('masse_horaire', masseHoraire);
+      fd.append('nb_controles',  nbControles);
+      fd.append('csrf_token',    document.querySelector('meta[name="csrf-token"]').content);
 
       fetch('gestion_modules.php', { method: 'POST', body: fd })
           .then(r => r.json())
@@ -400,12 +482,14 @@
               if (d.success) {
                   msgEl.textContent = '✓ ' + d.msg;
                   msgEl.style.color = '#6ee7b7';
-                  setTimeout(() => location.reload(), 800);
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('id_filiere', d.id_filiere);
+                  url.searchParams.set('id_module',  d.id_module);
+                  setTimeout(() => { window.location.href = url.toString(); }, 600);
               } else {
                   msgEl.textContent = '✗ ' + d.error;
                   msgEl.style.color = '#fca5a5';
               }
-              setTimeout(() => { msgEl.textContent = ''; }, 4000);
           })
           .catch(() => {
               msgEl.textContent = '✗ Erreur réseau.';
