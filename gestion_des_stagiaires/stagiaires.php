@@ -2026,6 +2026,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (nv === currentVal) opt.selected = true;
             fltNiveau.appendChild(opt);
         });
+        // Auto-select first available option if nothing is selected
+        if (!fltNiveau.value && fltNiveau.options.length > 1) {
+            fltNiveau.value = fltNiveau.options[1].value;
+            fltNiveau.disabled = false;
+        }
     }
 
     // ── Rebuild the FILTER BAR classe dropdown (annee + filiere + niveau aware) ─
@@ -2054,6 +2059,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 fltClasse.appendChild(opt);
             }
         });
+        // Auto-select first available option if nothing is selected
+        if (!fltClasse.value && fltClasse.options.length > 1) {
+            fltClasse.value = fltClasse.options[1].value;
+            fltClasse.disabled = false;
+        }
     }
 
     // ── Rebuild the FILTER BAR année dropdown (filière-aware) ────────────────
@@ -2219,14 +2229,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── Initial render ───────────────────────────────────────────────────────
     sortTable();
+    // Step 0: auto-select first filière if none set from URL
+    if (fltFiliere && !fltFiliere.value && fltFiliere.options.length > 1) {
+        fltFiliere.value = fltFiliere.options[1].value;
+        rebuildFilterAnnees();
+    }
     // Step 1: rebuild niveau options based on pre-selected année + filière (from URL ?a= ?f=)
+    //         rebuildFilterNiveaux now auto-selects first option when nothing is chosen
     rebuildFilterNiveaux();
-    // Step 2: restore pre-selected niveau from URL (?niv=), stored in data-selected-niveau by PHP
+    // Step 2: restore pre-selected niveau from URL (?niv=) — overrides auto-select if provided
     const _savedNiveau = fltNiveau ? fltNiveau.dataset.selectedNiveau : '';
     if (_savedNiveau && fltNiveau) { fltNiveau.value = _savedNiveau; }
     // Step 3: rebuild classe options based on pre-selected année + filière + niveau
+    //         rebuildFilterClasses now auto-selects first option when nothing is chosen
     rebuildFilterClasses();
-    // Step 4: restore pre-selected classe from URL (?c=), stored in data-selected-classe by PHP
+    // Step 4: restore pre-selected classe from URL (?c=) — overrides auto-select if provided
     const _savedClasse = fltClasse ? fltClasse.dataset.selectedClasse : '';
     if (_savedClasse && fltClasse) { fltClasse.value = _savedClasse; }
     // Step 5: trigger gdsTableFilter with all pre-selected values.
