@@ -638,7 +638,7 @@ usort($anneesList, fn($a, $b) => strcmp((string)$b, (string)$a));
 
 // Default = most recent school year (first item in $anneesList which is sorted DESC).
 // Falls back to empty string if no valid years exist.
-$currentAnnee = !empty($anneesList) ? $anneesList[0] : '';
+$currentAnnee = $_SESSION['global_annee_scolaire'] ?? (!empty($anneesList) ? $anneesList[0] : '');
 $navAnnee = (string) ($_GET['a'] ?? $currentAnnee);
 // Validate — must be a known valid year or empty (= all years)
 if ($navAnnee !== '' && !in_array($navAnnee, $anneesList, true)) {
