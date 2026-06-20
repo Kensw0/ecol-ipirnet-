@@ -151,7 +151,7 @@ function log_document_gen(PDO $pdo, string $type, int $idStagiaire, ?string $ref
     $allowed = [
         'certificat_scolarite', 'billet_excuse', 'etat_mensualites', 'fiche_inscription', 'recu_paiement',
         'releve_notes', 'bulletin', 'attestation_reussite', 'convention_stage',
-        'fiche_preinscription', 'liste_stagiaires', 'etat_paiement', 'autre',
+        'fiche_preinscription', 'liste_stagiaires', 'etat_paiement', 'rapport_individuel', 'autre',
     ];
     if (!in_array($type, $allowed, true)) {
         $type = 'autre';

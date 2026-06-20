@@ -22,6 +22,7 @@ $typeLabels = [
     'fiche_preinscription' => 'Fiche de Pré-inscription',
     'liste_stagiaires'     => 'Liste des Stagiaires',
     'etat_paiement'        => 'État de Paiement',
+    'rapport_individuel'   => 'Rapport Individuel',
     'autre'                => 'Autre',
 ];
 $typeIcons = [
@@ -37,6 +38,7 @@ $typeIcons = [
     'fiche_preinscription' => ['fa-clipboard-list',      'rgba(251,146,60,0.15)',  '#fb923c'],
     'liste_stagiaires'     => ['fa-users',               'rgba(129,140,248,0.15)', '#818cf8'],
     'etat_paiement'        => ['fa-file-invoice',        'rgba(244,114,182,0.15)', '#f472b6'],
+    'rapport_individuel'   => ['fa-file-lines',          'rgba(251,146,60,0.15)',  '#fb923c'],
     'autre'                => ['fa-file',                'rgba(113,113,122,0.15)', '#71717a'],
 ];
 
