@@ -26,7 +26,7 @@ if ($selFiliere > 0 && $selAnnee !== '') {
     $stNiv = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
     $stNiv->execute([$selFiliere, $selAnnee]);
     $allNiveaux = $stNiv->fetchAll(PDO::FETCH_COLUMN);
-    if ($selNiveau === '' && !empty($allNiveaux)) { $selNiveau = $allNiveaux[0]; }
+    if (!empty($allNiveaux) && !in_array($selNiveau, $allNiveaux, true)) { $selNiveau = $allNiveaux[0]; }
 }
 
 $allClasses = [];
@@ -34,7 +34,8 @@ if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
     $stCl = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
     $stCl->execute([$selFiliere, $selAnnee, $selNiveau]);
     $allClasses = $stCl->fetchAll();
-    if ($selClasse === 0 && !empty($allClasses)) { $selClasse = (int)$allClasses[0]['id_classe']; }
+    $_vcids = array_map('intval', array_column($allClasses, 'id_classe'));
+    if (!empty($allClasses) && !in_array($selClasse, $_vcids, true)) { $selClasse = (int)$allClasses[0]['id_classe']; }
 }
 
 // ── LOAD STAGIAIRES + STAGES ──────────────────────────────────────────────────
@@ -323,7 +324,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="filter-group">
                     <label>Niveau</label>
                     <select name="niveau" id="f-niveau" <?= $selFiliere == 0 ? 'disabled' : '' ?>>
-                        <option value="">— Choisir —</option>
+                        <?php if (empty($allNiveaux)): ?><option value="">— Aucun —</option><?php endif; ?>
                         <?php foreach ($allNiveaux as $n): ?>
                             <option value="<?= h($n) ?>" <?= $n === $selNiveau ? 'selected' : '' ?>><?= h($n) ?></option>
                         <?php endforeach; ?>
@@ -332,7 +333,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="filter-group">
                     <label>Classe</label>
                     <select name="id_classe" id="f-classe" <?= $selNiveau === '' ? 'disabled' : '' ?>>
-                        <option value="0">— Choisir —</option>
+                        <?php if (empty($allClasses)): ?><option value="0">— Aucune —</option><?php endif; ?>
                         <?php foreach ($allClasses as $c): ?>
                             <option value="<?= $c['id_classe'] ?>" <?= $c['id_classe'] == $selClasse ? 'selected' : '' ?>><?= h($c['nom_classe']) ?></option>
                         <?php endforeach; ?>

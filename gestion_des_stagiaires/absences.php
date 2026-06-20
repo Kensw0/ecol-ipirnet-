@@ -163,13 +163,14 @@ $allNiveaux = [];
 if ($selFiliere > 0 && $selAnnee !== '') {
     $st = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
     $st->execute([$selFiliere,$selAnnee]); $allNiveaux = $st->fetchAll(PDO::FETCH_COLUMN);
-    if ($selNiveau === '' && !empty($allNiveaux)) { $selNiveau = $allNiveaux[0]; }
+    if (!empty($allNiveaux) && !in_array($selNiveau, $allNiveaux, true)) { $selNiveau = $allNiveaux[0]; }
 }
 $allClasses = [];
 if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
     $st = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
     $st->execute([$selFiliere,$selAnnee,$selNiveau]); $allClasses = $st->fetchAll();
-    if ($selClasse === 0 && !empty($allClasses)) { $selClasse = (int)$allClasses[0]['id_classe']; }
+    $_vcids = array_map('intval', array_column($allClasses, 'id_classe'));
+    if (!empty($allClasses) && !in_array($selClasse, $_vcids, true)) { $selClasse = (int)$allClasses[0]['id_classe']; }
 }
 $allModules = [];
 if ($selFiliere > 0) {
@@ -344,7 +345,7 @@ require __DIR__ . '/includes/header.php';
 
         <label>Niveau
           <select name="niveau" onchange="this.form.submit()" <?= ($selFiliere===0||$selAnnee==='')?'disabled':'' ?>>
-            <option value="">— Choisir —</option>
+            <?php if (empty($allNiveaux)): ?><option value="">— Aucun —</option><?php endif; ?>
             <?php foreach ($allNiveaux as $niv): ?>
               <option value="<?= h($niv) ?>" <?= $selNiveau===$niv?'selected':'' ?>><?= h($niv) ?></option>
             <?php endforeach; ?>
@@ -353,7 +354,7 @@ require __DIR__ . '/includes/header.php';
 
         <label>Classe
           <select name="id_classe" onchange="this.form.submit()" <?= ($selNiveau===''||$selFiliere===0)?'disabled':'' ?>>
-            <option value="0">— Choisir —</option>
+            <?php if (empty($allClasses)): ?><option value="0">— Aucune —</option><?php endif; ?>
             <?php foreach ($allClasses as $cl): ?>
               <option value="<?= (int)$cl['id_classe'] ?>" <?= $selClasse===(int)$cl['id_classe']?'selected':'' ?>><?= h($cl['nom_classe']) ?></option>
             <?php endforeach; ?>
