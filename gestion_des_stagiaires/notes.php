@@ -38,10 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_save_notes'])) {
     $saved        = 0;
 
     if ($id_module > 0 && is_array($rows)) {
+        // Delete existing notes for these students first to avoid stale/duplicate rows
+        $validSids = array_filter(array_map('intval', array_keys($rows)));
+        if (!empty($validSids)) {
+            $delPh = implode(',', array_fill(0, count($validSids), '?'));
+            $pdo->prepare("DELETE FROM module_notes WHERE id_module=? AND id_stagiaire IN ($delPh)")
+                ->execute(array_merge([$id_module], $validSids));
+        }
         $stmt = $pdo->prepare(
-            'INSERT INTO module_notes (id_stagiaire, id_module, note, type)
-             VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE note = VALUES(note)'
+            'INSERT INTO module_notes (id_stagiaire, id_module, note, type) VALUES (?, ?, ?, ?)'
         );
         foreach ($rows as $sid => $vals) {
             $sid = (int)$sid;
