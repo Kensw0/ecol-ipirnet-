@@ -509,7 +509,7 @@ require_once __DIR__ . '/includes/header.php';
                     <thead>
                         <tr>
                             <th style="width:8%;white-space:nowrap;">Code</th>
-                            <th style="width:25%;">Stagiaire</th>
+                            <th style="width:22%;">Stagiaire</th>
                             <?php if ($nb_controles === 1): ?>
                                 <th class="th-group-controle">Contrôle</th>
                             <?php else: ?>
@@ -519,6 +519,7 @@ require_once __DIR__ . '/includes/header.php';
                             <?php endif; ?>
                             <th class="th-group-examen">Théorique</th>
                             <th class="th-group-examen">Pratique</th>
+                            <th style="white-space:nowrap;text-align:center;">Relevés</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -561,6 +562,25 @@ require_once __DIR__ . '/includes/header.php';
                                 value="<?= h($np) ?>"
                                 min="0" max="20" step="0.25"
                                 placeholder="—">
+                        </td>
+                        <td style="text-align:center;white-space:nowrap;padding:0.4rem 0.5rem;">
+                            <div style="display:flex;flex-direction:column;gap:0.3rem;align-items:center;">
+                                <a href="print_releve_notes.php?id=<?= $sid ?>&mode=combined" target="_blank"
+                                   title="Relevé Complet"
+                                   style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.22rem 0.55rem;border-radius:6px;font-size:0.72rem;font-weight:600;text-decoration:none;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#c4b5fd;white-space:nowrap;">
+                                    <i class="fa-solid fa-print"></i> Complet
+                                </a>
+                                <a href="print_releve_notes.php?id=<?= $sid ?>&mode=controle" target="_blank"
+                                   title="Relevé Contrôles"
+                                   style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.22rem 0.55rem;border-radius:6px;font-size:0.72rem;font-weight:600;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;white-space:nowrap;">
+                                    <i class="fa-solid fa-list-check"></i> Contrôles
+                                </a>
+                                <a href="print_releve_notes.php?id=<?= $sid ?>&mode=examen" target="_blank"
+                                   title="Relevé Examens"
+                                   style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.22rem 0.55rem;border-radius:6px;font-size:0.72rem;font-weight:600;text-decoration:none;background:rgba(20,184,166,0.12);border:1px solid rgba(20,184,166,0.3);color:#5eead4;white-space:nowrap;">
+                                    <i class="fa-solid fa-clipboard-check"></i> Examens
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
