@@ -1694,6 +1694,7 @@ if (isset($_GET['id'])) {
                     
                     <a href="print_recu_paiement.php?id=<?= $sid_doc ?>&mois=<?=h(date('Y-m'))?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon pink"><i class="fa-solid fa-receipt"></i></div><span>Reçu de Paiement</span></a>
                     <a href="print_etat_paiement.php?id=<?= $sid_doc ?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon" style="background:rgba(16,185,129,0.15);color:#10b981;"><i class="fa-solid fa-file-invoice-dollar"></i></div><span>État Général des Paiements</span></a>
+                    <a href="print_etat_paiements_annuel.php?id_stagiaire=<?= $sid_doc ?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon" style="background:rgba(59,130,246,0.15);color:#3b82f6;"><i class="fa-solid fa-calendar-check"></i></div><span>État des Paiements</span></a>
                     <a href="print_rapport_individuel.php?id=<?= $sid_doc ?>&auto=1" target="_blank" class="doc-v2-link"><div class="doc-v2-icon" style="background:rgba(168,85,247,0.15);color:#a855f7;"><i class="fa-solid fa-file-lines"></i></div><span>Rapport Individuel</span></a>
                     <?php foreach($hubStages as $stgDoc): ?>
                         <a href="print_convention_stage.php?id=<?= (int)$stgDoc['id_stage'] ?>&auto=1" target="_blank" class="doc-v2-link">
