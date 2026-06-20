@@ -635,6 +635,13 @@ require __DIR__ . '/includes/header.php';
                 <i class="fa-solid fa-receipt"></i> Reçu
               </a>
               <?php endif; ?>
+              <a href="print_etat_paiements_annuel.php?id_stagiaire=<?= (int)$s['id_stagiaire'] ?>&auto=1" target="_blank"
+                 class="btn-cot btn-cot sm"
+                 style="text-decoration:none;background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.25);"
+                 onmouseover="this.style.background='rgba(59,130,246,.2)'" onmouseout="this.style.background='rgba(59,130,246,.1)'"
+                 title="État annuel des paiements">
+                <i class="fa-solid fa-calendar-check"></i> État annuel
+              </a>
             </div>
           </td>
         </tr>
