@@ -5,7 +5,7 @@
   $pageTitle = 'Gestion des Modules';
   $curPage   = 'modules';
 
-  // ── POST: save nb_controles ───────────────────────────────────────────────
+  // ── POST: save module fields ──────────────────────────────────────────────
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       csrf_verify();
       header('Content-Type: application/json');
@@ -25,6 +25,24 @@
           }
           exit;
       }
+
+      if (isset($_POST['save_module_fields'])) {
+          $idModule    = (int)($_POST['id_module']    ?? 0);
+          $coefficient = (float)str_replace(',', '.', (string)($_POST['coefficient'] ?? 0));
+          $semestre    = (int)($_POST['semestre']     ?? 0);
+          if ($idModule <= 0 || $coefficient < 0 || $coefficient > 99 || $semestre < 1 || $semestre > 10) {
+              echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
+          }
+          try {
+              $pdo->prepare("UPDATE modules SET coefficient=?, semestre=? WHERE id_module=?")
+                  ->execute([$coefficient, $semestre, $idModule]);
+              echo json_encode(['success' => true, 'msg' => 'Module mis à jour.', 'coefficient' => $coefficient, 'semestre' => $semestre]);
+          } catch (\Throwable $e) {
+              echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+          }
+          exit;
+      }
+
       echo json_encode(['success' => false, 'error' => 'Action inconnue.']); exit;
   }
 
@@ -166,18 +184,46 @@
       <h2><i data-lucide="layers" width="18" height="18" style="vertical-align:-3px;margin-right:.4rem;stroke:#a855f7;"></i><?= h($moduleInfo['nom_module']) ?></h2>
       <div class="mod-meta-grid">
           <div class="mod-meta-item"><div class="label">Filière</div><div class="value"><?= h($moduleInfo['nom_filiere']) ?></div></div>
-          <div class="mod-meta-item"><div class="label">Coefficient</div><div class="value"><?= h((string)($moduleInfo['coefficient'] ?? '—')) ?></div></div>
           <div class="mod-meta-item"><div class="label">Masse horaire</div><div class="value"><?= h((string)($moduleInfo['masse_horaire'] ?? '—')) ?> h</div></div>
-          <div class="mod-meta-item"><div class="label">Semestre</div><div class="value"><?= h((string)($moduleInfo['semestre'] ?? '—')) ?></div></div>
       </div>
-      <div class="mod-nb-form">
-          <label for="nb-controles-input">Nombre de contrôles&nbsp;:</label>
-          <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10"
-                 value="<?= h((string)$nbControles) ?>">
-          <button class="btn-save-nb" onclick="saveNbControles()">
-              <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer
-          </button>
-          <span id="save-nb-msg" class="mod-save-msg"></span>
+
+      <div class="mod-nb-form" style="flex-wrap:wrap;gap:1.25rem;align-items:flex-end;">
+
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Nb. contrôles</label>
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                  <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10"
+                         value="<?= h((string)$nbControles) ?>">
+                  <button class="btn-save-nb" onclick="saveNbControles()">
+                      <i class="fa-solid fa-floppy-disk" style="margin-right:.3rem;"></i>Sauv.
+                  </button>
+                  <span id="save-nb-msg" class="mod-save-msg"></span>
+              </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Coefficient</label>
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                  <input type="number" id="mod-coefficient-input" class="mod-nb-input" min="0" max="99" step="0.5"
+                         style="width:80px;" value="<?= h((string)($moduleInfo['coefficient'] ?? 0)) ?>">
+              </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+              <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;">Semestre</label>
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                  <input type="number" id="mod-semestre-input" class="mod-nb-input" min="1" max="10"
+                         style="width:80px;" value="<?= h((string)($moduleInfo['semestre'] ?? 1)) ?>">
+              </div>
+          </div>
+
+          <div>
+              <button class="btn-save-nb" onclick="saveModuleFields()" style="padding:.45rem 1.25rem;">
+                  <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer coeff. &amp; semestre
+              </button>
+              <span id="save-fields-msg" class="mod-save-msg"></span>
+          </div>
+
       </div>
   </div>
 
@@ -264,6 +310,45 @@
       if (m) url.searchParams.set('id_module', m);
       else url.searchParams.delete('id_module');
       window.location.href = url.toString();
+  }
+
+  function saveModuleFields() {
+      const idModule    = <?= (int)$selModule ?>;
+      const coefficient = parseFloat(document.getElementById('mod-coefficient-input')?.value ?? '');
+      const semestre    = parseInt(document.getElementById('mod-semestre-input')?.value ?? '', 10);
+      const msgEl       = document.getElementById('save-fields-msg');
+      if (isNaN(coefficient) || coefficient < 0 || isNaN(semestre) || semestre < 1 || semestre > 10) {
+          msgEl.textContent = 'Valeurs invalides.';
+          msgEl.style.color = '#fca5a5';
+          return;
+      }
+      msgEl.textContent = 'Enregistrement…';
+      msgEl.style.color = '#a1a1aa';
+
+      const fd = new FormData();
+      fd.append('save_module_fields', '1');
+      fd.append('id_module',    idModule);
+      fd.append('coefficient',  coefficient);
+      fd.append('semestre',     semestre);
+      fd.append('csrf_token',   document.querySelector('meta[name="csrf-token"]').content);
+
+      fetch('gestion_modules.php', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(d => {
+              if (d.success) {
+                  msgEl.textContent = '✓ ' + d.msg;
+                  msgEl.style.color = '#6ee7b7';
+                  setTimeout(() => location.reload(), 800);
+              } else {
+                  msgEl.textContent = '✗ ' + d.error;
+                  msgEl.style.color = '#fca5a5';
+              }
+              setTimeout(() => { msgEl.textContent = ''; }, 4000);
+          })
+          .catch(() => {
+              msgEl.textContent = '✗ Erreur réseau.';
+              msgEl.style.color = '#fca5a5';
+          });
   }
 
   function saveNbControles() {
