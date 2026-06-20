@@ -163,13 +163,7 @@ if ($idClasse > 0) {
     </table>
 
     <div class="doc-title">Tableau de Notes de Contrôle</div>
-    <?php if ($nb_controles > 1): ?>
     <div class="doc-subtitle">Contrôle N° <?= $controleNo ?></div>
-    <?php else: ?>
-    <div class="controle-no-line" style="text-align:right;font-size:.88rem;margin-bottom:8px;">
-        Contrôle N° : <span style="border-bottom:1px solid #111;display:inline-block;width:80px;padding-left:6px;">1</span>
-    </div>
-    <?php endif; ?>
 
     <!-- Meta -->
     <table class="meta-table">
