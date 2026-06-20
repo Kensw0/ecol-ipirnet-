@@ -19,12 +19,14 @@ $allAnnees  = $pdo->query("SELECT DISTINCT annee_scolaire FROM classes WHERE ann
 if ($selAnnee === '') { $selAnnee = $_SESSION['global_annee_scolaire'] ?? ($allAnnees[0] ?? ''); }
 
 $allFilieres = $pdo->query("SELECT DISTINCT f.id_filiere, f.nom_filiere FROM filieres f INNER JOIN classes c ON c.id_filiere=f.id_filiere ORDER BY f.nom_filiere")->fetchAll();
+if ($selFiliere === 0 && !empty($allFilieres)) { $selFiliere = (int)$allFilieres[0]['id_filiere']; }
 
 $allNiveaux = [];
 if ($selFiliere > 0 && $selAnnee !== '') {
     $stNiv = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
     $stNiv->execute([$selFiliere, $selAnnee]);
     $allNiveaux = $stNiv->fetchAll(PDO::FETCH_COLUMN);
+    if ($selNiveau === '' && !empty($allNiveaux)) { $selNiveau = $allNiveaux[0]; }
 }
 
 $allClasses = [];
@@ -32,6 +34,7 @@ if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
     $stCl = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
     $stCl->execute([$selFiliere, $selAnnee, $selNiveau]);
     $allClasses = $stCl->fetchAll();
+    if ($selClasse === 0 && !empty($allClasses)) { $selClasse = (int)$allClasses[0]['id_classe']; }
 }
 
 // ── LOAD STAGIAIRES + STAGES ──────────────────────────────────────────────────
