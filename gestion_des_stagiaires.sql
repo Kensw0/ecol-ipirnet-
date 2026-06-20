@@ -88,7 +88,7 @@ INSERT INTO `classes` (`id_classe`, `nom_classe`, `annee_scolaire`, `niveau`, `i
 
 CREATE TABLE `documents_generes` (
   `id_gen` int(10) UNSIGNED NOT NULL,
-  `type_document` enum('certificat_scolarite','billet_excuse','etat_mensualites','releve_notes','bulletin','attestation_reussite','convention_stage','fiche_inscription','recu_paiement','autre') NOT NULL,
+  `type_document` enum('certificat_scolarite','billet_excuse','etat_mensualites','releve_notes','bulletin','attestation_reussite','convention_stage','fiche_inscription','recu_paiement','fiche_preinscription','liste_stagiaires','etat_paiement','rapport_individuel','autre') NOT NULL DEFAULT 'autre',
   `id_stagiaire` int(10) UNSIGNED NOT NULL,
   `reference` varchar(64) DEFAULT NULL,
   `genere_le` datetime NOT NULL DEFAULT current_timestamp()
