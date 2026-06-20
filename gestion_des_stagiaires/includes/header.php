@@ -349,6 +349,11 @@ if (!$isPublic && isset($pdo)) {
                 <a href="gestion_modules.php" class="nav-item<?= $curPage === 'modules' ? ' active' : '' ?>">
                     <i data-lucide="layers" width="18" height="18"></i> <span>Gestion des modules</span>
                 </a>
+                <?php if (gds_is_directeur()): ?>
+                <a href="gestion_classes.php" class="nav-item<?= $curPage === 'classes' ? ' active' : '' ?>">
+                    <i data-lucide="school" width="18" height="18"></i> <span>Gestion des classes</span>
+                </a>
+                <?php endif; ?>
                 <a href="historique_documents.php" class="nav-item<?= $curPage === 'historique_docs' ? ' active' : '' ?>">
                     <i data-lucide="scroll-text" width="18" height="18"></i> <span>Historique Documents</span>
                 </a>
