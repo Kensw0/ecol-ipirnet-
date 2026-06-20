@@ -175,7 +175,6 @@ $allModules = [];
 if ($selFiliere > 0) {
     $st = $pdo->prepare("SELECT id_module, nom_module FROM modules WHERE id_filiere=? ORDER BY nom_module");
     $st->execute([$selFiliere]); $allModules = $st->fetchAll();
-    if ($selModule === 0 && !empty($allModules)) { $selModule = (int)$allModules[0]['id_module']; }
 }
 
 // ── STUDENT DATA ──────────────────────────────────────────────────────────
