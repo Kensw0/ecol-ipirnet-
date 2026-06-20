@@ -153,6 +153,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ── Student full-year payment detail ─────────────────────────────────
+    if (isset($_POST['get_student_payments'])) {
+        $sid = (int)($_POST['id_stagiaire'] ?? 0);
+        if ($sid <= 0) { echo json_encode(['success' => false, 'error' => 'ID invalide.']); exit; }
+
+        // Get student's class info for annee_scolaire + tarif
+        $stSt = $pdo->prepare(
+            'SELECT s.nom, s.prenom, s.num_inscri, c.annee_scolaire, c.id_filiere
+             FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe
+             WHERE s.id_stagiaire = ?'
+        );
+        $stSt->execute([$sid]);
+        $info = $stSt->fetch();
+        if (!$info) { echo json_encode(['success' => false, 'error' => 'Stagiaire introuvable.']); exit; }
+
+        $tarif  = getTarif((int)$info['id_filiere'], $tarifsDefaut);
+        $annee  = (string)$info['annee_scolaire']; // e.g. "2025/2026"
+        $parts  = explode('/', $annee);
+        $year1  = (int)($parts[0] ?? date('Y'));
+        $year2  = (int)($parts[1] ?? ($year1 + 1));
+
+        $moisList = [
+            sprintf('%04d-09', $year1), sprintf('%04d-10', $year1),
+            sprintf('%04d-11', $year1), sprintf('%04d-12', $year1),
+            sprintf('%04d-01', $year2), sprintf('%04d-02', $year2),
+            sprintf('%04d-03', $year2), sprintf('%04d-04', $year2),
+            sprintf('%04d-05', $year2), sprintf('%04d-06', $year2),
+        ];
+
+        // Fetch all existing records for these months
+        $ph = implode(',', array_fill(0, count($moisList), '?'));
+        $stPay = $pdo->prepare(
+            "SELECT mois_ref, montant_total, montant_paye, montant_restant,
+                    statut_paiement, est_paye, date_paiement
+             FROM mensualites WHERE id_stagiaire = ? AND mois_ref IN ($ph)"
+        );
+        $stPay->execute(array_merge([$sid], $moisList));
+        $records = [];
+        foreach ($stPay->fetchAll() as $r) { $records[$r['mois_ref']] = $r; }
+
+        // Build month rows
+        $rows = [];
+        $totDu = 0; $totPaye = 0; $totRest = 0;
+        $lastPayDate = null;
+        foreach ($moisList as $m) {
+            $r  = $records[$m] ?? null;
+            $du   = $r ? (float)$r['montant_total']   : $tarif;
+            $paye = $r ? (float)$r['montant_paye']     : 0.0;
+            $rest = $r ? (float)$r['montant_restant']  : $du;
+            $stat = $r ? (string)$r['statut_paiement'] : '';
+            $date = $r ? $r['date_paiement']            : null;
+            if ($date) $lastPayDate = $date;
+            $totDu   += $du;
+            $totPaye += $paye;
+            $totRest += $rest;
+            $rows[] = ['mois' => $m, 'du' => $du, 'paye' => $paye, 'restant' => $rest,
+                       'statut' => $stat, 'date_paiement' => $date];
+        }
+
+        echo json_encode([
+            'success'   => true,
+            'nom'       => trim((string)$info['nom'] . ' ' . (string)$info['prenom']),
+            'num_inscri'=> (string)$info['num_inscri'],
+            'annee'     => $annee,
+            'tarif'     => $tarif,
+            'rows'      => $rows,
+            'total_du'  => $totDu,
+            'total_paye'=> $totPaye,
+            'total_rest'=> $totRest,
+            'last_pay_date' => $lastPayDate,
+        ]);
+        exit;
+    }
+
     echo json_encode(['success' => false, 'error' => 'Action inconnue.']); exit;
 }
 
@@ -296,6 +370,40 @@ require __DIR__ . '/includes/header.php';
 .amount-green{color:#34d399;font-weight:700;}
 .amount-red{color:#f87171;font-weight:700;}
 .amount-gray{color:#71717a;}
+
+/* ── Student payment drawer ── */
+.pmt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:none;transition:opacity .25s;}
+.pmt-overlay.open{display:block;}
+.pmt-drawer{position:fixed;top:0;right:0;height:100%;width:min(520px,100vw);background:#18181b;border-left:1px solid rgba(255,255,255,.1);z-index:10001;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;overflow:hidden;}
+.pmt-drawer.open{transform:translateX(0);}
+.pmt-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
+.pmt-drawer-title{font-size:1.05rem;font-weight:700;color:#f4f4f5;margin:0 0 .2rem;}
+.pmt-drawer-sub{font-size:.78rem;color:#71717a;}
+.pmt-drawer-body{flex:1;overflow-y:auto;padding:1.25rem 1.5rem;}
+.pmt-drawer-foot{flex-shrink:0;border-top:1px solid rgba(255,255,255,.07);padding:1rem 1.5rem;}
+.pmt-month-table{width:100%;border-collapse:collapse;font-size:.84rem;}
+.pmt-month-table th{padding:.45rem .6rem;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:#71717a;font-weight:600;border-bottom:1px solid rgba(255,255,255,.07);}
+.pmt-month-table td{padding:.55rem .6rem;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;color:#e4e4e7;}
+.pmt-month-table tbody tr:hover td{background:rgba(168,85,247,.06);}
+.pmt-month-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.pmt-month-name{font-weight:600;white-space:nowrap;}
+.pmt-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap;}
+.pmt-badge.paye{background:rgba(52,211,153,.13);color:#34d399;border:1px solid rgba(52,211,153,.3);}
+.pmt-badge.partiel{background:rgba(251,146,60,.13);color:#fb923c;border:1px solid rgba(251,146,60,.3);}
+.pmt-badge.impaye{background:rgba(248,113,113,.13);color:#f87171;border:1px solid rgba(248,113,113,.3);}
+.pmt-badge.aucun{background:rgba(113,113,122,.1);color:#71717a;border:1px solid rgba(113,113,122,.2);}
+.pmt-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.85rem;}
+.pmt-sum-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.7rem .85rem;text-align:center;}
+.pmt-sum-val{font-size:1.1rem;font-weight:800;line-height:1.1;margin-bottom:.2rem;}
+.pmt-sum-lbl{font-size:.67rem;text-transform:uppercase;letter-spacing:.06em;color:#71717a;}
+.pmt-last-pay{font-size:.8rem;color:#71717a;text-align:center;}
+.btn-stag-name{background:none;border:none;color:#e4e4e7;font-weight:600;cursor:pointer;padding:0;text-align:left;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(168,85,247,.5);transition:color .15s;}
+.btn-stag-name:hover{color:#c084fc;}
+.btn-eye{background:none;border:none;color:#52525b;cursor:pointer;padding:0 0 0 6px;font-size:.85rem;transition:color .15s;vertical-align:middle;}
+.btn-eye:hover{color:#a855f7;}
+.pmt-skeleton{display:flex;flex-direction:column;gap:.6rem;padding:.5rem 0;}
+.pmt-skel-row{height:32px;background:rgba(255,255,255,.05);border-radius:6px;animation:skel-pulse 1.2s ease-in-out infinite;}
+@keyframes skel-pulse{0%,100%{opacity:.5;}50%{opacity:1;}}
 </style>
 
 <div style="max-width:1200px;margin:0 auto;padding:1.5rem;">
@@ -454,7 +562,8 @@ require __DIR__ . '/includes/header.php';
             <input type="checkbox" class="row-cb" value="<?= (int)$s['id_stagiaire'] ?>" onchange="updateBulkBar()">
           </td>
           <td>
-            <div style="font-weight:600;color:#e4e4e7;"><?= h(trim($s['nom'].' '.$s['prenom'])) ?></div>
+            <button type="button" class="btn-stag-name" onclick="openPmtDrawer(<?= (int)$s['id_stagiaire'] ?>)"><?= h(trim($s['nom'].' '.$s['prenom'])) ?></button>
+            <button type="button" class="btn-eye" onclick="openPmtDrawer(<?= (int)$s['id_stagiaire'] ?>)" title="Voir historique annuel"><i class="fa-solid fa-eye"></i></button>
             <div style="font-size:.76rem;color:#71717a;"><?= h((string)($s['num_inscri'] ?? '')) ?></div>
           </td>
           <td style="text-align:right;" class="col-du"><?= number_format($mTotal, 2) ?> MAD</td>
@@ -581,6 +690,40 @@ require __DIR__ . '/includes/header.php';
         <i class="fa-solid fa-floppy-disk"></i> Enregistrer
       </button>
     </div>
+  </div>
+</div>
+
+<!-- ── STUDENT PAYMENT DRAWER ─────────────────────────────────────────────── -->
+<div id="pmt-overlay" class="pmt-overlay" onclick="closePmtDrawer()"></div>
+<div id="pmt-drawer" class="pmt-drawer">
+  <div class="pmt-drawer-head">
+    <div>
+      <div class="pmt-drawer-title" id="pmt-drawer-name">—</div>
+      <div class="pmt-drawer-sub" id="pmt-drawer-sub">—</div>
+    </div>
+    <button type="button" onclick="closePmtDrawer()" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:1.2rem;padding:.2rem;"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="pmt-drawer-body" id="pmt-drawer-body">
+    <div class="pmt-skeleton">
+      <?php for ($i=0;$i<10;$i++): ?><div class="pmt-skel-row"></div><?php endfor; ?>
+    </div>
+  </div>
+  <div class="pmt-drawer-foot" id="pmt-drawer-foot" style="display:none;">
+    <div class="pmt-summary-grid">
+      <div class="pmt-sum-card">
+        <div class="pmt-sum-val" id="pmt-tot-du" style="color:#a1a1aa;">—</div>
+        <div class="pmt-sum-lbl">Total Dû</div>
+      </div>
+      <div class="pmt-sum-card">
+        <div class="pmt-sum-val" id="pmt-tot-paye" style="color:#34d399;">—</div>
+        <div class="pmt-sum-lbl">Total Payé</div>
+      </div>
+      <div class="pmt-sum-card">
+        <div class="pmt-sum-val" id="pmt-tot-rest" style="color:#f87171;">—</div>
+        <div class="pmt-sum-lbl">Solde Global</div>
+      </div>
+    </div>
+    <div class="pmt-last-pay" id="pmt-last-pay"></div>
   </div>
 </div>
 
@@ -854,6 +997,110 @@ document.getElementById('gds-confirm-overlay')?.addEventListener('click', functi
 });
 document.getElementById('modal-pay')?.addEventListener('click', function(e) {
   if (e.target === this) closePayModal();
+});
+
+// ── Student full-year payment drawer ─────────────────────────────────────
+const MOIS_NOMS = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function openPmtDrawer(sid) {
+  const overlay = document.getElementById('pmt-overlay');
+  const drawer  = document.getElementById('pmt-drawer');
+  const body    = document.getElementById('pmt-drawer-body');
+  const foot    = document.getElementById('pmt-drawer-foot');
+
+  // Reset
+  document.getElementById('pmt-drawer-name').textContent = 'Chargement…';
+  document.getElementById('pmt-drawer-sub').textContent  = '';
+  body.innerHTML = '<div class="pmt-skeleton">' + Array(10).fill('<div class="pmt-skel-row"></div>').join('') + '</div>';
+  foot.style.display = 'none';
+
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const fd = new FormData();
+  fd.append('get_student_payments', '1');
+  fd.append('csrf_token', GDS_CSRF);
+  fd.append('id_stagiaire', sid);
+
+  fetch('cotisations.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) { body.innerHTML = `<div style="color:#f87171;padding:1rem;">${data.error || 'Erreur.'}</div>`; return; }
+
+      document.getElementById('pmt-drawer-name').textContent = data.nom;
+      document.getElementById('pmt-drawer-sub').textContent  =
+        (data.num_inscri ? data.num_inscri + ' · ' : '') + (data.annee || '') + ' · Tarif ' + fmtAmtN(data.tarif) + ' / mois';
+
+      // Build table
+      let html = '<table class="pmt-month-table"><thead><tr>' +
+        '<th>Mois</th><th style="text-align:right;">Dû</th><th style="text-align:right;">Payé</th>' +
+        '<th style="text-align:right;">Restant</th><th>Date paiement</th><th>Statut</th></tr></thead><tbody>';
+
+      data.rows.forEach(row => {
+        const [y, m] = row.mois.split('-');
+        const moisLabel = (MOIS_NOMS[parseInt(m)] || m) + ' ' + y;
+        const isPaye    = row.statut === 'payé';
+        const isPartiel = row.statut === 'partiel';
+        const isEmpty   = !row.statut;
+        const badgeCls  = isPaye ? 'paye' : isPartiel ? 'partiel' : isEmpty ? 'aucun' : 'impaye';
+        const badgeLbl  = isPaye ? 'Payé' : isPartiel ? 'Partiel' : isEmpty ? '—' : 'Impayé';
+        const restColor = row.restant > 0 ? 'color:#f87171;' : 'color:#71717a;';
+        const payeColor = row.paye  > 0   ? 'color:#34d399;' : 'color:#71717a;';
+        const dateStr   = row.date_paiement ? row.date_paiement.slice(0, 10) : '<span style="color:#3f3f46;">—</span>';
+
+        // Highlight current selected month row
+        const isSelMois = row.mois === SEL_MOIS;
+        const rowStyle  = isSelMois ? ' style="background:rgba(168,85,247,.08);"' : '';
+
+        html += `<tr${rowStyle}>
+          <td class="pmt-month-name">${isSelMois ? '<i class="fa-solid fa-circle" style="color:#a855f7;font-size:.45rem;vertical-align:middle;margin-right:5px;"></i>' : ''}${moisLabel}</td>
+          <td class="num">${fmtAmtN(row.du)}</td>
+          <td class="num" style="${payeColor}font-weight:600;">${fmtAmtN(row.paye)}</td>
+          <td class="num" style="${restColor}font-weight:600;">${fmtAmtN(row.restant)}</td>
+          <td style="font-size:.78rem;color:#a1a1aa;">${dateStr}</td>
+          <td><span class="pmt-badge ${badgeCls}">${badgeLbl}</span></td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      body.innerHTML = html;
+
+      // Footer summary
+      const restColor = data.total_rest > 0 ? '#f87171' : '#34d399';
+      document.getElementById('pmt-tot-du').textContent   = fmtAmtN(data.total_du);
+      document.getElementById('pmt-tot-paye').textContent = fmtAmtN(data.total_paye);
+      document.getElementById('pmt-tot-rest').textContent = fmtAmtN(data.total_rest);
+      document.getElementById('pmt-tot-rest').style.color = restColor;
+
+      const lastEl = document.getElementById('pmt-last-pay');
+      if (data.last_pay_date) {
+        lastEl.innerHTML = '<i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i>Dernier paiement : <strong style="color:#e4e4e7;">' + data.last_pay_date.slice(0,10) + '</strong>';
+      } else {
+        lastEl.innerHTML = '<i class="fa-regular fa-calendar-xmark" style="margin-right:4px;color:#f87171;"></i>Aucun paiement enregistré';
+      }
+      foot.style.display = '';
+    })
+    .catch(e => {
+      body.innerHTML = `<div style="color:#f87171;padding:1rem;">Erreur réseau : ${e.message}</div>`;
+    });
+}
+
+function closePmtDrawer() {
+  document.getElementById('pmt-overlay').classList.remove('open');
+  document.getElementById('pmt-drawer').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function fmtAmtN(v) {
+  return parseFloat(v || 0).toLocaleString('fr-MA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+}
+
+// Close drawer on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closePmtDrawer();
+    closePayModal();
+  }
 });
 </script>
 
