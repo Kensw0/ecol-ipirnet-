@@ -454,6 +454,27 @@ require_once __DIR__ . '/includes/header.php';
     <!-- ── Notes grid ── -->
     <?php if ($selClasse > 0 && $selModule > 0): ?>
 
+        <!-- nb_controles editor -->
+        <?php if ($moduleInfo): ?>
+        <div style="margin-bottom:1rem;">
+            <form method="post" action="notes.php" style="display:inline;">
+                <?= csrf_hidden() ?>
+                <input type="hidden" name="save_nb_controles" value="1">
+                <input type="hidden" name="id_module"    value="<?= $selModule ?>">
+                <input type="hidden" name="id_classe"    value="<?= $selClasse ?>">
+                <input type="hidden" name="annee"        value="<?= h($selAnnee) ?>">
+                <input type="hidden" name="id_filiere"   value="<?= $selFiliere ?>">
+                <input type="hidden" name="niveau"       value="<?= h($selNiveau) ?>">
+                <div class="ctrl-editor">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Nb. contrôles :</span>
+                    <input type="number" name="nb_controles" value="<?= $nb_controles ?>" min="1" max="10">
+                    <button type="submit">Mettre à jour</button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+
     <form method="post" action="notes.php">
         <?= csrf_hidden() ?>
         <input type="hidden" name="bulk_save_notes" value="1">
@@ -502,26 +523,6 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <!-- nb_controles editor -->
-        <?php if ($moduleInfo): ?>
-        <div style="margin-bottom:1rem;">
-            <form method="post" action="notes.php" style="display:inline;">
-                <?= csrf_hidden() ?>
-                <input type="hidden" name="save_nb_controles" value="1">
-                <input type="hidden" name="id_module"    value="<?= $selModule ?>">
-                <input type="hidden" name="id_classe"    value="<?= $selClasse ?>">
-                <input type="hidden" name="annee"        value="<?= h($selAnnee) ?>">
-                <input type="hidden" name="id_filiere"   value="<?= $selFiliere ?>">
-                <input type="hidden" name="niveau"       value="<?= h($selNiveau) ?>">
-                <div class="ctrl-editor">
-                    <i class="fa-solid fa-sliders"></i>
-                    <span>Nb. contrôles :</span>
-                    <input type="number" name="nb_controles" value="<?= $nb_controles ?>" min="1" max="10">
-                    <button type="submit">Mettre à jour</button>
-                </div>
-            </form>
-        </div>
-        <?php endif; ?>
 
         <?php if (count($stagiaires) === 0): ?>
         <div class="notes-empty">
