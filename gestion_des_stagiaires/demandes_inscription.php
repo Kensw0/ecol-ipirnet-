@@ -303,19 +303,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('demandes_inscription.php');
     }
 
-    /* ── BULK ACCEPT ── */
-    if (isset($_POST['bulk_accepter'])) {
-        $ids       = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids']      ?? []))));
-        $classeId  = (int)($_POST['bulk_id_classe'] ?? 0);
-        if (empty($ids) || $classeId <= 0) {
-            flash_set('Sélection ou classe manquante.');
-            redirect('demandes_inscription.php');
+    /* ── BULK PREFLIGHT (AJAX) ── */
+    if (isset($_POST['bulk_preflight'])) {
+        header('Content-Type: application/json');
+        // Ensure capacite column exists (soft-cap support)
+        try { $pdo->exec("ALTER TABLE classes ADD COLUMN IF NOT EXISTS capacite INT UNSIGNED NOT NULL DEFAULT 30"); } catch (\Throwable $ignored) {}
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? []))));
+        if (empty($ids)) { echo json_encode(['groups' => []]); exit; }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stRows = $pdo->prepare(
+            "SELECT d.id_demande, d.id_filiere, COALESCE(d.annee_scolaire_visee,'') AS annee_scolaire_visee,
+                    d.nom, d.prenom, f.nom_filiere
+             FROM pre_inscription d JOIN filieres f ON f.id_filiere = d.id_filiere
+             WHERE d.id_demande IN ($ph) AND d.statut = 'en_attente'"
+        );
+        $stRows->execute($ids);
+        $rawRows = $stRows->fetchAll();
+        $groups = [];
+        foreach ($rawRows as $r) {
+            $key = (int)$r['id_filiere'] . '|||' . $r['annee_scolaire_visee'];
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'id_filiere'  => (int)$r['id_filiere'],
+                    'nom_filiere' => $r['nom_filiere'],
+                    'annee'       => $r['annee_scolaire_visee'],
+                    'ids'         => [],
+                ];
+            }
+            $groups[$key]['ids'][] = (int)$r['id_demande'];
         }
-        // Verify class exists
-        $chkCls = $pdo->prepare('SELECT id_filiere FROM classes WHERE id_classe = ?');
-        $chkCls->execute([$classeId]);
-        if (!$chkCls->fetch()) {
-            flash_set('Classe invalide.');
+        $result = [];
+        foreach ($groups as $group) {
+            $clsQ = $pdo->prepare(
+                "SELECT c.id_classe, c.nom_classe, c.niveau, COALESCE(c.capacite, 30) AS capacite,
+                        COUNT(s.id_stagiaire) AS effectif
+                 FROM classes c LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
+                 WHERE c.id_filiere = ? AND c.annee_scolaire = ?
+                 GROUP BY c.id_classe ORDER BY c.niveau ASC LIMIT 1"
+            );
+            $clsQ->execute([$group['id_filiere'], $group['annee']]);
+            $cls   = $clsQ->fetch();
+            $count = count($group['ids']);
+            if (!$cls) {
+                $result[] = [
+                    'id_filiere'  => $group['id_filiere'],
+                    'nom_filiere' => $group['nom_filiere'],
+                    'annee'       => $group['annee'],
+                    'id_classe'   => 0,
+                    'nom_classe'  => null,
+                    'niveau'      => null,
+                    'count'       => $count,
+                    'effectif'    => 0,
+                    'capacite'    => 30,
+                    'status'      => 'no_class',
+                    'ids'         => $group['ids'],
+                ];
+            } else {
+                $effectif = (int)$cls['effectif'];
+                $capacite = (int)$cls['capacite'];
+                $result[] = [
+                    'id_filiere'  => $group['id_filiere'],
+                    'nom_filiere' => $group['nom_filiere'],
+                    'annee'       => $group['annee'],
+                    'id_classe'   => (int)$cls['id_classe'],
+                    'nom_classe'  => $cls['nom_classe'],
+                    'niveau'      => $cls['niveau'],
+                    'count'       => $count,
+                    'effectif'    => $effectif,
+                    'capacite'    => $capacite,
+                    'status'      => ($effectif + $count) <= $capacite ? 'ok' : 'full',
+                    'ids'         => $group['ids'],
+                ];
+            }
+        }
+        echo json_encode(['groups' => array_values($result)]);
+        exit;
+    }
+
+    /* ── BULK ACCEPT (auto-assign by filière) ── */
+    if (isset($_POST['bulk_accepter'])) {
+        $groupsRaw = trim((string)($_POST['bulk_groups'] ?? ''));
+        $groups = [];
+        try { $groups = json_decode($groupsRaw, true) ?: []; } catch (\Throwable $e) {}
+        if (empty($groups)) {
+            flash_set('Aucune donnée de groupe reçue.');
             redirect('demandes_inscription.php');
         }
         $di   = date('Y-m-d');
@@ -324,53 +395,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok   = 0; $skip = 0;
         $pdo->beginTransaction();
         try {
-            foreach ($ids as $idDem) {
-                $st = $pdo->prepare('SELECT * FROM pre_inscription WHERE id_demande = ? AND statut = ?');
-                $st->execute([$idDem, 'en_attente']);
-                $d = $st->fetch();
-                if (!$d) { $skip++; continue; }
-                // CIN duplicate check
-                $cin_val = strtoupper(trim((string)($d['cin'] ?? '')));
-                if ($cin_val !== '') {
-                    $chk = $pdo->prepare('SELECT id_stagiaire FROM stagiaires WHERE cin = ?');
-                    $chk->execute([$cin_val]);
-                    if ($chk->fetch()) { $skip++; continue; }
-                }
-                // Email duplicate check
-                $em = trim((string)($d['email'] ?? ''));
-                if ($em !== '') {
-                    $chkE = $pdo->prepare('SELECT COUNT(*) FROM stagiaires WHERE email = ?');
-                    $chkE->execute([$em]);
-                    if ((int)$chkE->fetchColumn() > 0) { $skip++; continue; }
-                }
-                // Generate num_inscri
-                $stGen = $pdo->prepare(
-                    "SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(num_inscri, '-', -1) AS UNSIGNED)), 0)
-                       FROM stagiaires WHERE num_inscri LIKE ?
-                        AND num_inscri REGEXP '^INS-[0-9]{4}-[0-9]{5}$'"
+            foreach ($groups as $group) {
+                $classeId = (int)($group['id_classe'] ?? 0);
+                $override = !empty($group['override']);
+                $ids      = array_values(array_filter(array_map('intval', (array)($group['ids'] ?? []))));
+                if ($classeId <= 0 || empty($ids)) { $skip += count((array)($group['ids'] ?? [])); continue; }
+                // Current occupancy
+                $capQ = $pdo->prepare(
+                    "SELECT COALESCE(c.capacite,30) AS cap, COUNT(s.id_stagiaire) AS eff
+                     FROM classes c LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
+                     WHERE c.id_classe = ? GROUP BY c.id_classe"
                 );
-                $stGen->execute(['INS-' . $year . '-%']);
-                $maxNum = (int)$stGen->fetchColumn();
-                $newNum = 'INS-' . $year . '-' . str_pad((string)($maxNum + 1), 5, '0', STR_PAD_LEFT);
-                $ins = $pdo->prepare(
-                    'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe)
-                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-                );
-                $ins->execute([
-                    $newNum, $cin_val ?: null, $d['nom'], $d['prenom'],
-                    $d['date_naissance'] ?: null, $d['adresse'] ?: null,
-                    $em ?: null, $d['telephone'] ?: null,
-                    $d['telephone_parent'] ?: null, $d['nom_tuteur'] ?: null,
-                    $hash, null, $di, $classeId,
-                ]);
-                $newId = (int)$pdo->lastInsertId();
-                $pdo->prepare('UPDATE pre_inscription SET statut = ?, date_decision = NOW(), id_stagiaire_cree = ? WHERE id_demande = ?')
-                    ->execute(['converti', $newId, $idDem]);
-                $ok++;
+                $capQ->execute([$classeId]);
+                $capRow = $capQ->fetch();
+                $cap    = $capRow ? (int)$capRow['cap'] : 30;
+                $eff    = $capRow ? (int)$capRow['eff'] : 0;
+                foreach ($ids as $idDem) {
+                    if (!$override && $eff >= $cap) { $skip++; continue; }
+                    $st = $pdo->prepare('SELECT * FROM pre_inscription WHERE id_demande = ? AND statut = ?');
+                    $st->execute([$idDem, 'en_attente']);
+                    $d = $st->fetch();
+                    if (!$d) { $skip++; continue; }
+                    $cin_val = strtoupper(trim((string)($d['cin'] ?? '')));
+                    if ($cin_val !== '') {
+                        $chk = $pdo->prepare('SELECT id_stagiaire FROM stagiaires WHERE cin = ?');
+                        $chk->execute([$cin_val]);
+                        if ($chk->fetch()) { $skip++; continue; }
+                    }
+                    $em = trim((string)($d['email'] ?? ''));
+                    if ($em !== '') {
+                        $chkE = $pdo->prepare('SELECT COUNT(*) FROM stagiaires WHERE email = ?');
+                        $chkE->execute([$em]);
+                        if ((int)$chkE->fetchColumn() > 0) { $skip++; continue; }
+                    }
+                    $stGen = $pdo->prepare(
+                        "SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(num_inscri,'-',-1) AS UNSIGNED)),0)
+                           FROM stagiaires WHERE num_inscri LIKE ?
+                            AND num_inscri REGEXP '^INS-[0-9]{4}-[0-9]{5}$'"
+                    );
+                    $stGen->execute(['INS-' . $year . '-%']);
+                    $maxNum = (int)$stGen->fetchColumn();
+                    $newNum = 'INS-' . $year . '-' . str_pad((string)($maxNum + 1), 5, '0', STR_PAD_LEFT);
+                    $pdo->prepare(
+                        'INSERT INTO stagiaires (num_inscri,cin,nom,prenom,date_naissance,adresse,email,telephone,telephone_parent,nom_tuteur,mot_de_passe,photo,date_inscription,id_classe)
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                    )->execute([
+                        $newNum, $cin_val ?: null, $d['nom'], $d['prenom'],
+                        $d['date_naissance'] ?: null, $d['adresse'] ?: null,
+                        $em ?: null, $d['telephone'] ?: null,
+                        $d['telephone_parent'] ?: null, $d['nom_tuteur'] ?: null,
+                        $hash, null, $di, $classeId,
+                    ]);
+                    $newId = (int)$pdo->lastInsertId();
+                    $pdo->prepare('UPDATE pre_inscription SET statut=?,date_decision=NOW(),id_stagiaire_cree=? WHERE id_demande=?')
+                        ->execute(['converti', $newId, $idDem]);
+                    $ok++; $eff++;
+                }
             }
             $pdo->commit();
             $msg = $ok . ' stagiaire(s) créé(s) avec succès.';
-            if ($skip > 0) $msg .= ' ' . $skip . ' ignoré(s) (CIN/email en doublon ou déjà traité).';
+            if ($skip > 0) $msg .= ' ' . $skip . ' ignoré(s) (classe pleine, doublon ou déjà traité).';
             flash_set($msg, 'success');
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1628,35 +1712,35 @@ document.getElementById('pi-add-modal').addEventListener('click', function(e) {
 // id_filiere is now a <select> — no JS needed to sync it
 </script>
 
-<!-- ── BULK ACCEPT MODAL ────────────────────────────────────── -->
-<div id="pi-bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10500;align-items:center;justify-content:center;">
-    <div style="background:#1a1a2e;border:1px solid rgba(16,185,129,0.3);border-radius:14px;padding:1.75rem;width:100%;max-width:440px;margin:1rem;">
+<!-- ── BULK ACCEPT MODAL (Pre-flight Summary) ─────────────────── -->
+<div id="pi-bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:10500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem;">
+    <div style="background:#13132a;border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:1.75rem 1.75rem 1.5rem;width:100%;max-width:700px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-            <h3 style="margin:0;font-size:1.05rem;color:#10b981;display:flex;align-items:center;gap:0.5rem;">
-                <i class="fa-solid fa-users-line"></i> Validation groupée
+            <h3 style="margin:0;font-size:1.05rem;color:#a855f7;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fa-solid fa-clipboard-check"></i> Vérification avant validation groupée
             </h3>
-            <button type="button" onclick="document.getElementById('pi-bulk-modal').style.display='none';" style="background:none;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" onclick="closeBulkModal()" style="background:none;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p id="pi-bulk-modal-desc" style="font-size:0.88rem;color:#a1a1aa;margin:0 0 1.25rem;"></p>
-        <label style="display:block;font-size:0.8rem;color:#a1a1aa;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
-            <i class="fa-solid fa-chalkboard-user" style="color:#10b981;margin-right:0.3rem;"></i>
-            Classe à affecter <span style="color:#ef4444;">*</span>
-        </label>
-        <select id="pi-bulk-classe-sel"
-                style="width:100%;background:#111;border:1.5px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:0.7rem 0.9rem;font-size:0.95rem;outline:none;cursor:pointer;transition:border-color 0.2s;margin-bottom:0.85rem;"
-                onchange="this.style.borderColor=this.value?'#10b981':'rgba(255,255,255,0.12)';">
-            <option value="">— Choisir une classe —</option>
-        </select>
-        <div id="pi-bulk-modal-err" style="display:none;align-items:center;gap:0.5rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.55rem 0.9rem;margin-bottom:0.85rem;font-size:0.85rem;color:#f87171;">
-            <i class="fa-solid fa-triangle-exclamation"></i> Veuillez sélectionner une classe.
+        <!-- Loading state -->
+        <div id="pi-bulk-modal-loading" style="text-align:center;padding:2rem 1rem;color:#a1a1aa;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size:1.5rem;color:#a855f7;margin-bottom:0.75rem;display:block;"></i>
+            Analyse en cours…
         </div>
-        <div style="display:flex;gap:0.75rem;">
-            <button type="button" id="pi-bulk-confirm-btn" style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
-                <i class="fa-solid fa-user-check"></i> Créer les stagiaires
-            </button>
-            <button type="button" onclick="document.getElementById('pi-bulk-modal').style.display='none';" style="padding:0.65rem 1rem;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#a1a1aa;font-weight:600;font-size:0.9rem;cursor:pointer;">
-                Annuler
-            </button>
+        <!-- Groups body -->
+        <div id="pi-bulk-modal-body" style="display:none;">
+            <p style="font-size:0.85rem;color:#a1a1aa;margin:0 0 1rem;">Candidats regroupés par filière. Vérifiez les capacités avant de confirmer.</p>
+            <div id="pi-bulk-groups-table"></div>
+            <div id="pi-bulk-modal-err" style="display:none;align-items:center;gap:0.5rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.55rem 0.9rem;margin:.75rem 0 0;font-size:0.85rem;color:#f87171;">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span id="pi-bulk-err-msg"></span>
+            </div>
+            <div style="display:flex;gap:0.75rem;margin-top:1.25rem;">
+                <button type="button" onclick="submitBulkAccept()" style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+                    <i class="fa-solid fa-user-check"></i> Confirmer l'inscription
+                </button>
+                <button type="button" onclick="closeBulkModal()" style="padding:0.65rem 1rem;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#a1a1aa;font-weight:600;font-size:0.9rem;cursor:pointer;">
+                    Annuler
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1665,8 +1749,7 @@ document.getElementById('pi-add-modal').addEventListener('click', function(e) {
 <form id="pi-bulk-form" method="post" style="display:none;">
     <?= csrf_hidden() ?>
     <div id="pi-bulk-ids-container"></div>
-    <input type="hidden" name="bulk_id_classe" id="pi-bulk-form-classe">
-    <input type="hidden" name="bulk_action" id="pi-bulk-form-action">
+    <input type="hidden" name="bulk_groups" id="pi-bulk-form-groups">
 </form>
 
 <script>
@@ -1760,69 +1843,154 @@ function bulkRefuse() {
     );
 }
 
+var _bulkPreflight = [];
+
+function closeBulkModal() {
+    document.getElementById('pi-bulk-modal').style.display = 'none';
+    document.getElementById('pi-bulk-modal-loading').style.display = 'block';
+    document.getElementById('pi-bulk-modal-body').style.display = 'none';
+    _bulkPreflight = [];
+}
+
 function bulkAccept() {
     if (_bulkSelected.size === 0) return;
-    var n = _bulkSelected.size;
 
-    // Build class options — gather unique filières from selected rows
-    var filIds = new Set();
-    _bulkSelected.forEach(function(id) {
-        var row = document.getElementById('pi-row-' + id);
-        if (row) filIds.add(parseInt(row.dataset.id_filiere || 0));
-    });
-
-    var allClasses = [];
-    filIds.forEach(function(fid) {
-        if (GDS_CLASSES_BY_FILIERE[fid]) {
-            GDS_CLASSES_BY_FILIERE[fid].forEach(function(cls) { allClasses.push(cls); });
-        }
-    });
-    // De-duplicate by id_classe
-    var seen = new Set();
-    allClasses = allClasses.filter(function(c) {
-        if (seen.has(c.id_classe)) return false;
-        seen.add(c.id_classe); return true;
-    });
-
-    var sel = document.getElementById('pi-bulk-classe-sel');
-    sel.innerHTML = '<option value="">— Choisir une classe —</option>';
-    allClasses.forEach(function(cls) {
-        var opt = document.createElement('option');
-        opt.value = cls.id_classe;
-        opt.textContent = cls.nom_classe + ' — ' + cls.niveau + ' (' + cls.annee_scolaire + ')';
-        sel.appendChild(opt);
-    });
-    sel.value = '';
-    sel.style.borderColor = 'rgba(255,255,255,0.12)';
-
-    document.getElementById('pi-bulk-modal-desc').textContent =
-        n + ' candidat(s) sélectionné(s). Choisissez la classe dans laquelle ils seront inscrits.';
+    // Show modal with loading spinner
+    document.getElementById('pi-bulk-modal').style.display = 'flex';
+    document.getElementById('pi-bulk-modal-loading').style.display = 'block';
+    document.getElementById('pi-bulk-modal-body').style.display = 'none';
     document.getElementById('pi-bulk-modal-err').style.display = 'none';
 
-    document.getElementById('pi-bulk-confirm-btn').onclick = function() {
-        var clsId = sel.value;
-        if (!clsId) {
-            document.getElementById('pi-bulk-modal-err').style.display = 'flex';
-            sel.focus(); return;
-        }
-        // Submit bulk accept form
-        var form = document.getElementById('pi-bulk-form');
-        document.getElementById('pi-bulk-ids-container').innerHTML = '';
-        _bulkSelected.forEach(function(id) {
-            var inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = 'bulk_ids[]'; inp.value = id;
-            document.getElementById('pi-bulk-ids-container').appendChild(inp);
-        });
-        var actionInp = document.createElement('input');
-        actionInp.type = 'hidden'; actionInp.name = 'bulk_accepter'; actionInp.value = '1';
-        document.getElementById('pi-bulk-ids-container').appendChild(actionInp);
-        document.getElementById('pi-bulk-form-classe').value = clsId;
-        document.getElementById('pi-bulk-modal').style.display = 'none';
-        form.submit();
-    };
+    var fd = new FormData();
+    fd.append('bulk_preflight', '1');
+    fd.append('csrf_token', <?= json_encode(csrf_token()) ?>);
+    _bulkSelected.forEach(function(id) { fd.append('bulk_ids[]', id); });
 
-    document.getElementById('pi-bulk-modal').style.display = 'flex';
-    setTimeout(function() { sel.focus(); }, 80);
+    fetch(window.location.pathname + window.location.search, { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            _bulkPreflight = data.groups || [];
+            renderBulkGroups(_bulkPreflight);
+        })
+        .catch(function() {
+            document.getElementById('pi-bulk-modal-loading').innerHTML =
+                '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>Erreur lors de la vérification.';
+        });
+}
+
+function htmlEsc(s) {
+    if (!s) return '—';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderBulkGroups(groups) {
+    var tbl = document.getElementById('pi-bulk-groups-table');
+    tbl.innerHTML = '';
+
+    if (!groups || groups.length === 0) {
+        tbl.innerHTML = '<p style="color:#a1a1aa;font-size:0.88rem;text-align:center;padding:1rem 0;">Aucun candidat en attente dans la sélection.</p>';
+        document.getElementById('pi-bulk-modal-loading').style.display = 'none';
+        document.getElementById('pi-bulk-modal-body').style.display = 'block';
+        return;
+    }
+
+    var html = '<div style="display:flex;flex-direction:column;gap:0.65rem;">';
+
+    groups.forEach(function(g, idx) {
+        var isNoClass = g.status === 'no_class';
+        var isFull    = g.status === 'full';
+
+        var borderColor = isNoClass ? 'rgba(251,146,60,0.4)' : (isFull ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.3)');
+        var bgColor     = isNoClass ? 'rgba(251,146,60,0.06)' : (isFull ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.05)');
+
+        var badge = isNoClass
+            ? '<span style="background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">Aucune classe</span>'
+            : (isFull
+                ? '<span style="background:rgba(239,68,68,0.13);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">Classe pleine</span>'
+                : '<span style="background:rgba(16,185,129,0.13);color:#10b981;border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">&#10003; Places dispo</span>');
+
+        var capacityBar = '';
+        if (!isNoClass) {
+            var after   = g.effectif + g.count;
+            var capPct  = g.capacite > 0 ? Math.min(100, Math.round((after / g.capacite) * 100)) : 100;
+            var barCol  = capPct >= 100 ? '#ef4444' : (capPct >= 80 ? '#fb923c' : '#10b981');
+            capacityBar = '<div style="margin-top:0.55rem;">'
+                + '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#a1a1aa;margin-bottom:0.22rem;">'
+                + '<span>Après inscription</span>'
+                + '<span style="font-weight:700;color:' + barCol + ';">' + after + ' / ' + g.capacite + '</span>'
+                + '</div>'
+                + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+                + '<div style="height:100%;width:' + capPct + '%;background:' + barCol + ';border-radius:3px;"></div>'
+                + '</div></div>';
+        }
+
+        var overrideHtml = isFull
+            ? '<label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.6rem;font-size:0.82rem;color:#f87171;cursor:pointer;">'
+              + '<input type="checkbox" id="override-' + idx + '" style="accent-color:#ef4444;cursor:pointer;width:15px;height:15px;">'
+              + 'Inscrire quand même (dépasser la capacité)</label>'
+            : '';
+
+        var skipNote = isNoClass
+            ? '<div style="margin-top:0.5rem;font-size:0.78rem;color:#fb923c;"><i class="fa-solid fa-triangle-exclamation"></i> Ces candidats seront ignorés — aucune classe trouvée pour cette filière / année.</div>'
+            : '';
+
+        html += '<div style="border:1px solid ' + borderColor + ';background:' + bgColor + ';border-radius:10px;padding:0.9rem 1rem;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.75rem;flex-wrap:wrap;">'
+            + '<div style="min-width:0;">'
+            + '<div style="font-weight:700;font-size:0.92rem;color:#fff;margin-bottom:0.2rem;">'
+            + htmlEsc(g.nom_filiere) + ' <span style="color:#71717a;font-weight:400;">·</span> ' + htmlEsc(g.annee || '—')
+            + '</div>'
+            + '<div style="font-size:0.8rem;color:#a1a1aa;">'
+            + (isNoClass
+                ? '<span style="color:#fb923c;"><i class="fa-solid fa-circle-xmark"></i> Classe non trouvée pour cette filière/année</span>'
+                : '<i class="fa-solid fa-chalkboard-user" style="color:#a855f7;"></i> ' + htmlEsc(g.nom_classe) + ' · ' + htmlEsc(g.niveau))
+            + '</div></div>'
+            + '<div style="display:flex;align-items:center;gap:0.45rem;flex-shrink:0;">'
+            + '<span style="background:rgba(168,85,247,0.12);color:#d8b4fe;border:1px solid rgba(168,85,247,0.25);border-radius:6px;font-size:0.74rem;font-weight:700;padding:0.15rem 0.55rem;white-space:nowrap;">' + g.count + ' candidat(s)</span>'
+            + badge + '</div></div>'
+            + capacityBar + overrideHtml + skipNote
+            + '</div>';
+    });
+
+    html += '</div>';
+    tbl.innerHTML = html;
+
+    document.getElementById('pi-bulk-modal-loading').style.display = 'none';
+    document.getElementById('pi-bulk-modal-body').style.display = 'block';
+}
+
+function submitBulkAccept() {
+    if (!_bulkPreflight || _bulkPreflight.length === 0) return;
+
+    var groups = [];
+    var hasActionable = false;
+
+    _bulkPreflight.forEach(function(g, idx) {
+        if (g.status === 'no_class') return; // auto-skip
+        var override = false;
+        var cb = document.getElementById('override-' + idx);
+        if (cb) override = cb.checked;
+        if (!override && g.status === 'full') return; // full, no override — skip
+        groups.push({ id_classe: g.id_classe, override: override, ids: g.ids });
+        hasActionable = true;
+    });
+
+    if (!hasActionable) {
+        document.getElementById('pi-bulk-err-msg').textContent =
+            'Aucun candidat à inscrire. Cochez "Inscrire quand même" pour les classes pleines, ou ajoutez des classes manquantes via "Gestion des classes".';
+        document.getElementById('pi-bulk-modal-err').style.display = 'flex';
+        return;
+    }
+
+    var idsContainer = document.getElementById('pi-bulk-ids-container');
+    idsContainer.innerHTML = '';
+    var actionInp = document.createElement('input');
+    actionInp.type = 'hidden'; actionInp.name = 'bulk_accepter'; actionInp.value = '1';
+    idsContainer.appendChild(actionInp);
+
+    document.getElementById('pi-bulk-form-groups').value = JSON.stringify(groups);
+    closeBulkModal();
+    document.getElementById('pi-bulk-form').submit();
 }
 </script>
 
