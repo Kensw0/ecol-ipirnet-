@@ -1058,7 +1058,17 @@ if (isset($_GET['id'])) {
                 <div class="hub-actions-v3">
                     <button type="button" onclick="triggerModifierHub()" class="v3-btn secondary"><i class="fa-solid fa-pen-nib"></i> Modifier</button>
                     <a href="print_fiche_inscription.php?id=<?= $selectedStudent['id_stagiaire'] ?>&auto=1" target="_blank" class="v3-btn ghost"><i class="fa-solid fa-file-invoice"></i> Fiche</a>
+                    <?php if (gds_is_directeur()): ?>
+                    <button type="button" onclick="confirmDeleteStagiaire(<?= (int)$selectedStudent['id_stagiaire'] ?>, '<?= h(addslashes($selectedStudent['prenom'].' '.$selectedStudent['nom'])) ?>')" class="v3-btn" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);"><i class="fa-solid fa-trash"></i> Supprimer</button>
+                    <?php endif; ?>
                 </div>
+                <!-- Delete form (hidden, submitted by JS) -->
+                <?php if (gds_is_directeur()): ?>
+                <form id="form-delete-stagiaire" method="post" style="display:none;">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="delete_id" id="delete-stag-id" value="">
+                </form>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -2445,6 +2455,36 @@ function clearCotisFilters() {
     document.querySelectorAll('#cotis-tbody tr[data-mois-ref]').forEach(function(tr) { tr.style.display = ''; });
     const c = document.getElementById('cotis-filter-count');
     if (c) c.textContent = '';
+}
+
+// Delete stagiaire with confirmation
+function confirmDeleteStagiaire(id, name) {
+    const existing = document.getElementById('gds-confirm-overlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'gds-confirm-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#1a1a2e;border:1px solid rgba(239,68,68,0.3);border-radius:16px;padding:2rem;max-width:420px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="width:52px;height:52px;background:rgba(239,68,68,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;font-size:1.4rem;"></i>
+            </div>
+            <div style="color:#e4e4e7;font-size:1rem;font-weight:700;margin-bottom:0.5rem;">Supprimer ce stagiaire ?</div>
+            <div style="color:#a1a1aa;font-size:0.875rem;margin-bottom:0.25rem;">${name}</div>
+            <div style="color:#71717a;font-size:0.78rem;margin-bottom:1.5rem;">Cette action est irréversible. Toutes les données associées (absences, notes, paiements, stages, documents) seront supprimées.</div>
+            <div style="display:flex;gap:0.75rem;justify-content:center;">
+                <button id="gds-del-cancel" style="padding:0.6rem 1.5rem;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#a1a1aa;cursor:pointer;font-size:0.9rem;">Annuler</button>
+                <button id="gds-del-ok" style="padding:0.6rem 1.5rem;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:600;"><i class="fa-solid fa-trash" style="margin-right:0.4rem;"></i>Supprimer définitivement</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('gds-del-cancel').onclick = function() { overlay.remove(); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('gds-del-ok').onclick = function() {
+        const form = document.getElementById('form-delete-stagiaire');
+        document.getElementById('delete-stag-id').value = id;
+        if (form) form.submit();
+    };
 }
 
 // Fix 1: Custom in-page confirm dialog (replaces browser confirm())

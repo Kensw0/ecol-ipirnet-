@@ -16,7 +16,9 @@ $selAnnee   = trim((string)($_GET['annee']      ?? ''));
 $selFiliere = (int)($_GET['id_filiere'] ?? 0);
 $selNiveau  = trim((string)($_GET['niveau']     ?? ''));
 $selClasse  = (int)($_GET['id_classe']  ?? 0);
-$selModule  = (int)($_GET['id_module']  ?? 0);
+$selModule   = (int)($_GET['id_module']   ?? 0);
+$selSemestre = trim((string)($_GET['semestre']  ?? ''));
+if (!in_array($selSemestre, ['', 'Semestre 1', 'Semestre 2'], true)) $selSemestre = '';
 $selDateDe  = trim((string)($_GET['date_de']    ?? ''));
 $selDateA   = trim((string)($_GET['date_a']     ?? ''));
 
@@ -67,10 +69,11 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             $rows[] = [$r['num_inscri'],$r['nom'],$r['prenom'],$r['cin'],$r['email'],$r['telephone'],$r['nom_classe'],$r['nom_filiere'],$r['annee_scolaire'],$r['niveau']];
 
     } elseif ($exportTab === 'notes') {
-        $headers = ['Module','Coefficient','Moy. classe','Nb notes','Nb admis (≥10)','Taux admis %'];
+        $headers = ['Semestre','Module','Coefficient','Moy. classe','Nb notes','Nb admis (≥10)','Taux admis %'];
         $nWhere = $cw; $nParams = $cp;
-        if ($selModule > 0) { $nWhere[] = 'vm.id_module = ?'; $nParams[] = $selModule; }
-        $sql = "SELECT m.nom_module,m.coefficient,
+        if ($selModule   > 0)  { $nWhere[] = 'vm.id_module = ?'; $nParams[] = $selModule; }
+        if ($selSemestre !== '') { $nWhere[] = 'm.semestre = ?'; $nParams[] = $selSemestre; }
+        $sql = "SELECT m.nom_module,m.coefficient,m.semestre,
                        ROUND(AVG(vm.moyenne_module),2) as moy,
                        COUNT(vm.id_stagiaire) as nb,
                        SUM(CASE WHEN vm.moyenne_module>=10 THEN 1 ELSE 0 END) as admis
@@ -80,11 +83,11 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                 JOIN classes c ON c.id_classe=s.id_classe
                 JOIN filieres f ON f.id_filiere=c.id_filiere
                 " . ($nWhere ? 'WHERE ' . implode(' AND ', $nWhere) : '') . "
-                GROUP BY vm.id_module,m.nom_module,m.coefficient ORDER BY m.nom_module";
+                GROUP BY vm.id_module,m.nom_module,m.coefficient,m.semestre ORDER BY m.semestre,m.nom_module";
         $st = $pdo->prepare($sql); $st->execute($nParams);
         foreach ($st->fetchAll() as $r) {
             $taux = $r['nb'] > 0 ? round($r['admis'] / $r['nb'] * 100, 1) : 0;
-            $rows[] = [$r['nom_module'],$r['coefficient'],$r['moy'],$r['nb'],$r['admis'],$taux];
+            $rows[] = [$r['semestre'],$r['nom_module'],$r['coefficient'],$r['moy'],$r['nb'],$r['admis'],$taux];
         }
 
     } elseif ($exportTab === 'paiements') {
@@ -204,8 +207,9 @@ $notesRanking  = [];
 
 {
     $nw = $cw; $np = $cp;
-    if ($selModule > 0) { $nw[] = 'vm.id_module = ?'; $np[] = $selModule; }
-    $sql = "SELECT m.nom_module, m.coefficient,
+    if ($selModule   > 0)  { $nw[] = 'vm.id_module = ?'; $np[] = $selModule; }
+    if ($selSemestre !== '') { $nw[] = 'm.semestre = ?'; $np[] = $selSemestre; }
+    $sql = "SELECT m.nom_module, m.coefficient, m.semestre,
                    ROUND(AVG(vm.moyenne_module),2) as moy_classe,
                    COUNT(vm.id_stagiaire) as nb_notes,
                    SUM(CASE WHEN vm.moyenne_module >= 10 THEN 1 ELSE 0 END) as nb_admis
@@ -215,22 +219,25 @@ $notesRanking  = [];
             JOIN classes c ON c.id_classe=s.id_classe
             JOIN filieres f ON f.id_filiere=c.id_filiere
             " . ($nw ? 'WHERE ' . implode(' AND ', $nw) : '') . "
-            GROUP BY vm.id_module, m.nom_module, m.coefficient ORDER BY m.nom_module";
+            GROUP BY vm.id_module, m.nom_module, m.coefficient, m.semestre ORDER BY m.semestre, m.nom_module";
     $st = $pdo->prepare($sql); $st->execute($np);
     $notesModules = $st->fetchAll();
 }
 {
+    $rw = $cw; $rp = $cp;
+    if ($selSemestre !== '') { $rw[] = 'm.semestre = ?'; $rp[] = $selSemestre; }
     $sql = "SELECT s.nom, s.prenom, s.num_inscri,
                    ROUND(AVG(vm.moyenne_module),2) as moy_gen,
                    SUM(CASE WHEN vm.moyenne_module >= 10 THEN 1 ELSE 0 END) as mods_admis,
                    COUNT(vm.id_module) as total_mods
             FROM v_moyennes_par_module vm
+            JOIN modules m ON m.id_module=vm.id_module
             JOIN stagiaires s ON s.id_stagiaire=vm.id_stagiaire
             JOIN classes c ON c.id_classe=s.id_classe
             JOIN filieres f ON f.id_filiere=c.id_filiere
-            " . ($cw ? 'WHERE ' . implode(' AND ', $cw) : '') . "
+            " . ($rw ? 'WHERE ' . implode(' AND ', $rw) : '') . "
             GROUP BY vm.id_stagiaire, s.nom, s.prenom, s.num_inscri ORDER BY moy_gen DESC";
-    $st = $pdo->prepare($sql); $st->execute($cp);
+    $st = $pdo->prepare($sql); $st->execute($rp);
     $notesRanking = $st->fetchAll();
 }
 
@@ -311,8 +318,8 @@ $absTopStags  = [];
 }
 
 // ── Build export URL helper ────────────────────────────────────────────────
-function rpt_export_url(string $tab, int $selClasse, int $selFiliere, string $selNiveau, string $selAnnee, int $selModule, string $selDateDe, string $selDateA): string {
-    $p = ['export'=>'csv','tab'=>$tab,'annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule,'date_de'=>$selDateDe,'date_a'=>$selDateA];
+function rpt_export_url(string $tab, int $selClasse, int $selFiliere, string $selNiveau, string $selAnnee, int $selModule, string $selDateDe, string $selDateA, string $selSemestre = ''): string {
+    $p = ['export'=>'csv','tab'=>$tab,'annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule,'semestre'=>$selSemestre,'date_de'=>$selDateDe,'date_a'=>$selDateA];
     return 'rapports.php?' . http_build_query(array_filter($p, fn($v) => $v !== '' && $v !== 0));
 }
 
@@ -445,6 +452,15 @@ if ($__f):
           <?php foreach ($allClasses as $cl): ?>
             <option value="<?= (int)$cl['id_classe'] ?>" <?= $selClasse===(int)$cl['id_classe']?'selected':'' ?>><?= h($cl['nom_classe']) ?></option>
           <?php endforeach; ?>
+        </select>
+      </label>
+
+      <!-- Notes tab: semestre filter -->
+      <label id="rpt-semestre-label" style="<?= $activeTab==='notes'?'':'display:none' ?>">Semestre
+        <select name="semestre" onchange="this.form.submit()">
+          <option value="" <?= $selSemestre===''?'selected':'' ?>>— Tous —</option>
+          <option value="Semestre 1" <?= $selSemestre==='Semestre 1'?'selected':'' ?>>Semestre 1</option>
+          <option value="Semestre 2" <?= $selSemestre==='Semestre 2'?'selected':'' ?>>Semestre 2</option>
         </select>
       </label>
 
@@ -606,7 +622,7 @@ if ($__f):
     <div class="rpt-card" style="margin-bottom:1.25rem;">
       <div class="rpt-section-header">
         <div class="rpt-card-title"><i class="fa-solid fa-chart-line"></i> Moyennes par module</div>
-        <a class="rpt-export-btn" href="<?= rpt_export_url('notes',$selClasse,$selFiliere,$selNiveau,$selAnnee,$selModule,$selDateDe,$selDateA) ?>">
+        <a class="rpt-export-btn" href="<?= rpt_export_url('notes',$selClasse,$selFiliere,$selNiveau,$selAnnee,$selModule,$selDateDe,$selDateA,$selSemestre) ?>">
           <i class="fa-solid fa-file-csv"></i> Exporter CSV
         </a>
       </div>
@@ -935,9 +951,11 @@ function rptTab(name) {
     var hiddenTab = document.getElementById('rpt-tab-hidden');
     if (hiddenTab) hiddenTab.value = name;
     // Show/hide extra filter inputs
+    var semestreLabel = document.getElementById('rpt-semestre-label');
     var moduleLabel  = document.getElementById('rpt-module-label');
     var dateDeLbl    = document.getElementById('rpt-date-de-label');
     var dateALbl     = document.getElementById('rpt-date-a-label');
+    if (semestreLabel) semestreLabel.style.display = (name === 'notes') ? '' : 'none';
     if (moduleLabel) moduleLabel.style.display  = (name === 'notes')                          ? '' : 'none';
     if (dateDeLbl)  dateDeLbl.style.display     = (name === 'absences' || name === 'paiements') ? '' : 'none';
     if (dateALbl)   dateALbl.style.display      = (name === 'absences' || name === 'paiements') ? '' : 'none';
@@ -1019,8 +1037,9 @@ $notesRanking  = [];
 
 {
     $nw = $cw; $np = $cp;
-    if ($selModule > 0) { $nw[] = 'vm.id_module = ?'; $np[] = $selModule; }
-    $sql = "SELECT m.nom_module, m.coefficient,
+    if ($selModule   > 0)  { $nw[] = 'vm.id_module = ?'; $np[] = $selModule; }
+    if ($selSemestre !== '') { $nw[] = 'm.semestre = ?'; $np[] = $selSemestre; }
+    $sql = "SELECT m.nom_module, m.coefficient, m.semestre,
                    ROUND(AVG(vm.moyenne_module),2) as moy_classe,
                    COUNT(vm.id_stagiaire) as nb_notes,
                    SUM(CASE WHEN vm.moyenne_module >= 10 THEN 1 ELSE 0 END) as nb_admis
@@ -1030,22 +1049,25 @@ $notesRanking  = [];
             JOIN classes c ON c.id_classe=s.id_classe
             JOIN filieres f ON f.id_filiere=c.id_filiere
             " . ($nw ? 'WHERE ' . implode(' AND ', $nw) : '') . "
-            GROUP BY vm.id_module, m.nom_module, m.coefficient ORDER BY m.nom_module";
+            GROUP BY vm.id_module, m.nom_module, m.coefficient, m.semestre ORDER BY m.semestre, m.nom_module";
     $st = $pdo->prepare($sql); $st->execute($np);
     $notesModules = $st->fetchAll();
 }
 {
+    $rw = $cw; $rp = $cp;
+    if ($selSemestre !== '') { $rw[] = 'm.semestre = ?'; $rp[] = $selSemestre; }
     $sql = "SELECT s.nom, s.prenom, s.num_inscri,
                    ROUND(AVG(vm.moyenne_module),2) as moy_gen,
                    SUM(CASE WHEN vm.moyenne_module >= 10 THEN 1 ELSE 0 END) as mods_admis,
                    COUNT(vm.id_module) as total_mods
             FROM v_moyennes_par_module vm
+            JOIN modules m ON m.id_module=vm.id_module
             JOIN stagiaires s ON s.id_stagiaire=vm.id_stagiaire
             JOIN classes c ON c.id_classe=s.id_classe
             JOIN filieres f ON f.id_filiere=c.id_filiere
-            " . ($cw ? 'WHERE ' . implode(' AND ', $cw) : '') . "
+            " . ($rw ? 'WHERE ' . implode(' AND ', $rw) : '') . "
             GROUP BY vm.id_stagiaire, s.nom, s.prenom, s.num_inscri ORDER BY moy_gen DESC";
-    $st = $pdo->prepare($sql); $st->execute($cp);
+    $st = $pdo->prepare($sql); $st->execute($rp);
     $notesRanking = $st->fetchAll();
 }
 
@@ -1126,8 +1148,8 @@ $absTopStags  = [];
 }
 
 // ── Build export URL helper ────────────────────────────────────────────────
-function rpt_export_url(string $tab, int $selClasse, int $selFiliere, string $selNiveau, string $selAnnee, int $selModule, string $selDateDe, string $selDateA): string {
-    $p = ['export'=>'csv','tab'=>$tab,'annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule,'date_de'=>$selDateDe,'date_a'=>$selDateA];
+function rpt_export_url(string $tab, int $selClasse, int $selFiliere, string $selNiveau, string $selAnnee, int $selModule, string $selDateDe, string $selDateA, string $selSemestre = ''): string {
+    $p = ['export'=>'csv','tab'=>$tab,'annee'=>$selAnnee,'id_filiere'=>$selFiliere,'niveau'=>$selNiveau,'id_classe'=>$selClasse,'id_module'=>$selModule,'semestre'=>$selSemestre,'date_de'=>$selDateDe,'date_a'=>$selDateA];
     return 'rapports.php?' . http_build_query(array_filter($p, fn($v) => $v !== '' && $v !== 0));
 }
 
@@ -1260,6 +1282,15 @@ if ($__f):
           <?php foreach ($allClasses as $cl): ?>
             <option value="<?= (int)$cl['id_classe'] ?>" <?= $selClasse===(int)$cl['id_classe']?'selected':'' ?>><?= h($cl['nom_classe']) ?></option>
           <?php endforeach; ?>
+        </select>
+      </label>
+
+      <!-- Notes tab: semestre filter -->
+      <label id="rpt-semestre-label" style="<?= $activeTab==='notes'?'':'display:none' ?>">Semestre
+        <select name="semestre" onchange="this.form.submit()">
+          <option value="" <?= $selSemestre===''?'selected':'' ?>>— Tous —</option>
+          <option value="Semestre 1" <?= $selSemestre==='Semestre 1'?'selected':'' ?>>Semestre 1</option>
+          <option value="Semestre 2" <?= $selSemestre==='Semestre 2'?'selected':'' ?>>Semestre 2</option>
         </select>
       </label>
 
@@ -1421,7 +1452,7 @@ if ($__f):
     <div class="rpt-card" style="margin-bottom:1.25rem;">
       <div class="rpt-section-header">
         <div class="rpt-card-title"><i class="fa-solid fa-chart-line"></i> Moyennes par module</div>
-        <a class="rpt-export-btn" href="<?= rpt_export_url('notes',$selClasse,$selFiliere,$selNiveau,$selAnnee,$selModule,$selDateDe,$selDateA) ?>">
+        <a class="rpt-export-btn" href="<?= rpt_export_url('notes',$selClasse,$selFiliere,$selNiveau,$selAnnee,$selModule,$selDateDe,$selDateA,$selSemestre) ?>">
           <i class="fa-solid fa-file-csv"></i> Exporter CSV
         </a>
       </div>
@@ -1750,9 +1781,11 @@ function rptTab(name) {
     var hiddenTab = document.getElementById('rpt-tab-hidden');
     if (hiddenTab) hiddenTab.value = name;
     // Show/hide extra filter inputs
+    var semestreLabel = document.getElementById('rpt-semestre-label');
     var moduleLabel  = document.getElementById('rpt-module-label');
     var dateDeLbl    = document.getElementById('rpt-date-de-label');
     var dateALbl     = document.getElementById('rpt-date-a-label');
+    if (semestreLabel) semestreLabel.style.display = (name === 'notes') ? '' : 'none';
     if (moduleLabel) moduleLabel.style.display  = (name === 'notes')                          ? '' : 'none';
     if (dateDeLbl)  dateDeLbl.style.display     = (name === 'absences' || name === 'paiements') ? '' : 'none';
     if (dateALbl)   dateALbl.style.display      = (name === 'absences' || name === 'paiements') ? '' : 'none';
