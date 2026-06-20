@@ -1329,9 +1329,9 @@ if (isset($_GET['id'])) {
                         <thead>
                             <tr>
                                 <th>Module</th>
-                                <th style="text-align:center;">Contrôle<br><small style="font-weight:400;color:#71717a;">40%</small></th>
-                                <th style="text-align:center;">Théorique<br><small style="font-weight:400;color:#71717a;">30%</small></th>
-                                <th style="text-align:center;">Pratique<br><small style="font-weight:400;color:#71717a;">30%</small></th>
+                                <th style="text-align:center;">Moy. Contrôles</th>
+                                <th style="text-align:center;">Examen Théorique</th>
+                                <th style="text-align:center;">Examen Pratique</th>
                                 <th style="text-align:center;">Moyenne</th>
                                 <th style="text-align:center;">Statut</th>
                             </tr>
