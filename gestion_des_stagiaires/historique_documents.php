@@ -206,7 +206,7 @@ require_once __DIR__ . '/includes/header.php';
                     <option value="">— Tous les types —</option>
                     <?php foreach ($typeCounts as $tc):
                         $tkey   = (string)$tc['type_document'];
-                        $tlabel = $typeLabels[$tkey] ?? str_replace('_', ' ', $tkey);
+                        $tlabel = $typeLabels[$tkey] ?? (trim($tkey) !== '' ? str_replace('_', ' ', $tkey) : 'Inconnu');
                     ?>
                     <option value="<?= h($tkey) ?>" <?= $fType === $tkey ? 'selected' : '' ?>>
                         <?= h($tlabel) ?> (<?= (int)$tc['c'] ?>)
@@ -265,7 +265,7 @@ require_once __DIR__ . '/includes/header.php';
                 <tbody>
                 <?php foreach ($docs as $d):
                     $tkey   = (string)$d['type_document'];
-                    $tlabel = $typeLabels[$tkey] ?? ($tkey ?: 'Inconnu');
+                    $tlabel = $typeLabels[$tkey] ?? (trim($tkey) !== '' ? str_replace('_', ' ', $tkey) : 'Inconnu');
                     $icon   = $typeIcons[$tkey]  ?? ['fa-file', 'rgba(113,113,122,0.15)', '#71717a'];
                     $hubUrl = 'stagiaires.php?id=' . (int)$d['id_stagiaire'];
                 ?>
