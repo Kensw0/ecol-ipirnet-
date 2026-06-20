@@ -2211,6 +2211,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // ── Boot: run cascade once on initial page load ──────────────────────────
+    // Without this, rebuildFilterNiveaux/Classes only fire on user interaction,
+    // so the Classe dropdown appears blank until the user touches a filter.
+    rebuildFilterNiveaux();
+    rebuildFilterClasses();
+    // Re-render the table with the now-populated filter values (same pattern as reset btn)
+    [fltAnnee, fltFiliere, fltNiveau, fltClasse, searchInput].forEach(function(el) {
+        if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    syncEmptyState();
+    attachLinks();
+
     // ── FAB (Add stagiaire) ──────────────────────────────────────────────────
     if (fabButton) {
         fabButton.onclick = function() {
