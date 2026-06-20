@@ -53,9 +53,10 @@
   }
 
   // ── STUDENT LIST WITH GRADES ──────────────────────────────────────────────
-  $stagiaires   = [];
-  $noteTypes    = [];
-  $globalAnnee  = $_SESSION['global_annee_scolaire'] ?? '';
+  // Shows Moy. Contrôles (average of controle_1..N), Théorique, Pratique per student.
+  $stagiaires  = [];
+  $nbControles = $moduleInfo ? (int)($moduleInfo['nb_controles'] ?? 0) : 0;
+  $globalAnnee = $_SESSION['global_annee_scolaire'] ?? '';
 
   if ($selModule > 0 && $selFiliere > 0 && $globalAnnee !== '') {
       $st = $pdo->prepare("
@@ -70,19 +71,26 @@
 
       if (!empty($students)) {
           $sids = array_column($students, 'id_stagiaire');
-          $placeholders = implode(',', array_fill(0, count($sids), '?'));
-          $stNotes = $pdo->prepare("SELECT id_stagiaire, type, note FROM module_notes WHERE id_module=? AND id_stagiaire IN ($placeholders) ORDER BY type");
-          $stNotes->execute(array_merge([$selModule], $sids));
+          $ph   = implode(',', array_fill(0, count($sids), '?'));
+          $stN  = $pdo->prepare("SELECT id_stagiaire, type, note FROM module_notes WHERE id_module=? AND id_stagiaire IN ($ph)");
+          $stN->execute(array_merge([$selModule], $sids));
           $notesMap = [];
-          $noteTypesSet = [];
-          foreach ($stNotes->fetchAll() as $n) {
-              $notesMap[(int)$n['id_stagiaire']][$n['type']] = $n['note'];
-              $noteTypesSet[$n['type']] = true;
+          foreach ($stN->fetchAll() as $n) {
+              if ($n['note'] !== null) {
+                  $notesMap[(int)$n['id_stagiaire']][$n['type']] = (float)$n['note'];
+              }
           }
-          ksort($noteTypesSet);
-          $noteTypes = array_keys($noteTypesSet);
           foreach ($students as $s) {
-              $s['notes'] = $notesMap[(int)$s['id_stagiaire']] ?? [];
+              $sid      = (int)$s['id_stagiaire'];
+              $allN     = $notesMap[$sid] ?? [];
+              // Average of controle_* keys only
+              $controls = array_filter($allN, fn($k) => str_starts_with($k, 'controle_'), ARRAY_FILTER_USE_KEY);
+              $s['moy_controles'] = count($controls) > 0
+                  ? round(array_sum($controls) / count($controls), 2)
+                  : null;
+              $s['nb_saisies']    = count($controls);
+              $s['theorique']     = $allN['theorique'] ?? null;
+              $s['pratique']      = $allN['pratique']  ?? null;
               $stagiaires[] = $s;
           }
       }
@@ -91,37 +99,37 @@
   require __DIR__ . '/includes/header.php';
   ?>
   <style>
-  .mod-filter-bar { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1.5rem; }
-  .mod-filter-bar label { font-size:.78rem; color:#a1a1aa; text-transform:uppercase; letter-spacing:.08em; font-weight:600; display:block; margin-bottom:.35rem; }
-  .mod-filter-bar select { background:#0f0f1a; color:#e4e4e7; border:1px solid rgba(168,85,247,.35); border-radius:8px; padding:.45rem .85rem; font-size:.88rem; min-width:190px; outline:none; cursor:pointer; }
-  .mod-filter-bar select:focus { border-color:#a855f7; }
-  .mod-card { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:1.5rem; margin-bottom:1.5rem; }
-  .mod-card h2 { font-size:1.15rem; font-weight:700; color:#fff; margin:0 0 1rem; }
-  .mod-meta-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1rem; margin-bottom:1.25rem; }
-  .mod-meta-item { background:rgba(168,85,247,.06); border:1px solid rgba(168,85,247,.15); border-radius:10px; padding:.75rem 1rem; }
-  .mod-meta-item .label { font-size:.7rem; color:rgba(168,85,247,.7); text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin-bottom:.25rem; }
-  .mod-meta-item .value { font-size:1rem; font-weight:700; color:#e4e4e7; }
-  .mod-nb-form { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
-  .mod-nb-form label { font-size:.82rem; color:#a1a1aa; font-weight:600; }
-  .mod-nb-input { background:#0f0f1a; color:#e4e4e7; border:1px solid rgba(168,85,247,.35); border-radius:8px; padding:.4rem .75rem; font-size:.9rem; width:80px; text-align:center; outline:none; }
-  .mod-nb-input:focus { border-color:#a855f7; }
-  .btn-save-nb { background:#a855f7; color:#fff; border:none; border-radius:8px; padding:.45rem 1.1rem; font-size:.85rem; font-weight:700; cursor:pointer; transition:background .2s; }
-  .btn-save-nb:hover { background:#9333ea; }
-  .mod-save-msg { font-size:.82rem; font-weight:600; margin-left:.5rem; }
-  .stag-table-wrap { overflow-x:auto; }
-  .stag-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-  .stag-table th { background:rgba(168,85,247,.12); color:#d8b4fe; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; padding:.65rem 1rem; text-align:left; white-space:nowrap; }
-  .stag-table td { padding:.6rem 1rem; border-bottom:1px solid rgba(255,255,255,.04); color:#e4e4e7; vertical-align:middle; white-space:nowrap; }
-  .stag-table tr:hover td { background:rgba(168,85,247,.04); }
-  .badge-note { display:inline-block; padding:.15rem .55rem; border-radius:6px; font-weight:700; font-size:.8rem; }
-  .badge-note.good { background:rgba(16,185,129,.15); color:#6ee7b7; }
-  .badge-note.avg  { background:rgba(245,158,11,.15); color:#fcd34d; }
-  .badge-note.fail { background:rgba(239,68,68,.15); color:#fca5a5; }
-  .badge-note.none { background:rgba(255,255,255,.05); color:#71717a; }
-  .link-hub { color:#a855f7; text-decoration:none; font-size:.8rem; font-weight:600; }
-  .link-hub:hover { color:#d8b4fe; text-decoration:underline; }
-  .empty-state { text-align:center; padding:3rem 1rem; color:#52525b; }
-  .empty-state i { font-size:2rem; margin-bottom:.75rem; display:block; }
+  .mod-filter-bar{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1.5rem}
+  .mod-filter-bar label{font-size:.78rem;color:#a1a1aa;text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:block;margin-bottom:.35rem}
+  .mod-filter-bar select{background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.45rem .85rem;font-size:.88rem;min-width:190px;outline:none;cursor:pointer}
+  .mod-filter-bar select:focus{border-color:#a855f7}
+  .mod-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem}
+  .mod-card h2{font-size:1.15rem;font-weight:700;color:#fff;margin:0 0 1rem}
+  .mod-meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.25rem}
+  .mod-meta-item{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-radius:10px;padding:.75rem 1rem}
+  .mod-meta-item .label{font-size:.7rem;color:rgba(168,85,247,.7);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:.25rem}
+  .mod-meta-item .value{font-size:1rem;font-weight:700;color:#e4e4e7}
+  .mod-nb-form{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+  .mod-nb-form label{font-size:.82rem;color:#a1a1aa;font-weight:600}
+  .mod-nb-input{background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.4rem .75rem;font-size:.9rem;width:80px;text-align:center;outline:none}
+  .mod-nb-input:focus{border-color:#a855f7}
+  .btn-save-nb{background:#a855f7;color:#fff;border:none;border-radius:8px;padding:.45rem 1.1rem;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
+  .btn-save-nb:hover{background:#9333ea}
+  .mod-save-msg{font-size:.82rem;font-weight:600;margin-left:.5rem}
+  .stag-table-wrap{overflow-x:auto}
+  .stag-table{width:100%;border-collapse:collapse;font-size:.85rem}
+  .stag-table th{background:rgba(168,85,247,.12);color:#d8b4fe;font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;padding:.65rem 1rem;text-align:left;white-space:nowrap}
+  .stag-table td{padding:.6rem 1rem;border-bottom:1px solid rgba(255,255,255,.04);color:#e4e4e7;vertical-align:middle;white-space:nowrap}
+  .stag-table tr:hover td{background:rgba(168,85,247,.04)}
+  .badge-note{display:inline-block;padding:.15rem .55rem;border-radius:6px;font-weight:700;font-size:.8rem}
+  .badge-note.good{background:rgba(16,185,129,.15);color:#6ee7b7}
+  .badge-note.avg {background:rgba(245,158,11,.15);color:#fcd34d}
+  .badge-note.fail{background:rgba(239,68,68,.15);color:#fca5a5}
+  .badge-note.none{background:rgba(255,255,255,.05);color:#71717a}
+  .link-hub{color:#a855f7;text-decoration:none;font-size:.8rem;font-weight:600}
+  .link-hub:hover{color:#d8b4fe;text-decoration:underline}
+  .empty-state{text-align:center;padding:3rem 1rem;color:#52525b}
+  .empty-state i{font-size:2rem;margin-bottom:.75rem;display:block}
   </style>
 
   <div class="mod-filter-bar">
@@ -164,7 +172,8 @@
       </div>
       <div class="mod-nb-form">
           <label for="nb-controles-input">Nombre de contrôles&nbsp;:</label>
-          <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10" value="<?= h((string)(int)($moduleInfo['nb_controles'] ?? 0)) ?>">
+          <input type="number" id="nb-controles-input" class="mod-nb-input" min="0" max="10"
+                 value="<?= h((string)$nbControles) ?>">
           <button class="btn-save-nb" onclick="saveNbControles()">
               <i class="fa-solid fa-floppy-disk" style="margin-right:.35rem;"></i>Enregistrer
           </button>
@@ -186,17 +195,25 @@
                       <th>#</th>
                       <th>Nom &amp; Prénom</th>
                       <th>Classe</th>
-                      <?php foreach ($noteTypes as $nt): ?>
-                      <th><?= h(strtoupper($nt)) ?></th>
-                      <?php endforeach; ?>
-                      <?php if (empty($noteTypes)): ?>
-                      <th>Notes</th>
+                      <?php if ($nbControles > 0): ?>
+                      <th title="Moyenne de <?= $nbControles ?> contrôle(s) saisis">Moy. Contrôles<?php if ($nbControles > 0): ?> <span style="font-weight:400;opacity:.6;">(sur <?= $nbControles ?>)</span><?php endif; ?></th>
                       <?php endif; ?>
+                      <th>Théorique</th>
+                      <th>Pratique</th>
                       <th></th>
                   </tr>
               </thead>
               <tbody>
                   <?php foreach ($stagiaires as $i => $s): ?>
+                  <?php
+                      $mc   = $s['moy_controles'];
+                      $th   = $s['theorique'];
+                      $pr   = $s['pratique'];
+                      $mcCl = $mc === null ? 'none' : ($mc >= 10 ? 'good' : ($mc >= 7 ? 'avg' : 'fail'));
+                      $thCl = $th === null ? 'none' : ($th >= 10 ? 'good' : ($th >= 7 ? 'avg' : 'fail'));
+                      $prCl = $pr === null ? 'none' : ($pr >= 10 ? 'good' : ($pr >= 7 ? 'avg' : 'fail'));
+                      $nb   = $s['nb_saisies'];
+                  ?>
                   <tr>
                       <td style="color:#52525b;font-size:.78rem;"><?= $i + 1 ?></td>
                       <td>
@@ -204,16 +221,18 @@
                           <div style="font-size:.75rem;color:#71717a;"><?= h($s['num_inscri'] ?? '') ?></div>
                       </td>
                       <td><span style="font-size:.8rem;background:rgba(168,85,247,.1);color:#d8b4fe;padding:.15rem .55rem;border-radius:6px;"><?= h($s['nom_classe']) ?></span></td>
-                      <?php if (!empty($noteTypes)): ?>
-                          <?php foreach ($noteTypes as $nt):
-                              $note = $s['notes'][$nt] ?? null;
-                              $cls  = $note === null ? 'none' : ((float)$note >= 10 ? 'good' : ((float)$note >= 7 ? 'avg' : 'fail'));
-                          ?>
-                          <td><span class="badge-note <?= $cls ?>"><?= $note !== null ? h(number_format((float)$note, 2)) : '—' ?></span></td>
-                          <?php endforeach; ?>
-                      <?php else: ?>
-                      <td><span class="badge-note none">—</span></td>
+                      <?php if ($nbControles > 0): ?>
+                      <td>
+                          <span class="badge-note <?= $mcCl ?>">
+                              <?= $mc !== null ? h(number_format($mc, 2)) : '—' ?>
+                          </span>
+                          <?php if ($mc !== null && $nb < $nbControles): ?>
+                          <span style="font-size:.7rem;color:#f59e0b;margin-left:.35rem;" title="<?= $nb ?>/<?= $nbControles ?> contrôles saisis">⚠</span>
+                          <?php endif; ?>
+                      </td>
                       <?php endif; ?>
+                      <td><span class="badge-note <?= $thCl ?>"><?= $th !== null ? h(number_format($th, 2)) : '—' ?></span></td>
+                      <td><span class="badge-note <?= $prCl ?>"><?= $pr !== null ? h(number_format($pr, 2)) : '—' ?></span></td>
                       <td><a href="stagiaire_hub.php?id=<?= (int)$s['id_stagiaire'] ?>" class="link-hub"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:.75rem;margin-right:.3rem;"></i>Hub</a></td>
                   </tr>
                   <?php endforeach; ?>
@@ -239,7 +258,7 @@
   <script>
   function applyFilter() {
       const f = document.getElementById('sel-filiere')?.value ?? '';
-      const m = document.getElementById('sel-module')?.value ?? '';
+      const m = document.getElementById('sel-module')?.value  ?? '';
       const url = new URL(window.location.href);
       url.searchParams.set('id_filiere', f);
       if (m) url.searchParams.set('id_module', m);
@@ -271,6 +290,7 @@
               if (d.success) {
                   msgEl.textContent = '✓ ' + d.msg;
                   msgEl.style.color = '#6ee7b7';
+                  setTimeout(() => location.reload(), 800);
               } else {
                   msgEl.textContent = '✗ ' + d.error;
                   msgEl.style.color = '#fca5a5';
