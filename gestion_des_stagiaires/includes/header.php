@@ -340,7 +340,7 @@ if (!$isPublic && isset($pdo)) {
                     <i data-lucide="briefcase" width="18" height="18"></i> <span>Gestion des stages</span>
                 </a>
                 <a href="cotisations.php" class="nav-item<?= $curPage === 'cotisations' ? ' active' : '' ?>">
-                    <i data-lucide="banknote" width="18" height="18"></i> <span>Gestion des cotisations</span>
+                    <i data-lucide="banknote" width="18" height="18"></i> <span>Gestion des paiements</span>
                 </a>
                 <a href="gestion_modules.php" class="nav-item<?= $curPage === 'modules' ? ' active' : '' ?>">
                     <i data-lucide="layers" width="18" height="18"></i> <span>Gestion des modules</span>
