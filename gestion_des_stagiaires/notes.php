@@ -8,27 +8,6 @@ gds_require_admin_session();
 $pageTitle = 'Gestion des notes';
 $curPage   = 'notes';
 
-// ── UPDATE nb_controles ───────────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_nb_controles'])) {
-    csrf_verify();
-    $id_module    = (int)($_POST['id_module']    ?? 0);
-    $nb_controles = max(1, min(10, (int)($_POST['nb_controles'] ?? 1)));
-    if ($id_module > 0) {
-        $pdo->prepare('UPDATE modules SET nb_controles = ? WHERE id_module = ?')
-            ->execute([$nb_controles, $id_module]);
-        flash_set("Nombre de contrôles mis à jour ($nb_controles).", 'success');
-    }
-    $qs = http_build_query([
-        'id_classe'  => $_POST['id_classe']  ?? '',
-        'id_module'  => $_POST['id_module']  ?? '',
-        'annee'      => $_POST['annee']      ?? '',
-        'id_filiere' => $_POST['id_filiere'] ?? '',
-        'niveau'     => $_POST['niveau']     ?? '',
-    ]);
-    header("Location: notes.php?$qs");
-    exit;
-}
-
 // ── BULK SAVE ────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_save_notes'])) {
     csrf_verify();
@@ -331,41 +310,52 @@ require_once __DIR__ . '/includes/header.php';
 }
 .notes-context-badge span { color: #a1a1aa; font-weight: 400; }
 
-/* nb_controles inline editor */
-.ctrl-editor {
-    display: inline-flex;
+/* controle picker modal */
+.ctrl-modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 9999;
     align-items: center;
-    gap: 0.5rem;
-    background: rgba(168,85,247,0.1);
-    border: 1px solid rgba(168,85,247,0.28);
-    border-radius: 8px;
-    padding: 0.35rem 0.7rem;
-    font-size: 0.82rem;
-    color: #c084fc;
-    font-weight: 600;
+    justify-content: center;
 }
-.ctrl-editor input[type=number] {
-    background: rgba(0,0,0,0.4);
+.ctrl-modal-overlay.open { display: flex; }
+.ctrl-modal {
+    background: #18181f;
     border: 1px solid rgba(168,85,247,0.35);
-    border-radius: 5px;
-    color: #fff;
-    width: 48px;
-    padding: 0.2rem 0.35rem;
-    text-align: center;
-    font-size: 0.85rem;
+    border-radius: 14px;
+    padding: 1.75rem 2rem;
+    min-width: 300px;
+    max-width: 90vw;
 }
-.ctrl-editor button {
-    background: rgba(168,85,247,0.3);
-    color: #e9d5ff;
-    border: 1px solid rgba(168,85,247,0.5);
-    border-radius: 5px;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.78rem;
+.ctrl-modal h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e4e4e7;
+    margin: 0 0 1rem;
+}
+.ctrl-modal select {
+    width: 100%;
+    background: #0d0d14;
+    border: 1px solid rgba(168,85,247,0.4);
+    border-radius: 8px;
+    color: #fff;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+}
+.ctrl-modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+.ctrl-modal-actions button {
+    border-radius: 8px;
+    padding: 0.5rem 1.2rem;
+    font-size: 0.88rem;
     font-weight: 700;
     cursor: pointer;
-    transition: background .15s;
+    border: 1px solid transparent;
 }
-.ctrl-editor button:hover { background: rgba(168,85,247,0.5); }
+.btn-modal-cancel { background: rgba(255,255,255,0.07); color: #a1a1aa; border-color: rgba(255,255,255,0.1); }
+.btn-modal-print  { background: rgba(245,158,11,0.2); color: #fcd34d; border-color: rgba(245,158,11,0.4); }
 
 .notes-empty {
     text-align: center;
@@ -454,26 +444,6 @@ require_once __DIR__ . '/includes/header.php';
     <!-- ── Notes grid ── -->
     <?php if ($selClasse > 0 && $selModule > 0): ?>
 
-        <!-- nb_controles editor -->
-        <?php if ($moduleInfo): ?>
-        <div style="margin-bottom:1rem;">
-            <form method="post" action="notes.php" style="display:inline;">
-                <?= csrf_hidden() ?>
-                <input type="hidden" name="save_nb_controles" value="1">
-                <input type="hidden" name="id_module"    value="<?= $selModule ?>">
-                <input type="hidden" name="id_classe"    value="<?= $selClasse ?>">
-                <input type="hidden" name="annee"        value="<?= h($selAnnee) ?>">
-                <input type="hidden" name="id_filiere"   value="<?= $selFiliere ?>">
-                <input type="hidden" name="niveau"       value="<?= h($selNiveau) ?>">
-                <div class="ctrl-editor">
-                    <i class="fa-solid fa-sliders"></i>
-                    <span>Nb. contrôles :</span>
-                    <input type="number" name="nb_controles" value="<?= $nb_controles ?>" min="1" max="10">
-                    <button type="submit">Mettre à jour</button>
-                </div>
-            </form>
-        </div>
-        <?php endif; ?>
 
     <form method="post" action="notes.php">
         <?= csrf_hidden() ?>
@@ -514,9 +484,15 @@ require_once __DIR__ . '/includes/header.php';
                 <a href="bulletins.php?<?= $bulQs ?>" class="btn-save-notes" style="text-decoration:none;background:rgba(56,189,248,0.15);color:#7dd3fc;border-color:rgba(56,189,248,0.3);">
                     <i class="fa-solid fa-chart-bar"></i> Voir les bulletins
                 </a>
-                <a href="print_tableau_notes_controle.php?<?= $printQs ?>" target="_blank" class="btn-save-notes" style="text-decoration:none;background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.3);">
+                <?php if ($nb_controles <= 1): ?>
+                <a href="print_tableau_notes_controle.php?<?= $printQs ?>&controle_no=1" target="_blank" class="btn-save-notes" style="text-decoration:none;background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.3);">
                     <i class="fa-solid fa-print"></i> Tableau de Contrôle
                 </a>
+                <?php else: ?>
+                <button type="button" onclick="openCtrlModal()" class="btn-save-notes" style="background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.3);">
+                    <i class="fa-solid fa-print"></i> Tableau de Contrôle
+                </button>
+                <?php endif; ?>
                 <button type="submit" class="btn-save-notes">
                     <i class="fa-solid fa-floppy-disk"></i> Enregistrer
                 </button>
@@ -608,6 +584,23 @@ require_once __DIR__ . '/includes/header.php';
 
 </div>
 
+<?php if ($nb_controles > 1): ?>
+<div class="ctrl-modal-overlay" id="ctrl-modal-overlay">
+    <div class="ctrl-modal">
+        <h3><i class="fa-solid fa-print" style="margin-right:.5rem;color:#fcd34d;"></i>Quel contrôle imprimer ?</h3>
+        <select id="ctrl-modal-select">
+            <?php for ($i = 1; $i <= $nb_controles; $i++): ?>
+            <option value="<?= $i ?>">Contrôle <?= $i ?></option>
+            <?php endfor; ?>
+        </select>
+        <div class="ctrl-modal-actions">
+            <button class="btn-modal-cancel" onclick="closeCtrlModal()">Annuler</button>
+            <button class="btn-modal-print"  onclick="goCtrlPrint()"><i class="fa-solid fa-print" style="margin-right:.35rem;"></i>Imprimer</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 (function () {
     const form    = document.getElementById('notes-filter-form');
@@ -663,6 +656,26 @@ require_once __DIR__ . '/includes/header.php';
         }
     }
 })();
+
+var _printBase = 'print_tableau_notes_controle.php?id_classe=<?= $selClasse ?>&id_module=<?= $selModule ?>';
+
+function openCtrlModal() {
+    var el = document.getElementById('ctrl-modal-overlay');
+    if (el) el.classList.add('open');
+}
+function closeCtrlModal() {
+    var el = document.getElementById('ctrl-modal-overlay');
+    if (el) el.classList.remove('open');
+}
+function goCtrlPrint() {
+    var sel = document.getElementById('ctrl-modal-select');
+    var no  = sel ? sel.value : 1;
+    window.open(_printBase + '&controle_no=' + no, '_blank');
+    closeCtrlModal();
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeCtrlModal();
+});
 </script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
