@@ -166,7 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Get student's class info for annee_scolaire + tarif
         $stSt = $pdo->prepare(
-            'SELECT s.nom, s.prenom, s.num_inscri, c.annee_scolaire, c.id_filiere
+            'SELECT s.nom, s.prenom, s.num_inscri, c.annee_scolaire, c.id_filiere,
+                    COALESCE(s.remise_mensuelle, 0) as remise_mensuelle
              FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe
              WHERE s.id_stagiaire = ?'
         );
@@ -205,8 +206,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lastPayDate = null;
         foreach ($moisList as $m) {
             $r       = $records[$m] ?? null;
-            $remiseR = $r ? max(0.0, (float)($r['remise'] ?? 0)) : 0.0;
-            $du      = $r ? max(0.0, (float)$r['montant_total'] - $remiseR) : $tarif;
+            $remiseMensDef = max(0.0, (float)($info['remise_mensuelle'] ?? 0));
+            $remiseR = $r ? max(0.0, (float)($r['remise'] ?? 0)) : $remiseMensDef;
+            $du      = $r ? max(0.0, (float)$r['montant_total'] - $remiseR) : max(0.0, $tarif - $remiseMensDef);
             $paye    = $r ? (float)$r['montant_paye']     : 0.0;
             $rest    = $r ? (float)$r['montant_restant']  : $du;
             $stat    = $r ? (string)$r['statut_paiement'] : '';
@@ -274,6 +276,7 @@ if ($selClasse > 0) {
 
     $st = $pdo->prepare("
         SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom,
+               COALESCE(s.remise_mensuelle, 0) as remise_mensuelle,
                m.montant_total, m.remise, m.montant_paye, m.montant_restant, m.statut_paiement, m.est_paye, m.date_paiement
         FROM stagiaires s
         LEFT JOIN mensualites m ON m.id_stagiaire = s.id_stagiaire AND m.mois_ref = ?
@@ -288,8 +291,8 @@ if ($selClasse > 0) {
 $totalDu      = 0; $totalPaye = 0; $totalRestant = 0;
 $nbPaye = 0; $nbPartiel = 0; $nbImpaye = 0;
 foreach ($stagiaires as $s) {
-    $mRemise = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : 0.0;
-    $mTotal  = $s['montant_total']   !== null ? max(0.0, (float)$s['montant_total'] - $mRemise) : $tarifClasse;
+    $mRemise = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : max(0.0, (float)($s['remise_mensuelle'] ?? 0));
+    $mTotal  = $s['montant_total']   !== null ? max(0.0, (float)$s['montant_total'] - $mRemise) : max(0.0, $tarifClasse - (float)($s['remise_mensuelle'] ?? 0));
     $mPaye   = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0;
     $mRest   = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mTotal;
     $sp      = (string)($s['statut_paiement'] ?? '');
@@ -578,7 +581,8 @@ require __DIR__ . '/includes/header.php';
         $isPaye   = (int)($s['est_paye'] ?? 0) === 1 || $sp === 'payé';
         $isPartiel= $sp === 'partiel';
         $isImpaye = !$isPaye && !$isPartiel;
-        $mRemise  = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : 0.0;
+        $sRemiseMens = max(0.0, (float)($s['remise_mensuelle'] ?? 0));
+        $mRemise  = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : $sRemiseMens;
         $mTotal   = $s['montant_total']   !== null ? (float)$s['montant_total']   : $tarifClasse;
         $mEffectif= max(0.0, $mTotal - $mRemise);
         $mPaye    = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0.0;
@@ -593,6 +597,7 @@ require __DIR__ . '/includes/header.php';
           'mois_ref'        => $selMois,
           'tarif'           => $tarifClasse,
           'remise'          => $mRemise,
+          'remise_mensuelle'=> $sRemiseMens,
           'montant_paye'    => $mPaye,
           'montant_restant' => $mRest,
           'has_record'      => $hasRecord,
@@ -854,7 +859,8 @@ function openPayModal(rowData) {
     document.getElementById('pay-info-restant-row').style.display  = '';
     document.getElementById('pay-info-paye').textContent    = fmtAmt(rowData.montant_paye);
     document.getElementById('pay-info-restant').textContent = fmtAmt(rowData.montant_restant);
-    document.getElementById('pay-remise-ajout').value = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : '';
+    const _defRemiseAjout = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : (rowData.remise_mensuelle || 0);
+    document.getElementById('pay-remise-ajout').value = _defRemiseAjout > 0 ? _defRemiseAjout : '';
     document.getElementById('pay-nouveau-versement').value = '';
     document.getElementById('pay-nouveau-versement').max = rowData.montant_restant;
     document.getElementById('pay-ajout-preview').style.display = 'none';
@@ -864,7 +870,8 @@ function openPayModal(rowData) {
     document.getElementById('pay-section-ajout').style.display = 'none';
     document.getElementById('pay-info-existant-row').style.display = 'none';
     document.getElementById('pay-info-restant-row').style.display  = 'none';
-    document.getElementById('pay-remise').value = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : '';
+    const _defRemiseNew = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : (rowData.remise_mensuelle || 0);
+    document.getElementById('pay-remise').value = _defRemiseNew > 0 ? _defRemiseNew : '';
     document.getElementById('pay-effectif-info').style.display = 'none';
     document.getElementById('pay-statut').value = 'payé';
     payUpdateFields();
