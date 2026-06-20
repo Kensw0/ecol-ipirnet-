@@ -1895,9 +1895,6 @@ if (isset($_GET['id'])) {
         <div class="gds-filter-bar__field">
             <button id="btn-print-liste" class="btn" style="width:100%; background:rgba(168,85,247,0.15); color:#d8b4fe; border:1px solid rgba(168,85,247,0.3);" onclick="gdsOpenPrintListe()"><i class="fa-solid fa-print"></i> Imprimer liste</button>
         </div>
-        <div class="gds-filter-bar__field">
-            <button id="btn-print-impaye" class="btn" style="width:100%; background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3);" onclick="gdsOpenPrintImpaye()"><i class="fa-solid fa-triangle-exclamation"></i> Imprimer impayés</button>
-        </div>
     </div>
 </section>
 
@@ -2838,24 +2835,6 @@ function gdsOpenPrintListe() {
     window.open('print_liste_stagiaires.php?' + params.toString(), '_blank');
 }
 
-function gdsOpenPrintImpaye() {
-    const fid    = document.getElementById('flt-stag-filiere')?.value || '';
-    const niv    = document.getElementById('flt-stag-niveau')?.value  || '';
-    const cid    = document.getElementById('flt-stag-classe')?.value  || '';
-    const annee  = document.getElementById('flt-stag-annee')?.value   || '';
-    const sort   = document.getElementById('flt-stag-sort')?.value    || 'nom';
-    const mois   = document.querySelector('input[name="mois"]')?.value || '';
-    const params = new URLSearchParams();
-    if (annee) params.set('annee_scolaire', annee);
-    if (fid)   params.set('id_filiere', fid);
-    if (niv)   params.set('niveau', niv);
-    if (cid)   params.set('id_classe', cid);
-    if (mois)  params.set('mois', mois);
-    params.set('sort', sort);
-    params.set('impaye', '1');
-    params.set('auto', '1');
-    window.open('print_liste_impayes.php?' + params.toString(), '_blank');
-}
 
 // Fix 4 (CORRECTED): Use event delegation on document so modal forms rendered AFTER
 // this script block are also intercepted. The old querySelectorAll at DOMContentLoaded
