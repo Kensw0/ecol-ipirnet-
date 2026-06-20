@@ -604,9 +604,19 @@ require __DIR__ . '/includes/header.php';
             <span class="badge-cot <?= $statusClass ?>"><?= $statusLabel ?></span>
           </td>
           <td style="text-align:center;">
-            <button type="button" class="btn-cot ghost btn-cot sm" onclick='openPayModal(<?= htmlspecialchars($rowData, ENT_QUOTES) ?>)'>
-              <i class="fa-solid fa-money-bill-wave"></i> Paiement
-            </button>
+            <div style="display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;">
+              <button type="button" class="btn-cot ghost btn-cot sm" onclick='openPayModal(<?= htmlspecialchars($rowData, ENT_QUOTES) ?>)'>
+                <i class="fa-solid fa-money-bill-wave"></i> Paiement
+              </button>
+              <?php if ($hasRecord): ?>
+              <a href="print_recu_paiement.php?id=<?= (int)$s['id_stagiaire'] ?>&mois=<?= h($selMois) ?>" target="_blank"
+                 class="btn-cot btn-cot sm"
+                 style="text-decoration:none;background:rgba(250,204,21,.1);color:#fde047;border:1px solid rgba(250,204,21,.25);"
+                 onmouseover="this.style.background='rgba(250,204,21,.2)'" onmouseout="this.style.background='rgba(250,204,21,.1)'">
+                <i class="fa-solid fa-receipt"></i> Reçu
+              </a>
+              <?php endif; ?>
+            </div>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -1147,6 +1157,10 @@ function _renderPmtDrawer(data) {
         </div>
         <div class="pmt-card-right">
           <span class="pmt-badge ${badgeCls}"><i class="fa-solid ${badgeIcon}"></i> ${badgeLbl}</span>
+          ${row.statut ? `<a href="print_recu_paiement.php?id=${_pmtDrawerSid}&mois=${row.mois}" target="_blank"
+            style="display:inline-flex;align-items:center;gap:3px;padding:4px 9px;border-radius:7px;font-size:.72rem;font-weight:600;border:1px solid rgba(250,204,21,.3);background:rgba(250,204,21,.08);color:#fde047;text-decoration:none;white-space:nowrap;transition:all .15s;"
+            onmouseover="this.style.background='rgba(250,204,21,.18)'" onmouseout="this.style.background='rgba(250,204,21,.08)'">
+            <i class="fa-solid fa-receipt"></i> Reçu</a>` : ''}
           <button type="button" class="pmt-edit-btn" onclick='openPayModalFromDrawer(${editRowData})'>
             <i class="fa-solid fa-pen-to-square"></i> Modifier
           </button>
