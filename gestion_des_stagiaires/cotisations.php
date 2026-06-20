@@ -372,38 +372,69 @@ require __DIR__ . '/includes/header.php';
 .amount-gray{color:#71717a;}
 
 /* ── Student payment drawer ── */
-.pmt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:none;transition:opacity .25s;}
+.pmt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:none;backdrop-filter:blur(2px);}
 .pmt-overlay.open{display:block;}
-.pmt-drawer{position:fixed;top:0;right:0;height:100%;width:min(520px,100vw);background:#18181b;border-left:1px solid rgba(255,255,255,.1);z-index:10001;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;overflow:hidden;}
+.pmt-drawer{position:fixed;top:0;right:0;height:100%;width:min(480px,100vw);background:#111113;border-left:1px solid rgba(255,255,255,.08);z-index:10001;transform:translateX(100%);transition:transform .32s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;overflow:hidden;box-shadow:-12px 0 48px rgba(0,0,0,.6);}
 .pmt-drawer.open{transform:translateX(0);}
-.pmt-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
-.pmt-drawer-title{font-size:1.05rem;font-weight:700;color:#f4f4f5;margin:0 0 .2rem;}
-.pmt-drawer-sub{font-size:.78rem;color:#71717a;}
-.pmt-drawer-body{flex:1;overflow-y:auto;padding:1.25rem 1.5rem;}
-.pmt-drawer-foot{flex-shrink:0;border-top:1px solid rgba(255,255,255,.07);padding:1rem 1.5rem;}
-.pmt-month-table{width:100%;border-collapse:collapse;font-size:.84rem;}
-.pmt-month-table th{padding:.45rem .6rem;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:#71717a;font-weight:600;border-bottom:1px solid rgba(255,255,255,.07);}
-.pmt-month-table td{padding:.55rem .6rem;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;color:#e4e4e7;}
-.pmt-month-table tbody tr:hover td{background:rgba(168,85,247,.06);}
-.pmt-month-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
-.pmt-month-name{font-weight:600;white-space:nowrap;}
-.pmt-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap;}
-.pmt-badge.paye{background:rgba(52,211,153,.13);color:#34d399;border:1px solid rgba(52,211,153,.3);}
-.pmt-badge.partiel{background:rgba(251,146,60,.13);color:#fb923c;border:1px solid rgba(251,146,60,.3);}
-.pmt-badge.impaye{background:rgba(248,113,113,.13);color:#f87171;border:1px solid rgba(248,113,113,.3);}
-.pmt-badge.aucun{background:rgba(113,113,122,.1);color:#71717a;border:1px solid rgba(113,113,122,.2);}
-.pmt-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.85rem;}
-.pmt-sum-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.7rem .85rem;text-align:center;}
-.pmt-sum-val{font-size:1.1rem;font-weight:800;line-height:1.1;margin-bottom:.2rem;}
-.pmt-sum-lbl{font-size:.67rem;text-transform:uppercase;letter-spacing:.06em;color:#71717a;}
-.pmt-last-pay{font-size:.8rem;color:#71717a;text-align:center;}
-.btn-stag-name{background:none;border:none;color:#e4e4e7;font-weight:600;cursor:pointer;padding:0;text-align:left;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(168,85,247,.5);transition:color .15s;}
+
+/* head */
+.pmt-drawer-head{display:flex;justify-content:space-between;align-items:center;padding:1.1rem 1.4rem;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;background:rgba(168,85,247,.06);}
+.pmt-drawer-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:.95rem;font-weight:800;color:#fff;flex-shrink:0;margin-right:.85rem;}
+.pmt-drawer-title{font-size:1rem;font-weight:700;color:#f4f4f5;margin:0 0 .15rem;line-height:1.2;}
+.pmt-drawer-sub{font-size:.74rem;color:#71717a;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;}
+.pmt-drawer-sub .pip{width:3px;height:3px;border-radius:50%;background:#3f3f46;display:inline-block;}
+
+/* body */
+.pmt-drawer-body{flex:1;overflow-y:auto;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.55rem;}
+.pmt-drawer-body::-webkit-scrollbar{width:4px;}.pmt-drawer-body::-webkit-scrollbar-track{background:transparent;}.pmt-drawer-body::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px;}
+
+/* month cards */
+.pmt-card{background:#18181b;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:.85rem 1rem;transition:border-color .15s;}
+.pmt-card:hover{border-color:rgba(168,85,247,.3);}
+.pmt-card.is-current{border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.06);}
+.pmt-card.is-paye{border-color:rgba(52,211,153,.2);}
+.pmt-card.is-impaye{border-color:rgba(248,113,113,.2);}
+.pmt-card.is-partiel{border-color:rgba(251,146,60,.2);}
+.pmt-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;}
+.pmt-card-month{font-size:.88rem;font-weight:700;color:#e4e4e7;display:flex;align-items:center;gap:.4rem;}
+.pmt-card-right{display:flex;align-items:center;gap:.5rem;}
+.pmt-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:.69rem;font-weight:700;white-space:nowrap;}
+.pmt-badge.paye{background:rgba(52,211,153,.13);color:#34d399;border:1px solid rgba(52,211,153,.25);}
+.pmt-badge.partiel{background:rgba(251,146,60,.13);color:#fb923c;border:1px solid rgba(251,146,60,.25);}
+.pmt-badge.impaye{background:rgba(248,113,113,.13);color:#f87171;border:1px solid rgba(248,113,113,.25);}
+.pmt-badge.aucun{background:rgba(113,113,122,.1);color:#71717a;border:1px solid rgba(113,113,122,.18);}
+.pmt-edit-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:7px;font-size:.72rem;font-weight:600;border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.08);color:#c084fc;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.pmt-edit-btn:hover{background:rgba(168,85,247,.2);border-color:rgba(168,85,247,.5);}
+
+/* progress bar */
+.pmt-progress-wrap{position:relative;height:5px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin-bottom:.65rem;}
+.pmt-progress-fill{position:absolute;left:0;top:0;height:100%;border-radius:99px;transition:width .5s ease;}
+
+/* amounts row */
+.pmt-amounts{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
+.pmt-amount-item{display:flex;flex-direction:column;gap:.1rem;}
+.pmt-amount-lbl{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:#52525b;font-weight:600;}
+.pmt-amount-val{font-size:.82rem;font-weight:700;font-variant-numeric:tabular-nums;}
+.pmt-date-line{font-size:.71rem;color:#52525b;margin-top:.5rem;display:flex;align-items:center;gap:.3rem;}
+
+/* footer */
+.pmt-drawer-foot{flex-shrink:0;border-top:1px solid rgba(255,255,255,.07);padding:1rem 1.1rem;background:#111113;}
+.pmt-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:.7rem;}
+.pmt-sum-card{background:#18181b;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:.65rem .75rem;text-align:center;}
+.pmt-sum-val{font-size:.95rem;font-weight:800;line-height:1.15;margin-bottom:.15rem;font-variant-numeric:tabular-nums;}
+.pmt-sum-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#52525b;font-weight:600;}
+.pmt-last-pay{font-size:.76rem;color:#71717a;text-align:center;display:flex;align-items:center;justify-content:center;gap:.35rem;}
+
+/* name trigger */
+.btn-stag-name{background:none;border:none;color:#e4e4e7;font-weight:600;cursor:pointer;padding:0;text-align:left;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(168,85,247,.4);transition:color .15s;}
 .btn-stag-name:hover{color:#c084fc;}
-.btn-eye{background:none;border:none;color:#52525b;cursor:pointer;padding:0 0 0 6px;font-size:.85rem;transition:color .15s;vertical-align:middle;}
+.btn-eye{background:none;border:none;color:#52525b;cursor:pointer;padding:0 0 0 6px;font-size:.82rem;transition:color .15s;vertical-align:middle;}
 .btn-eye:hover{color:#a855f7;}
-.pmt-skeleton{display:flex;flex-direction:column;gap:.6rem;padding:.5rem 0;}
-.pmt-skel-row{height:32px;background:rgba(255,255,255,.05);border-radius:6px;animation:skel-pulse 1.2s ease-in-out infinite;}
-@keyframes skel-pulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+
+/* skeleton */
+.pmt-skeleton{display:flex;flex-direction:column;gap:.55rem;}
+.pmt-skel-row{height:96px;background:rgba(255,255,255,.04);border-radius:12px;animation:skel-pulse 1.3s ease-in-out infinite;}
+@keyframes skel-pulse{0%,100%{opacity:.4;}50%{opacity:.8;}}
 </style>
 
 <div style="max-width:1200px;margin:0 auto;padding:1.5rem;">
@@ -697,11 +728,14 @@ require __DIR__ . '/includes/header.php';
 <div id="pmt-overlay" class="pmt-overlay" onclick="closePmtDrawer()"></div>
 <div id="pmt-drawer" class="pmt-drawer">
   <div class="pmt-drawer-head">
-    <div>
-      <div class="pmt-drawer-title" id="pmt-drawer-name">—</div>
-      <div class="pmt-drawer-sub" id="pmt-drawer-sub">—</div>
+    <div style="display:flex;align-items:center;">
+      <div class="pmt-drawer-avatar" id="pmt-drawer-avatar">?</div>
+      <div>
+        <div class="pmt-drawer-title" id="pmt-drawer-name">Chargement…</div>
+        <div class="pmt-drawer-sub" id="pmt-drawer-sub"></div>
+      </div>
     </div>
-    <button type="button" onclick="closePmtDrawer()" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:1.2rem;padding:.2rem;"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" onclick="closePmtDrawer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:#71717a;cursor:pointer;font-size:.9rem;padding:.35rem .55rem;border-radius:8px;transition:all .15s;" onmouseover="this.style.color='#f4f4f5'" onmouseout="this.style.color='#71717a'"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <div class="pmt-drawer-body" id="pmt-drawer-body">
     <div class="pmt-skeleton">
@@ -719,8 +753,8 @@ require __DIR__ . '/includes/header.php';
         <div class="pmt-sum-lbl">Total Payé</div>
       </div>
       <div class="pmt-sum-card">
-        <div class="pmt-sum-val" id="pmt-tot-rest" style="color:#f87171;">—</div>
-        <div class="pmt-sum-lbl">Solde Global</div>
+        <div class="pmt-sum-val" id="pmt-tot-rest">—</div>
+        <div class="pmt-sum-lbl">Solde Restant</div>
       </div>
     </div>
     <div class="pmt-last-pay" id="pmt-last-pay"></div>
@@ -1001,107 +1035,213 @@ document.getElementById('modal-pay')?.addEventListener('click', function(e) {
 
 // ── Student full-year payment drawer ─────────────────────────────────────
 const MOIS_NOMS = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MOIS_ICONS = { paye:'fa-circle-check', partiel:'fa-circle-half-stroke', impayé:'fa-circle-xmark', '':'fa-circle' };
+
+let _pmtDrawerSid  = null;
+let _pmtDrawerData = null; // last fetched data, used for refresh after modal save
 
 function openPmtDrawer(sid) {
-  const overlay = document.getElementById('pmt-overlay');
-  const drawer  = document.getElementById('pmt-drawer');
-  const body    = document.getElementById('pmt-drawer-body');
-  const foot    = document.getElementById('pmt-drawer-foot');
+  _pmtDrawerSid = sid;
+  const body = document.getElementById('pmt-drawer-body');
+  const foot = document.getElementById('pmt-drawer-foot');
 
-  // Reset
   document.getElementById('pmt-drawer-name').textContent = 'Chargement…';
-  document.getElementById('pmt-drawer-sub').textContent  = '';
+  document.getElementById('pmt-drawer-sub').innerHTML    = '';
+  document.getElementById('pmt-drawer-avatar').textContent = '?';
   body.innerHTML = '<div class="pmt-skeleton">' + Array(10).fill('<div class="pmt-skel-row"></div>').join('') + '</div>';
   foot.style.display = 'none';
 
-  overlay.classList.add('open');
-  drawer.classList.add('open');
+  document.getElementById('pmt-overlay').classList.add('open');
+  document.getElementById('pmt-drawer').classList.add('open');
   document.body.style.overflow = 'hidden';
 
+  _fetchPmtDrawer(sid);
+}
+
+function _fetchPmtDrawer(sid) {
   const fd = new FormData();
   fd.append('get_student_payments', '1');
   fd.append('csrf_token', GDS_CSRF);
   fd.append('id_stagiaire', sid);
 
-  fetch('cotisations.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+  fetch('cotisations.php', { method:'POST', body:fd, credentials:'same-origin' })
     .then(r => r.json())
     .then(data => {
-      if (!data.success) { body.innerHTML = `<div style="color:#f87171;padding:1rem;">${data.error || 'Erreur.'}</div>`; return; }
-
-      document.getElementById('pmt-drawer-name').textContent = data.nom;
-      document.getElementById('pmt-drawer-sub').textContent  =
-        (data.num_inscri ? data.num_inscri + ' · ' : '') + (data.annee || '') + ' · Tarif ' + fmtAmtN(data.tarif) + ' / mois';
-
-      // Build table
-      let html = '<table class="pmt-month-table"><thead><tr>' +
-        '<th>Mois</th><th style="text-align:right;">Dû</th><th style="text-align:right;">Payé</th>' +
-        '<th style="text-align:right;">Restant</th><th>Date paiement</th><th>Statut</th></tr></thead><tbody>';
-
-      data.rows.forEach(row => {
-        const [y, m] = row.mois.split('-');
-        const moisLabel = (MOIS_NOMS[parseInt(m)] || m) + ' ' + y;
-        const isPaye    = row.statut === 'payé';
-        const isPartiel = row.statut === 'partiel';
-        const isEmpty   = !row.statut;
-        const badgeCls  = isPaye ? 'paye' : isPartiel ? 'partiel' : isEmpty ? 'aucun' : 'impaye';
-        const badgeLbl  = isPaye ? 'Payé' : isPartiel ? 'Partiel' : isEmpty ? '—' : 'Impayé';
-        const restColor = row.restant > 0 ? 'color:#f87171;' : 'color:#71717a;';
-        const payeColor = row.paye  > 0   ? 'color:#34d399;' : 'color:#71717a;';
-        const dateStr   = row.date_paiement ? row.date_paiement.slice(0, 10) : '<span style="color:#3f3f46;">—</span>';
-
-        // Highlight current selected month row
-        const isSelMois = row.mois === SEL_MOIS;
-        const rowStyle  = isSelMois ? ' style="background:rgba(168,85,247,.08);"' : '';
-
-        html += `<tr${rowStyle}>
-          <td class="pmt-month-name">${isSelMois ? '<i class="fa-solid fa-circle" style="color:#a855f7;font-size:.45rem;vertical-align:middle;margin-right:5px;"></i>' : ''}${moisLabel}</td>
-          <td class="num">${fmtAmtN(row.du)}</td>
-          <td class="num" style="${payeColor}font-weight:600;">${fmtAmtN(row.paye)}</td>
-          <td class="num" style="${restColor}font-weight:600;">${fmtAmtN(row.restant)}</td>
-          <td style="font-size:.78rem;color:#a1a1aa;">${dateStr}</td>
-          <td><span class="pmt-badge ${badgeCls}">${badgeLbl}</span></td>
-        </tr>`;
-      });
-      html += '</tbody></table>';
-      body.innerHTML = html;
-
-      // Footer summary
-      const restColor = data.total_rest > 0 ? '#f87171' : '#34d399';
-      document.getElementById('pmt-tot-du').textContent   = fmtAmtN(data.total_du);
-      document.getElementById('pmt-tot-paye').textContent = fmtAmtN(data.total_paye);
-      document.getElementById('pmt-tot-rest').textContent = fmtAmtN(data.total_rest);
-      document.getElementById('pmt-tot-rest').style.color = restColor;
-
-      const lastEl = document.getElementById('pmt-last-pay');
-      if (data.last_pay_date) {
-        lastEl.innerHTML = '<i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i>Dernier paiement : <strong style="color:#e4e4e7;">' + data.last_pay_date.slice(0,10) + '</strong>';
-      } else {
-        lastEl.innerHTML = '<i class="fa-regular fa-calendar-xmark" style="margin-right:4px;color:#f87171;"></i>Aucun paiement enregistré';
+      if (!data.success) {
+        document.getElementById('pmt-drawer-body').innerHTML =
+          `<div style="color:#f87171;padding:1.5rem;text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem;display:block;margin-bottom:.5rem;"></i>${data.error||'Erreur.'}</div>`;
+        return;
       }
-      foot.style.display = '';
+      _pmtDrawerData = data;
+      _renderPmtDrawer(data);
     })
     .catch(e => {
-      body.innerHTML = `<div style="color:#f87171;padding:1rem;">Erreur réseau : ${e.message}</div>`;
+      document.getElementById('pmt-drawer-body').innerHTML =
+        `<div style="color:#f87171;padding:1rem;">Erreur réseau : ${e.message}</div>`;
     });
 }
+
+function _renderPmtDrawer(data) {
+  // Avatar initials
+  const parts    = data.nom.trim().split(' ');
+  const initials = (parts[0]?.[0]||'') + (parts[1]?.[0]||'');
+  document.getElementById('pmt-drawer-avatar').textContent = initials.toUpperCase();
+  document.getElementById('pmt-drawer-name').textContent   = data.nom;
+  document.getElementById('pmt-drawer-sub').innerHTML =
+    `<span>${data.num_inscri||''}</span>` +
+    (data.num_inscri ? '<span class="pip"></span>' : '') +
+    `<span>${data.annee||''}</span>` +
+    `<span class="pip"></span><span>Tarif : <strong style="color:#c084fc;">${fmtAmtN(data.tarif)}</strong>/mois</span>`;
+
+  // Build month cards
+  let html = '';
+  data.rows.forEach(row => {
+    const [y, m]    = row.mois.split('-');
+    const moisLabel = (MOIS_NOMS[parseInt(m)]||m) + ' ' + y;
+    const isPaye    = row.statut === 'payé';
+    const isPartiel = row.statut === 'partiel';
+    const isImpaye  = row.statut === 'impayé';
+    const isEmpty   = !row.statut;
+    const isCurrent = row.mois === SEL_MOIS;
+
+    const cardCls   = 'pmt-card' +
+      (isCurrent ? ' is-current' : '') +
+      (isPaye    ? ' is-paye'    : '') +
+      (isPartiel ? ' is-partiel' : '') +
+      (isImpaye  ? ' is-impaye'  : '');
+
+    const badgeCls  = isPaye ? 'paye' : isPartiel ? 'partiel' : isImpaye ? 'impaye' : 'aucun';
+    const badgeIcon = isPaye ? 'fa-circle-check' : isPartiel ? 'fa-circle-half-stroke' : isImpaye ? 'fa-circle-xmark' : 'fa-circle';
+    const badgeLbl  = isPaye ? 'Payé' : isPartiel ? 'Partiel' : isImpaye ? 'Impayé' : 'Non enregistré';
+
+    // progress bar
+    const pct       = data.tarif > 0 ? Math.min(100, (row.paye / data.tarif) * 100) : 0;
+    const barColor  = isPaye ? '#34d399' : isPartiel ? '#fb923c' : '#3f3f46';
+
+    // amounts colors
+    const payeColor = row.paye > 0   ? '#34d399' : '#52525b';
+    const restColor = row.restant > 0 ? '#f87171' : '#52525b';
+
+    // date
+    const dateStr = row.date_paiement
+      ? '<i class="fa-regular fa-calendar-check" style="color:#34d399;"></i> ' + row.date_paiement.slice(0,10)
+      : '<i class="fa-regular fa-calendar" style="color:#3f3f46;"></i> <span style="color:#3f3f46;">Aucun paiement</span>';
+
+    // edit button — show always so you can record a new payment or update
+    const editRowData = JSON.stringify({
+      id_stagiaire: _pmtDrawerSid,
+      nom: data.nom,
+      mois_ref: row.mois,
+      tarif: data.tarif,
+      montant_paye: row.paye,
+      montant_restant: row.restant,
+      has_record: !!row.statut,
+      statut: row.statut || '',
+    });
+
+    html += `<div class="${cardCls}">
+      <div class="pmt-card-top">
+        <div class="pmt-card-month">
+          ${isCurrent ? '<i class="fa-solid fa-bookmark" style="color:#a855f7;font-size:.7rem;"></i>' : ''}
+          ${moisLabel}
+        </div>
+        <div class="pmt-card-right">
+          <span class="pmt-badge ${badgeCls}"><i class="fa-solid ${badgeIcon}"></i> ${badgeLbl}</span>
+          <button type="button" class="pmt-edit-btn" onclick='openPayModalFromDrawer(${editRowData})'>
+            <i class="fa-solid fa-pen-to-square"></i> Modifier
+          </button>
+        </div>
+      </div>
+      <div class="pmt-progress-wrap">
+        <div class="pmt-progress-fill" style="width:${pct}%;background:${barColor};"></div>
+      </div>
+      <div class="pmt-amounts">
+        <div class="pmt-amount-item">
+          <span class="pmt-amount-lbl">Dû</span>
+          <span class="pmt-amount-val" style="color:#a1a1aa;">${fmtAmtN(row.du)}</span>
+        </div>
+        <div class="pmt-amount-item">
+          <span class="pmt-amount-lbl">Payé</span>
+          <span class="pmt-amount-val" style="color:${payeColor};">${fmtAmtN(row.paye)}</span>
+        </div>
+        <div class="pmt-amount-item">
+          <span class="pmt-amount-lbl">Restant</span>
+          <span class="pmt-amount-val" style="color:${restColor};">${fmtAmtN(row.restant)}</span>
+        </div>
+      </div>
+      <div class="pmt-date-line">${dateStr}</div>
+    </div>`;
+  });
+
+  document.getElementById('pmt-drawer-body').innerHTML = html;
+
+  // Footer
+  const restCol = data.total_rest > 0 ? '#f87171' : '#34d399';
+  document.getElementById('pmt-tot-du').textContent    = fmtAmtN(data.total_du);
+  document.getElementById('pmt-tot-paye').textContent  = fmtAmtN(data.total_paye);
+  document.getElementById('pmt-tot-rest').textContent  = fmtAmtN(data.total_rest);
+  document.getElementById('pmt-tot-rest').style.color  = restCol;
+
+  const lastEl = document.getElementById('pmt-last-pay');
+  if (data.last_pay_date) {
+    lastEl.innerHTML = '<i class="fa-regular fa-calendar-check" style="color:#34d399;"></i> Dernier paiement : <strong style="color:#e4e4e7;">' + data.last_pay_date.slice(0,10) + '</strong>';
+  } else {
+    lastEl.innerHTML = '<i class="fa-regular fa-calendar-xmark" style="color:#f87171;"></i> Aucun paiement enregistré';
+  }
+  document.getElementById('pmt-drawer-foot').style.display = '';
+}
+
+// Open pay modal pre-filled from drawer, then refresh drawer on save
+function openPayModalFromDrawer(rowData) {
+  openPayModal(rowData);
+  // After save, the existing savePayment() success path calls updateRow().
+  // We hook in via _pmtDrawerAfterSave flag.
+  _pmtDrawerAfterSaveNeeded = true;
+}
+
+let _pmtDrawerAfterSaveNeeded = false;
+
+// Patch into the existing savePayment success flow
+const _origUpdateRow = window.updateRow || function(){};
+// We override savePayment's success callback by wrapping it
+const _origSavePayment = window.savePayment;
 
 function closePmtDrawer() {
   document.getElementById('pmt-overlay').classList.remove('open');
   document.getElementById('pmt-drawer').classList.remove('open');
   document.body.style.overflow = '';
+  _pmtDrawerAfterSaveNeeded = false;
 }
 
 function fmtAmtN(v) {
-  return parseFloat(v || 0).toLocaleString('fr-MA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+  return parseFloat(v||0).toLocaleString('fr-MA', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' MAD';
 }
 
-// Close drawer on Escape key
+// Close on Escape
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closePmtDrawer();
-    closePayModal();
-  }
+  if (e.key === 'Escape') { closePmtDrawer(); closePayModal(); }
 });
+
+// ── Hook: after a payment modal save, refresh the drawer if open ──────────
+// We do this by monkey-patching the fetch response in savePayment.
+// Instead, we watch for the pay-save-btn to re-enable (save done) and reload.
+(function() {
+  const btn = document.getElementById('pay-save-btn');
+  if (!btn) return;
+  const observer = new MutationObserver(() => {
+    if (!btn.disabled && _pmtDrawerAfterSaveNeeded && _pmtDrawerSid) {
+      _pmtDrawerAfterSaveNeeded = false;
+      // Small delay so the modal close animation finishes
+      setTimeout(() => {
+        document.getElementById('pmt-drawer-body').innerHTML =
+          '<div class="pmt-skeleton">' + Array(10).fill('<div class="pmt-skel-row"></div>').join('') + '</div>';
+        document.getElementById('pmt-drawer-foot').style.display = 'none';
+        _fetchPmtDrawer(_pmtDrawerSid);
+      }, 350);
+    }
+  });
+  observer.observe(btn, { attributes: true, attributeFilter: ['disabled'] });
+})();
 </script>
 
 <?php
