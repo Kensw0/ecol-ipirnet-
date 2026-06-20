@@ -20,12 +20,26 @@ if (!$s) {
     http_response_code(404);
     exit('Stagiaire introuvable');
 }
-$rows = $pdo->prepare('SELECT mois_ref, est_paye, statut_paiement, montant_paye, date_paiement, marque_le FROM mensualites WHERE id_stagiaire=? ORDER BY mois_ref DESC LIMIT 36');
+
+// ── Fetch student's global monthly discount ──
+$stRem = $pdo->prepare('SELECT COALESCE(remise_mensuelle, 0) FROM stagiaires WHERE id_stagiaire = ?');
+$stRem->execute([$id]);
+$remiseMensuelleStag = max(0.0, (float)($stRem->fetchColumn() ?: 0));
+
+// ── Filière tarif default ──
+$tarifsDefaut = [2 => 700.0, 3 => 600.0, 4 => 800.0];
+$fidEtat = (int)($s['id_filiere'] ?? 0);
+$tarifStdEtat = $tarifsDefaut[$fidEtat] ?? 700.0;
+
+$rows = $pdo->prepare('SELECT mois_ref, est_paye, statut_paiement, montant_total, montant_paye, montant_restant, remise, date_paiement, marque_le FROM mensualites WHERE id_stagiaire=? ORDER BY mois_ref DESC LIMIT 36');
 $rows->execute([$id]);
 $hist = $rows->fetchAll();
 $nbPaye = 0;
 $nbPartiel = 0;
 $nbImpaye = 0;
+$totalDuEtat = 0.0;
+$totalPayeEtat = 0.0;
+$totalRestantEtat = 0.0;
 foreach ($hist as $r) {
     $sp = strtolower(trim((string)($r['statut_paiement'] ?? '')));
     $mp_r = (float)($r['montant_paye'] ?? 0);
@@ -37,6 +51,14 @@ foreach ($hist as $r) {
     } else {
         $nbImpaye++;
     }
+    // Effective amount: use per-payment remise, fall back to student's global remise_mensuelle
+    $eRemise = max(0.0, (float)($r['remise'] ?? 0));
+    if ($eRemise === 0.0) $eRemise = $remiseMensuelleStag;
+    $eDu      = max(0.0, (float)($r['montant_total'] ?? $tarifStdEtat) - $eRemise);
+    $ePaye    = (float)($r['montant_paye'] ?? 0);
+    $totalDuEtat      += $eDu;
+    $totalPayeEtat    += $ePaye;
+    $totalRestantEtat += max(0.0, $eDu - $ePaye);
 }
 log_document_gen($pdo, 'etat_mensualites', $id, (string) $s['num_inscri']);
 
@@ -195,9 +217,10 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
             font-weight: 700;
             text-align: center;
         }
-        .ep-table td.mois, .ep-table th.mois { width: 30%; }
-        .ep-table td.statut, .ep-table th.statut { width: 22%; text-align: center; font-weight: 700; }
-        .ep-table td.date, .ep-table th.date { width: 30%; text-align: center; }
+        .ep-table td.mois, .ep-table th.mois { width: 26%; }
+        .ep-table td.statut, .ep-table th.statut { width: 24%; text-align: center; font-weight: 700; }
+        .ep-table td.date, .ep-table th.date { width: 26%; text-align: center; }
+        .ep-table td.amt, .ep-table th.amt { width: 24%; text-align: right; }
         .ep-table tfoot th { background: #f4f4f5; font-weight: 700; text-align: right; }
         .ep-table tfoot th.num { text-align: center; }
         .ep-empty { text-align: center; font-style: italic; padding: 14px; }
@@ -326,29 +349,34 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
                 <th class="mois">Mois</th>
                 <th class="statut">Statut</th>
                 <th class="date">Marqué le</th>
+                <th class="amt">Montant dû (MAD)</th>
             </tr>
         </thead>
         <tbody>
             <?php if (!$hist): ?>
-                <tr><td colspan="3" class="ep-empty">Aucun enregistrement de cotisation.</td></tr>
+                <tr><td colspan="4" class="ep-empty">Aucun enregistrement de cotisation.</td></tr>
             <?php else: ?>
                 <?php foreach ($hist as $e): ?>
+                    <?php
+                        $sp_e  = strtolower(trim((string)($e['statut_paiement'] ?? '')));
+                        $mp_e  = (float)($e['montant_paye'] ?? 0);
+                        $ep_e  = (int)$e['est_paye'];
+                        if ($ep_e === 1 || $sp_e === 'payé') {
+                            $statLabel = 'Payé'; $statStyle = 'color:#1a7a1a; font-weight:700;';
+                        } elseif ($sp_e === 'partiel' || ($mp_e > 0 && $ep_e === 0)) {
+                            $statLabel = 'Partiel (' . number_format($mp_e, 2, ',', ' ') . ' payé)'; $statStyle = 'color:#b45309; font-weight:700;';
+                        } else {
+                            $statLabel = 'Non payé'; $statStyle = 'color:#b91c1c; font-weight:700;';
+                        }
+                        $eRemise_e = max(0.0, (float)($e['remise'] ?? 0));
+                        if ($eRemise_e === 0.0) $eRemise_e = $remiseMensuelleStag;
+                        $eDu_e = max(0.0, (float)($e['montant_total'] ?? $tarifStdEtat) - $eRemise_e);
+                    ?>
                     <tr>
                         <td class="mois"><?= h($fmtMois((string) $e['mois_ref'])) ?></td>
-                        <?php
-                            $sp_e = strtolower(trim((string)($e['statut_paiement'] ?? '')));
-                            $mp_e = (float)($e['montant_paye'] ?? 0);
-                            $ep_e = (int)$e['est_paye'];
-                            if ($ep_e === 1 || $sp_e === 'payé') {
-                                $statLabel = 'Payé'; $statStyle = 'color:#1a7a1a; font-weight:700;';
-                            } elseif ($sp_e === 'partiel' || ($mp_e > 0 && $ep_e === 0)) {
-                                $statLabel = 'Partiel (' . number_format($mp_e, 2) . ' MAD payé)'; $statStyle = 'color:#b45309; font-weight:700;';
-                            } else {
-                                $statLabel = 'Non payé'; $statStyle = 'color:#b91c1c; font-weight:700;';
-                            }
-                        ?>
                         <td class="statut" style="<?= $statStyle ?>"><?= h($statLabel) ?></td>
                         <td class="date"><?= h($fmtDt((string) (!empty($e['date_paiement']) ? $e['date_paiement'] : ($e['marque_le'] ?? '')))) ?></td>
+                        <td class="amt"><?= number_format($eDu_e, 2, ',', ' ') ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -356,10 +384,17 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
         <?php if ($hist): ?>
         <tfoot>
             <tr>
-                <th class="mois">Total</th>
-                <th class="num"><?= (int) ($nbPaye + $nbImpaye) ?> mois</th>
-                <th class="date"><?= (int) $nbPaye ?> payés / <?= (int) $nbImpaye ?> non payés</th>
+                <th class="mois">Totaux</th>
+                <th class="num" style="text-align:center;"><?= (int)$nbPaye ?> payé<?= $nbPaye > 1 ? 's' : '' ?> / <?= (int)$nbImpaye ?> impayé<?= $nbImpaye > 1 ? 's' : '' ?><?= $nbPartiel > 0 ? ' / ' . (int)$nbPartiel . ' partiel' . ($nbPartiel > 1 ? 's' : '') : '' ?></th>
+                <th class="date" style="text-align:right;">Payé : <?= number_format($totalPayeEtat, 2, ',', ' ') ?> MAD</th>
+                <th class="amt">Dû : <?= number_format($totalDuEtat, 2, ',', ' ') ?> MAD</th>
             </tr>
+            <?php if ($totalRestantEtat > 0): ?>
+            <tr>
+                <th colspan="3" style="text-align:right; font-style:italic;">Restant dû total</th>
+                <th class="amt" style="color:#b91c1c;"><?= number_format($totalRestantEtat, 2, ',', ' ') ?> MAD</th>
+            </tr>
+            <?php endif; ?>
         </tfoot>
         <?php endif; ?>
     </table>
