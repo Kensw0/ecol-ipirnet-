@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $datePaie    = ($_POST['date_paiement'] ?? '') !== '' ? (string)$_POST['date_paiement'] : null;
         $nouveauVers = (float)($_POST['nouveau_versement'] ?? 0);
         $isAjout     = isset($_POST['is_ajout']) && (string)$_POST['is_ajout'] === '1';
+        $remise      = max(0.0, (float)($_POST['remise'] ?? 0));
 
         if ($sid <= 0 || !preg_match('/^\d{4}-\d{2}$/', $moisRef)) {
             echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
@@ -41,27 +42,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $existing = $stExist->fetch();
 
             if ($isAjout && $existing) {
+                // Keep existing remise if none submitted, else use new one
+                $remiseEff  = isset($_POST['remise']) ? $remise : max(0.0, (float)($existing['remise'] ?? 0));
+                $effectif   = max(0.0, $tarif - $remiseEff);
                 $ancienPaye = (float)($existing['montant_paye'] ?? 0);
-                $newPaye    = min($tarif, $ancienPaye + $nouveauVers);
-                $newRestant = max(0.0, $tarif - $newPaye);
+                $newPaye    = min($effectif, $ancienPaye + $nouveauVers);
+                $newRestant = max(0.0, $effectif - $newPaye);
                 $newStatut  = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
                 $newEstPaye = $newRestant <= 0 ? 1 : 0;
-                $pdo->prepare("UPDATE mensualites SET montant_paye=?, montant_restant=?, statut_paiement=?, est_paye=?, date_paiement=COALESCE(?,date_paiement), marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
-                    ->execute([$newPaye, $newRestant, $newStatut, $newEstPaye, $datePaie, $sid, $moisRef]);
+                $pdo->prepare("UPDATE mensualites SET remise=?, montant_paye=?, montant_restant=?, statut_paiement=?, est_paye=?, date_paiement=COALESCE(?,date_paiement), marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
+                    ->execute([$remiseEff, $newPaye, $newRestant, $newStatut, $newEstPaye, $datePaie, $sid, $moisRef]);
             } else {
                 $montantTotal   = $tarif;
+                $remise         = min($remise, $tarif);
+                $effectif       = max(0.0, $tarif - $remise);
                 $montantPaye    = (float)($_POST['montant_paye'] ?? 0);
-                if ($statut === 'payé') { $montantPaye = $montantTotal; }
-                $montantPaye    = min($montantPaye, $montantTotal);
-                $montantRestant = $statut === 'payé' ? 0.0 : max(0.0, $montantTotal - $montantPaye);
+                if ($statut === 'payé') { $montantPaye = $effectif; }
+                $montantPaye    = min($montantPaye, $effectif);
+                $montantRestant = $statut === 'payé' ? 0.0 : max(0.0, $effectif - $montantPaye);
                 $estPaye        = ($statut === 'payé') ? 1 : 0;
                 // Check if record exists → UPDATE, else INSERT
                 if ($existing) {
-                    $pdo->prepare("UPDATE mensualites SET est_paye=?, montant_total=?, montant_paye=?, montant_restant=?, statut_paiement=?, date_paiement=?, marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
-                        ->execute([$estPaye, $montantTotal, $montantPaye, $montantRestant, $statut, $datePaie, $sid, $moisRef]);
+                    $pdo->prepare("UPDATE mensualites SET est_paye=?, montant_total=?, remise=?, montant_paye=?, montant_restant=?, statut_paiement=?, date_paiement=?, marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
+                        ->execute([$estPaye, $montantTotal, $remise, $montantPaye, $montantRestant, $statut, $datePaie, $sid, $moisRef]);
                 } else {
-                    $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le) VALUES (?,?,?,?,?,?,0,?,?,NOW())")
-                        ->execute([$sid, $moisRef, $estPaye, $montantTotal, $montantPaye, $montantRestant, $statut, $datePaie]);
+                    $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, remise, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le) VALUES (?,?,?,?,?,?,?,0,?,?,NOW())")
+                        ->execute([$sid, $moisRef, $estPaye, $montantTotal, $remise, $montantPaye, $montantRestant, $statut, $datePaie]);
                 }
             }
             $stUpd = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=? ORDER BY id_mensualite DESC LIMIT 1');
@@ -185,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Fetch all existing records for these months
         $ph = implode(',', array_fill(0, count($moisList), '?'));
         $stPay = $pdo->prepare(
-            "SELECT mois_ref, montant_total, montant_paye, montant_restant,
+            "SELECT mois_ref, montant_total, remise, montant_paye, montant_restant,
                     statut_paiement, est_paye, date_paiement
              FROM mensualites WHERE id_stagiaire = ? AND mois_ref IN ($ph)"
         );
@@ -198,18 +204,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $totDu = 0; $totPaye = 0; $totRest = 0;
         $lastPayDate = null;
         foreach ($moisList as $m) {
-            $r  = $records[$m] ?? null;
-            $du   = $r ? (float)$r['montant_total']   : $tarif;
-            $paye = $r ? (float)$r['montant_paye']     : 0.0;
-            $rest = $r ? (float)$r['montant_restant']  : $du;
-            $stat = $r ? (string)$r['statut_paiement'] : '';
-            $date = $r ? $r['date_paiement']            : null;
+            $r       = $records[$m] ?? null;
+            $remiseR = $r ? max(0.0, (float)($r['remise'] ?? 0)) : 0.0;
+            $du      = $r ? max(0.0, (float)$r['montant_total'] - $remiseR) : $tarif;
+            $paye    = $r ? (float)$r['montant_paye']     : 0.0;
+            $rest    = $r ? (float)$r['montant_restant']  : $du;
+            $stat    = $r ? (string)$r['statut_paiement'] : '';
+            $date    = $r ? $r['date_paiement']            : null;
             if ($date) $lastPayDate = $date;
             $totDu   += $du;
             $totPaye += $paye;
             $totRest += $rest;
-            $rows[] = ['mois' => $m, 'du' => $du, 'paye' => $paye, 'restant' => $rest,
-                       'statut' => $stat, 'date_paiement' => $date];
+            $rows[] = ['mois' => $m, 'du' => $du, 'remise' => $remiseR, 'paye' => $paye,
+                       'restant' => $rest, 'statut' => $stat, 'date_paiement' => $date];
         }
 
         echo json_encode([
@@ -267,7 +274,7 @@ if ($selClasse > 0) {
 
     $st = $pdo->prepare("
         SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom,
-               m.montant_total, m.montant_paye, m.montant_restant, m.statut_paiement, m.est_paye, m.date_paiement
+               m.montant_total, m.remise, m.montant_paye, m.montant_restant, m.statut_paiement, m.est_paye, m.date_paiement
         FROM stagiaires s
         LEFT JOIN mensualites m ON m.id_stagiaire = s.id_stagiaire AND m.mois_ref = ?
         WHERE s.id_classe = ?
@@ -281,7 +288,8 @@ if ($selClasse > 0) {
 $totalDu      = 0; $totalPaye = 0; $totalRestant = 0;
 $nbPaye = 0; $nbPartiel = 0; $nbImpaye = 0;
 foreach ($stagiaires as $s) {
-    $mTotal  = $s['montant_total']   !== null ? (float)$s['montant_total']   : $tarifClasse;
+    $mRemise = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : 0.0;
+    $mTotal  = $s['montant_total']   !== null ? max(0.0, (float)$s['montant_total'] - $mRemise) : $tarifClasse;
     $mPaye   = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0;
     $mRest   = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mTotal;
     $sp      = (string)($s['statut_paiement'] ?? '');
@@ -570,22 +578,25 @@ require __DIR__ . '/includes/header.php';
         $isPaye   = (int)($s['est_paye'] ?? 0) === 1 || $sp === 'payé';
         $isPartiel= $sp === 'partiel';
         $isImpaye = !$isPaye && !$isPartiel;
+        $mRemise  = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : 0.0;
         $mTotal   = $s['montant_total']   !== null ? (float)$s['montant_total']   : $tarifClasse;
+        $mEffectif= max(0.0, $mTotal - $mRemise);
         $mPaye    = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0.0;
-        $mRest    = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mTotal;
+        $mRest    = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mEffectif;
         $hasRecord = $s['statut_paiement'] !== null;
-        if (!$hasRecord) { $mPaye = 0; $mRest = $mTotal; }
+        if (!$hasRecord) { $mPaye = 0; $mRest = $mEffectif; }
         $statusClass = $isPaye ? 'paye' : ($isPartiel ? 'partiel' : ($hasRecord ? 'impaye' : 'aucun'));
         $statusLabel = $isPaye ? 'Payé' : ($isPartiel ? 'Partiel' : ($hasRecord ? 'Impayé' : 'Aucun'));
         $rowData = json_encode([
-          'id_stagiaire' => (int)$s['id_stagiaire'],
-          'nom'          => trim($s['nom'] . ' ' . $s['prenom']),
-          'mois_ref'     => $selMois,
-          'tarif'        => $tarifClasse,
-          'montant_paye' => $mPaye,
+          'id_stagiaire'    => (int)$s['id_stagiaire'],
+          'nom'             => trim($s['nom'] . ' ' . $s['prenom']),
+          'mois_ref'        => $selMois,
+          'tarif'           => $tarifClasse,
+          'remise'          => $mRemise,
+          'montant_paye'    => $mPaye,
           'montant_restant' => $mRest,
-          'has_record'   => $hasRecord,
-          'statut'       => $sp,
+          'has_record'      => $hasRecord,
+          'statut'          => $sp,
         ]);
       ?>
         <tr data-sid="<?= (int)$s['id_stagiaire'] ?>" id="row-<?= (int)$s['id_stagiaire'] ?>"<?= $isImpaye ? ' style="background:rgba(255,60,60,.07);"' : '' ?>>
@@ -597,7 +608,10 @@ require __DIR__ . '/includes/header.php';
             <button type="button" class="btn-eye" onclick="openPmtDrawer(<?= (int)$s['id_stagiaire'] ?>)" title="Voir historique annuel"><i class="fa-solid fa-eye"></i></button>
             <div style="font-size:.76rem;color:#71717a;"><?= h((string)($s['num_inscri'] ?? '')) ?></div>
           </td>
-          <td style="text-align:right;" class="col-du"><?= number_format($mTotal, 2) ?> MAD</td>
+          <td style="text-align:right;" class="col-du">
+            <?= number_format($mEffectif, 2) ?> MAD
+            <?php if ($mRemise > 0): ?><br><span style="font-size:.7rem;color:#a855f7;font-weight:600;">-<?= number_format($mRemise, 2) ?> réduc.</span><?php endif; ?>
+          </td>
           <td style="text-align:right;" class="col-paye <?= $mPaye > 0 ? 'amount-green' : 'amount-gray' ?>"><?= number_format($mPaye, 2) ?> MAD</td>
           <td style="text-align:right;" class="col-restant <?= $mRest > 0 ? 'amount-red' : 'amount-gray' ?>"><?= number_format($mRest, 2) ?> MAD</td>
           <td style="text-align:center;" class="col-statut">
@@ -702,6 +716,14 @@ require __DIR__ . '/includes/header.php';
             <input type="date" id="pay-date" value="<?= date('Y-m-d') ?>">
           </div>
         </div>
+        <div class="cot-form-group">
+          <label style="display:flex;align-items:center;gap:.4rem;">
+            Réduction (MAD)
+            <span style="font-size:.68rem;font-weight:400;color:#71717a;text-transform:none;letter-spacing:0;">(bourse, cas spécial)</span>
+          </label>
+          <input type="number" id="pay-remise" min="0" step="0.01" placeholder="0.00" oninput="payUpdateEffectif()" style="border-color:rgba(168,85,247,.3);">
+          <div id="pay-effectif-info" style="display:none;margin-top:.3rem;font-size:.78rem;color:#c084fc;"></div>
+        </div>
         <div class="cot-form-group" id="pay-montant-wrap">
           <label>Montant payé (MAD)</label>
           <input type="number" id="pay-montant-paye" min="0" step="0.01" placeholder="0.00" oninput="payCapMontant()">
@@ -715,6 +737,13 @@ require __DIR__ . '/includes/header.php';
           <div style="color:#a1a1aa;font-size:.82rem;">Un paiement existe déjà pour ce mois. Entrez le montant supplémentaire à ajouter.</div>
         </div>
         <div class="cot-form-group" style="margin-top:.5rem;">
+          <label style="display:flex;align-items:center;gap:.4rem;">
+            Réduction (MAD)
+            <span style="font-size:.68rem;font-weight:400;color:#71717a;text-transform:none;letter-spacing:0;">(modifier si besoin)</span>
+          </label>
+          <input type="number" id="pay-remise-ajout" min="0" step="0.01" placeholder="0.00" oninput="payPreviewAjout()" style="border-color:rgba(168,85,247,.3);">
+        </div>
+        <div class="cot-form-group">
           <label>Nouveau versement (MAD)</label>
           <input type="number" id="pay-nouveau-versement" min="0" step="0.01" placeholder="0.00" oninput="payPreviewAjout()">
         </div>
@@ -825,6 +854,7 @@ function openPayModal(rowData) {
     document.getElementById('pay-info-restant-row').style.display  = '';
     document.getElementById('pay-info-paye').textContent    = fmtAmt(rowData.montant_paye);
     document.getElementById('pay-info-restant').textContent = fmtAmt(rowData.montant_restant);
+    document.getElementById('pay-remise-ajout').value = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : '';
     document.getElementById('pay-nouveau-versement').value = '';
     document.getElementById('pay-nouveau-versement').max = rowData.montant_restant;
     document.getElementById('pay-ajout-preview').style.display = 'none';
@@ -834,6 +864,8 @@ function openPayModal(rowData) {
     document.getElementById('pay-section-ajout').style.display = 'none';
     document.getElementById('pay-info-existant-row').style.display = 'none';
     document.getElementById('pay-info-restant-row').style.display  = 'none';
+    document.getElementById('pay-remise').value = (rowData.remise || 0) > 0 ? (rowData.remise || 0) : '';
+    document.getElementById('pay-effectif-info').style.display = 'none';
     document.getElementById('pay-statut').value = 'payé';
     payUpdateFields();
   }
@@ -855,21 +887,43 @@ function payUpdateFields() {
   }
 }
 
+function payGetEffectif() {
+  const remise = parseFloat(document.getElementById('pay-remise')?.value || 0) || 0;
+  return Math.max(0, TARIF_CLASSE - remise);
+}
+
+function payUpdateEffectif() {
+  const effectif = payGetEffectif();
+  const remise   = parseFloat(document.getElementById('pay-remise')?.value || 0) || 0;
+  const infoEl   = document.getElementById('pay-effectif-info');
+  if (remise > 0) {
+    infoEl.style.display = '';
+    infoEl.textContent = `Montant effectif après réduction : ${fmtAmt(effectif)}`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+  payCapMontant();
+}
+
 function payCapMontant() {
   const inp = document.getElementById('pay-montant-paye');
-  if (parseFloat(inp.value) > TARIF_CLASSE) inp.value = TARIF_CLASSE;
+  const effectif = payGetEffectif();
+  if (parseFloat(inp.value) > effectif) inp.value = effectif;
 }
 
 function payPreviewAjout() {
   if (!_payCurrentRow) return;
-  const v = parseFloat(document.getElementById('pay-nouveau-versement').value) || 0;
-  const newPaye   = Math.min(TARIF_CLASSE, _payCurrentRow.montant_paye + v);
-  const newRestant= Math.max(0, TARIF_CLASSE - newPaye);
+  const remise    = parseFloat(document.getElementById('pay-remise-ajout')?.value || 0) || 0;
+  const effectif  = Math.max(0, TARIF_CLASSE - remise);
+  const v         = parseFloat(document.getElementById('pay-nouveau-versement').value) || 0;
+  const newPaye   = Math.min(effectif, _payCurrentRow.montant_paye + v);
+  const newRestant= Math.max(0, effectif - newPaye);
   const preview   = document.getElementById('pay-ajout-preview');
-  if (v > 0) {
+  if (v > 0 || remise !== (_payCurrentRow.remise || 0)) {
     preview.style.display = '';
     const newStatut = newRestant <= 0 ? '✅ Payé' : (newPaye > 0 ? '⚠️ Partiel' : '❌ Impayé');
-    preview.innerHTML = `Nouveau total payé : <strong style="color:#34d399;">${fmtAmt(newPaye)}</strong> · Restant : <strong style="color:${newRestant>0?'#f87171':'#34d399'};">${fmtAmt(newRestant)}</strong> · Statut → <strong>${newStatut}</strong>`;
+    const remiseLine = remise > 0 ? `Réduction : <strong style="color:#a855f7;">${fmtAmt(remise)}</strong> → Effectif : <strong>${fmtAmt(effectif)}</strong><br>` : '';
+    preview.innerHTML = `${remiseLine}Nouveau total payé : <strong style="color:#34d399;">${fmtAmt(newPaye)}</strong> · Restant : <strong style="color:${newRestant>0?'#f87171':'#34d399'};">${fmtAmt(newRestant)}</strong> · Statut → <strong>${newStatut}</strong>`;
   } else {
     preview.style.display = 'none';
   }
@@ -886,14 +940,21 @@ function savePayment() {
   if (_payCurrentRow.has_record) {
     // Ajout mode
     const vers = parseFloat(document.getElementById('pay-nouveau-versement').value) || 0;
-    if (vers <= 0) { showToast('Entrez un montant à ajouter.', 'error'); return; }
+    const remiseAjout = parseFloat(document.getElementById('pay-remise-ajout').value) || 0;
+    if (vers <= 0 && remiseAjout === (_payCurrentRow.remise || 0)) {
+      showToast('Entrez un montant à ajouter ou modifiez la réduction.', 'error'); return;
+    }
     fd.append('is_ajout', '1');
+    fd.append('remise', remiseAjout);
     fd.append('nouveau_versement', vers);
     fd.append('statut_paiement', 'partiel');
     fd.append('date_paiement', document.getElementById('pay-date-ajout').value);
   } else {
     // New record
-    const statut = document.getElementById('pay-statut').value;
+    const statut  = document.getElementById('pay-statut').value;
+    const remise  = parseFloat(document.getElementById('pay-remise').value) || 0;
+    const effectif = Math.max(0, TARIF_CLASSE - remise);
+    fd.append('remise', remise);
     fd.append('statut_paiement', statut);
     fd.append('date_paiement', document.getElementById('pay-date').value);
     if (statut === 'partiel') {
@@ -901,7 +962,7 @@ function savePayment() {
       if (mp <= 0) { showToast('Entrez un montant payé.', 'error'); return; }
       fd.append('montant_paye', mp);
     } else if (statut === 'payé') {
-      fd.append('montant_paye', TARIF_CLASSE);
+      fd.append('montant_paye', effectif);
     } else {
       fd.append('montant_paye', 0);
     }
@@ -934,14 +995,21 @@ function savePayment() {
 function updateRow(sid, row, tarif, nomFallback) {
   const tr = document.getElementById('row-' + sid);
   if (!tr) { setTimeout(() => location.reload(), 800); return; }
-  const mTotal   = row && row.montant_total   ? parseFloat(row.montant_total)   : tarif;
+  const mRemise  = row && row.remise          ? parseFloat(row.remise)          : 0;
+  const mRawTotal= row && row.montant_total   ? parseFloat(row.montant_total)   : tarif;
+  const mEffectif= Math.max(0, mRawTotal - mRemise);
   const mPaye    = row && row.montant_paye    ? parseFloat(row.montant_paye)    : 0;
-  const mRest    = row && row.montant_restant ? parseFloat(row.montant_restant) : mTotal;
+  const mRest    = row && row.montant_restant ? parseFloat(row.montant_restant) : mEffectif;
   const sp       = row ? (row.statut_paiement || '') : '';
   const isPaye   = (row ? (parseInt(row.est_paye) === 1) : false) || sp === 'payé';
   const isPartiel= sp === 'partiel';
   const statusClass = isPaye ? 'paye' : (isPartiel ? 'partiel' : 'impaye');
   const statusLabel = isPaye ? 'Payé' : (isPartiel ? 'Partiel' : 'Impayé');
+  const duCell = tr.querySelector('.col-du');
+  if (duCell) {
+    duCell.innerHTML = fmtAmt(mEffectif) +
+      (mRemise > 0 ? `<br><span style="font-size:.7rem;color:#a855f7;font-weight:600;">-${fmtAmt(mRemise)} réduc.</span>` : '');
+  }
   tr.querySelector('.col-paye').textContent  = fmtAmt(mPaye);
   tr.querySelector('.col-paye').className    = 'col-paye ' + (mPaye > 0 ? 'amount-green' : 'amount-gray');
   tr.querySelector('.col-restant').textContent = fmtAmt(mRest);
@@ -954,6 +1022,7 @@ function updateRow(sid, row, tarif, nomFallback) {
       nom: nomFallback || '',
       mois_ref: SEL_MOIS,
       tarif: tarif,
+      remise: mRemise,
       montant_paye: mPaye,
       montant_restant: mRest,
       has_record: true,
@@ -1124,8 +1193,9 @@ function _renderPmtDrawer(data) {
     const badgeIcon = isPaye ? 'fa-circle-check' : isPartiel ? 'fa-circle-half-stroke' : isImpaye ? 'fa-circle-xmark' : 'fa-circle';
     const badgeLbl  = isPaye ? 'Payé' : isPartiel ? 'Partiel' : isImpaye ? 'Impayé' : 'Non enregistré';
 
-    // progress bar
-    const pct       = data.tarif > 0 ? Math.min(100, (row.paye / data.tarif) * 100) : 0;
+    // progress bar — based on effective amount
+    const effectif  = row.du; // already = montant_total - remise (computed in PHP)
+    const pct       = effectif > 0 ? Math.min(100, (row.paye / effectif) * 100) : 0;
     const barColor  = isPaye ? '#34d399' : isPartiel ? '#fb923c' : '#3f3f46';
 
     // amounts colors
@@ -1143,17 +1213,21 @@ function _renderPmtDrawer(data) {
       nom: data.nom,
       mois_ref: row.mois,
       tarif: data.tarif,
+      remise: row.remise || 0,
       montant_paye: row.paye,
       montant_restant: row.restant,
       has_record: !!row.statut,
       statut: row.statut || '',
     });
+    const remiseBadge = (row.remise || 0) > 0
+      ? `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:.65rem;font-weight:700;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.3);">-${fmtAmtN(row.remise)} réduc.</span>`
+      : '';
 
     html += `<div class="${cardCls}">
       <div class="pmt-card-top">
         <div class="pmt-card-month">
           ${isCurrent ? '<i class="fa-solid fa-bookmark" style="color:#a855f7;font-size:.7rem;"></i>' : ''}
-          ${moisLabel}
+          ${moisLabel} ${remiseBadge}
         </div>
         <div class="pmt-card-right">
           <span class="pmt-badge ${badgeCls}"><i class="fa-solid ${badgeIcon}"></i> ${badgeLbl}</span>
