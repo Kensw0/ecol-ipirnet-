@@ -221,16 +221,20 @@ if (!$isPublic && isset($pdo)) {
         }
         .nav-logout svg { stroke: #ef4444; width:18px; height:18px; }
 
-        /* Notification pulsing dots */
+        /* Notification count badges */
         @keyframes navPulse {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); transform: scale(1); }
-            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); transform: scale(1.1); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
+            0%   { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.7); }
+            70%  { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0); }
         }
-        .nav-dot {
-            position: absolute; right: 1rem; top: 50%; margin-top: -3px; 
-            width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
+        .nav-badge {
+            position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 9px; background: #ef4444; color: #fff;
+            font-size: 0.62rem; font-weight: 800; letter-spacing: 0;
+            display: flex; align-items: center; justify-content: center;
             animation: navPulse 2s infinite;
+            box-shadow: 0 0 0 2px rgba(239,68,68,0.25);
         }
     </style>
     <?php endif; ?>
@@ -325,7 +329,7 @@ if (!$isPublic && isset($pdo)) {
                 </a>
                 <a href="demandes_inscription.php" class="nav-item<?= $curPage === 'demandes' ? ' active' : '' ?>">
                     <i data-lucide="clipboard-list" width="18" height="18"></i> <span>Pré-inscriptions</span>
-                    <?php if($notifDots['demandes'] > 0): ?><span class="nav-dot"></span><?php endif; ?>
+                    <?php if($notifDots['demandes'] > 0): ?><span class="nav-badge"><?= $notifDots['demandes'] > 99 ? '99+' : $notifDots['demandes'] ?></span><?php endif; ?>
                 </a>
                 <a href="stagiaires.php" class="nav-item<?= $curPage === 'stagiaires' ? ' active' : '' ?>" title="Accéder au hub stagiaires pour les notes, absences, stages & classement">
                     <i data-lucide="layout-dashboard" width="18" height="18"></i> <span>Hub Stagiaires</span>
