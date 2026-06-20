@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$pageTitle = 'Gestion des Cotisations';
+$pageTitle = 'Gestion des Paiements';
 $curPage   = 'cotisations';
 
 // ── Tarifs par filière ────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ require __DIR__ . '/includes/header.php';
   <!-- Page header -->
   <div class="page-header-cot">
     <div>
-      <h1><i class="fa-solid fa-money-bill-transfer" style="color:#a855f7;margin-right:.5rem;"></i>Gestion des Cotisations</h1>
+      <h1><i class="fa-solid fa-money-bill-transfer" style="color:#a855f7;margin-right:.5rem;"></i>Gestion des Paiements</h1>
       <p>Système centralisé de gestion des paiements par classe</p>
     </div>
   </div>
@@ -355,33 +355,13 @@ require __DIR__ . '/includes/header.php';
   </div>
 
   <?php if ($selClasse > 0 && $classeInfo): ?>
-  <!-- Summary stats -->
-  <div class="cot-stats-row">
+  <!-- Summary stats — only Total stagiaires + Impayés -->
+  <div class="cot-stats-row" style="grid-template-columns:repeat(2,minmax(150px,220px));">
     <div class="cot-stat-card">
       <div class="cot-stat-val" style="color:#e4e4e7;"><?= count($stagiaires) ?></div>
-      <div class="cot-stat-lbl">Stagiaires</div>
+      <div class="cot-stat-lbl">Total stagiaires</div>
     </div>
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:#a1a1aa;"><?= number_format($totalDu, 0, ',', ' ') ?> MAD</div>
-      <div class="cot-stat-lbl">Total dû</div>
-    </div>
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:#34d399;"><?= number_format($totalPaye, 0, ',', ' ') ?> MAD</div>
-      <div class="cot-stat-lbl">Total payé</div>
-    </div>
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:<?= $totalRestant > 0 ? '#f87171' : '#34d399' ?>;"><?= number_format($totalRestant, 0, ',', ' ') ?> MAD</div>
-      <div class="cot-stat-lbl">Total restant</div>
-    </div>
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:#34d399;"><?= $nbPaye ?></div>
-      <div class="cot-stat-lbl">Payés</div>
-    </div>
-    <div class="cot-stat-card">
-      <div class="cot-stat-val" style="color:#fb923c;"><?= $nbPartiel ?></div>
-      <div class="cot-stat-lbl">Partiels</div>
-    </div>
-    <div class="cot-stat-card">
+    <div class="cot-stat-card" style="border-color:rgba(248,113,113,.25);">
       <div class="cot-stat-val" style="color:#f87171;"><?= $nbImpaye ?></div>
       <div class="cot-stat-lbl">Impayés</div>
     </div>
@@ -448,7 +428,7 @@ require __DIR__ . '/includes/header.php';
           'statut'       => $sp,
         ]);
       ?>
-        <tr data-sid="<?= (int)$s['id_stagiaire'] ?>" id="row-<?= (int)$s['id_stagiaire'] ?>">
+        <tr data-sid="<?= (int)$s['id_stagiaire'] ?>" id="row-<?= (int)$s['id_stagiaire'] ?>"<?= $isImpaye ? ' style="background:rgba(255,60,60,.07);"' : '' ?>>
           <td class="cb-col">
             <input type="checkbox" class="row-cb" value="<?= (int)$s['id_stagiaire'] ?>" onchange="updateBulkBar()">
           </td>
