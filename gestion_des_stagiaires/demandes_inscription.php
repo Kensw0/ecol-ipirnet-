@@ -283,6 +283,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set($u->rowCount() > 0 ? 'Pré-inscription refusée.' : 'Introuvable ou déjà traitée.');
         redirect('demandes_inscription.php');
     }
+
+    /* ── BULK REFUSE ── */
+    if (isset($_POST['bulk_refuser'])) {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? []))));
+        if (!empty($ids)) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $params = $ids;
+            $params[] = 'en_attente';
+            $stmt = $pdo->prepare(
+                "UPDATE pre_inscription SET statut = 'abandonne', date_decision = NOW()
+                 WHERE id_demande IN ($placeholders) AND statut = ?"
+            );
+            $stmt->execute($params);
+            $done = $stmt->rowCount();
+            flash_set($done . ' pré-inscription(s) marquée(s) comme abandonnée(s).',
+                      $done > 0 ? 'success' : 'warning');
+        }
+        redirect('demandes_inscription.php');
+    }
+
+    /* ── BULK ACCEPT ── */
+    if (isset($_POST['bulk_accepter'])) {
+        $ids       = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids']      ?? []))));
+        $classeId  = (int)($_POST['bulk_id_classe'] ?? 0);
+        if (empty($ids) || $classeId <= 0) {
+            flash_set('Sélection ou classe manquante.');
+            redirect('demandes_inscription.php');
+        }
+        // Verify class exists
+        $chkCls = $pdo->prepare('SELECT id_filiere FROM classes WHERE id_classe = ?');
+        $chkCls->execute([$classeId]);
+        if (!$chkCls->fetch()) {
+            flash_set('Classe invalide.');
+            redirect('demandes_inscription.php');
+        }
+        $di   = date('Y-m-d');
+        $year = date('Y');
+        $hash = password_hash('changeme', PASSWORD_DEFAULT);
+        $ok   = 0; $skip = 0;
+        $pdo->beginTransaction();
+        try {
+            foreach ($ids as $idDem) {
+                $st = $pdo->prepare('SELECT * FROM pre_inscription WHERE id_demande = ? AND statut = ?');
+                $st->execute([$idDem, 'en_attente']);
+                $d = $st->fetch();
+                if (!$d) { $skip++; continue; }
+                // CIN duplicate check
+                $cin_val = strtoupper(trim((string)($d['cin'] ?? '')));
+                if ($cin_val !== '') {
+                    $chk = $pdo->prepare('SELECT id_stagiaire FROM stagiaires WHERE cin = ?');
+                    $chk->execute([$cin_val]);
+                    if ($chk->fetch()) { $skip++; continue; }
+                }
+                // Email duplicate check
+                $em = trim((string)($d['email'] ?? ''));
+                if ($em !== '') {
+                    $chkE = $pdo->prepare('SELECT COUNT(*) FROM stagiaires WHERE email = ?');
+                    $chkE->execute([$em]);
+                    if ((int)$chkE->fetchColumn() > 0) { $skip++; continue; }
+                }
+                // Generate num_inscri
+                $stGen = $pdo->prepare(
+                    "SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(num_inscri, '-', -1) AS UNSIGNED)), 0)
+                       FROM stagiaires WHERE num_inscri LIKE ?
+                        AND num_inscri REGEXP '^INS-[0-9]{4}-[0-9]{5}$'"
+                );
+                $stGen->execute(['INS-' . $year . '-%']);
+                $maxNum = (int)$stGen->fetchColumn();
+                $newNum = 'INS-' . $year . '-' . str_pad((string)($maxNum + 1), 5, '0', STR_PAD_LEFT);
+                $ins = $pdo->prepare(
+                    'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe)
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                );
+                $ins->execute([
+                    $newNum, $cin_val ?: null, $d['nom'], $d['prenom'],
+                    $d['date_naissance'] ?: null, $d['adresse'] ?: null,
+                    $em ?: null, $d['telephone'] ?: null,
+                    $d['telephone_parent'] ?: null, $d['nom_tuteur'] ?: null,
+                    $hash, null, $di, $classeId,
+                ]);
+                $newId = (int)$pdo->lastInsertId();
+                $pdo->prepare('UPDATE pre_inscription SET statut = ?, date_decision = NOW(), id_stagiaire_cree = ? WHERE id_demande = ?')
+                    ->execute(['converti', $newId, $idDem]);
+                $ok++;
+            }
+            $pdo->commit();
+            $msg = $ok . ' stagiaire(s) créé(s) avec succès.';
+            if ($skip > 0) $msg .= ' ' . $skip . ' ignoré(s) (CIN/email en doublon ou déjà traité).';
+            flash_set($msg, 'success');
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            flash_set('Erreur lors de l\'inscription groupée : ' . $e->getMessage());
+        }
+        redirect('demandes_inscription.php');
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -395,7 +490,7 @@ function getAvatarInitials($nom, $prenom) {
 /* PRÉ-INSCRIPTION ROW DESIGN */
 .pi-row {
     display:grid;
-    grid-template-columns: 240px 1fr auto;
+    grid-template-columns: 28px 240px 1fr auto;
     align-items:center;
     gap:1.25rem;
     padding:0.9rem 1rem;
@@ -444,6 +539,64 @@ function getAvatarInitials($nom, $prenom) {
     .pi-row { grid-template-columns:1fr; }
     .pi-row-actions { flex-wrap:wrap; }
 }
+
+/* ── Bulk select checkbox ─────────────────────────────────────────────────── */
+.pi-row-checkbox {
+    display:flex; align-items:center; flex-shrink:0;
+}
+.pi-select-cb {
+    width:18px; height:18px; border-radius:4px; border:1.5px solid rgba(255,255,255,0.25);
+    background:transparent; cursor:pointer; appearance:none; -webkit-appearance:none;
+    flex-shrink:0; transition:all 0.15s; position:relative;
+}
+.pi-select-cb:checked {
+    background:#a855f7; border-color:#a855f7;
+}
+.pi-select-cb:checked::after {
+    content:''; position:absolute; top:2px; left:5px;
+    width:6px; height:9px;
+    border-right:2px solid #fff; border-bottom:2px solid #fff;
+    transform:rotate(45deg);
+}
+.pi-row.pi-row-selected {
+    background:rgba(168,85,247,0.08) !important;
+    border-color:rgba(168,85,247,0.35) !important;
+}
+
+/* ── Bulk action bar ──────────────────────────────────────────────────────── */
+#pi-bulk-bar {
+    display:none; align-items:center; gap:0.75rem; flex-wrap:wrap;
+    padding:0.7rem 1.25rem;
+    background:rgba(168,85,247,0.12);
+    border-bottom:1px solid rgba(168,85,247,0.3);
+}
+#pi-bulk-bar.visible { display:flex; }
+.pi-bulk-count {
+    font-size:0.85rem; font-weight:700; color:#d8b4fe;
+    margin-right:0.25rem;
+}
+.pi-bulk-btn {
+    display:inline-flex; align-items:center; gap:0.4rem;
+    padding:0.4rem 0.9rem; border-radius:7px; font-size:0.8rem;
+    font-weight:600; cursor:pointer; border:1px solid transparent;
+    transition:all 0.18s; font-family:inherit;
+}
+.pi-bulk-accept { background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3); color:#10b981; }
+.pi-bulk-accept:hover { background:rgba(16,185,129,0.25); border-color:#10b981; }
+.pi-bulk-refuse { background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.25); color:#f87171; }
+.pi-bulk-refuse:hover { background:rgba(239,68,68,0.22); border-color:#ef4444; }
+.pi-bulk-deselect { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:#a1a1aa; }
+.pi-bulk-deselect:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+/* ── Days-waiting badge ───────────────────────────────────────────────────── */
+.pi-days-badge {
+    display:inline-flex; align-items:center; gap:0.3rem;
+    padding:0.18rem 0.55rem; border-radius:5px;
+    font-size:0.72rem; font-weight:700; white-space:nowrap;
+}
+.pi-days-fresh   { background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25); }
+.pi-days-warn    { background:rgba(249,115,22,0.12); color:#f97316; border:1px solid rgba(249,115,22,0.3); }
+.pi-days-urgent  { background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
 
 /* ─────────────────────────────────────────────────────────────
    CHECKBOX & RADIO — pill-card design
@@ -602,16 +755,36 @@ function getAvatarInitials($nom, $prenom) {
 
 <!-- ── À TRAITER ──────────────────────────────────────────── -->
 <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(249,115,22,0.3);margin-bottom:2rem;">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(249,115,22,0.12) 0%,rgba(249,115,22,0.03) 100%);display:flex;justify-content:space-between;align-items:center;">
-        <h2 style="margin:0;font-size:1.1rem;color:#f97316;display:flex;align-items:center;gap:0.6rem;">
-            <i class="fa-solid fa-inbox"></i> À Traiter
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(249,115,22,0.12) 0%,rgba(249,115,22,0.03) 100%);display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
             <?php if($nbAttente > 0): ?>
-            <span style="background:#f97316;color:#fff;font-size:0.72rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:20px;"><?= $nbAttente ?></span>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;" title="Tout sélectionner">
+                <input type="checkbox" id="pi-select-all" class="pi-select-cb">
+            </label>
             <?php endif; ?>
-        </h2>
+            <h2 style="margin:0;font-size:1.1rem;color:#f97316;display:flex;align-items:center;gap:0.6rem;">
+                <i class="fa-solid fa-inbox"></i> À Traiter
+                <?php if($nbAttente > 0): ?>
+                <span style="background:#f97316;color:#fff;font-size:0.72rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:20px;"><?= $nbAttente ?></span>
+                <?php endif; ?>
+            </h2>
+        </div>
         <div style="font-size:0.78rem;color:rgba(249,115,22,0.7);display:flex;align-items:center;gap:0.4rem;">
             <i class="fa-solid fa-circle-notch fa-spin"></i> Actualisation auto...
         </div>
+    </div>
+    <!-- Bulk action bar — appears when rows are checked -->
+    <div id="pi-bulk-bar">
+        <span class="pi-bulk-count"><span id="pi-bulk-n">0</span> sélectionné(s)</span>
+        <button type="button" class="pi-bulk-btn pi-bulk-accept" onclick="bulkAccept()">
+            <i class="fa-solid fa-user-check"></i> Valider la sélection
+        </button>
+        <button type="button" class="pi-bulk-btn pi-bulk-refuse" onclick="bulkRefuse()">
+            <i class="fa-solid fa-ban"></i> Refuser la sélection
+        </button>
+        <button type="button" class="pi-bulk-btn pi-bulk-deselect" onclick="clearBulkSelection()">
+            <i class="fa-solid fa-xmark"></i> Désélectionner
+        </button>
     </div>
 
     <?php if($attente): ?>
@@ -639,6 +812,11 @@ function getAvatarInitials($nom, $prenom) {
             $initials = getAvatarInitials($r['nom'], $r['prenom']);
             $filiere  = h((string)$r['nom_filiere']);
         ?>
+        <?php
+            $daysWaiting = max(0, (int)floor((time() - strtotime((string)$r['date_soumission'])) / 86400));
+            $daysBadgeClass = $daysWaiting <= 2 ? 'pi-days-fresh' : ($daysWaiting <= 7 ? 'pi-days-warn' : 'pi-days-urgent');
+            $daysLabel = $daysWaiting === 0 ? "Aujourd'hui" : ($daysWaiting === 1 ? 'Hier' : 'Depuis ' . $daysWaiting . ' j');
+        ?>
         <div class="pi-row" id="pi-row-<?= $did ?>"
              data-pisearch="<?= htmlspecialchars(strtolower(trim($r['nom'].' '.$r['prenom'].' '.($r['cin'] ?? ''))), ENT_QUOTES, 'UTF-8') ?>"
              data-nom="<?= h((string)$r['nom']) ?>"
@@ -646,6 +824,11 @@ function getAvatarInitials($nom, $prenom) {
              data-filiere="<?= h((string)$r['nom_filiere']) ?>"
              data-id_filiere="<?= (int)$r['id_filiere'] ?>"
              data-annee="<?= h((string)($r['annee_scolaire_visee'] ?? '')) ?>">
+
+            <!-- CHECKBOX -->
+            <div class="pi-row-checkbox">
+                <input type="checkbox" class="pi-select-cb pi-row-cb" data-id="<?= $did ?>">
+            </div>
 
             <!-- LEFT: Avatar + Identity -->
             <div class="pi-row-left">
@@ -670,6 +853,7 @@ function getAvatarInitials($nom, $prenom) {
                 <div class="pi-row-info"><i class="fa-solid fa-phone"></i><?= h((string)$r['telephone']) ?></div>
                 <?php endif; ?>
                 <div class="pi-row-info pi-row-time"><i class="fa-regular fa-clock"></i>Soumis <?= timeAgo((string)$r['date_soumission']) ?></div>
+                <div><span class="pi-days-badge <?= $daysBadgeClass ?>"><i class="fa-regular fa-calendar-clock"></i><?= $daysLabel ?></span></div>
             </div>
 
             <!-- RIGHT: Action buttons -->
@@ -1442,6 +1626,204 @@ document.getElementById('pi-add-modal').addEventListener('click', function(e) {
 
 // ── Diplôme checkbox → set hidden id_filiere from FIRST checked ──────
 // id_filiere is now a <select> — no JS needed to sync it
+</script>
+
+<!-- ── BULK ACCEPT MODAL ────────────────────────────────────── -->
+<div id="pi-bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10500;align-items:center;justify-content:center;">
+    <div style="background:#1a1a2e;border:1px solid rgba(16,185,129,0.3);border-radius:14px;padding:1.75rem;width:100%;max-width:440px;margin:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="margin:0;font-size:1.05rem;color:#10b981;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fa-solid fa-users-line"></i> Validation groupée
+            </h3>
+            <button type="button" onclick="document.getElementById('pi-bulk-modal').style.display='none';" style="background:none;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="pi-bulk-modal-desc" style="font-size:0.88rem;color:#a1a1aa;margin:0 0 1.25rem;"></p>
+        <label style="display:block;font-size:0.8rem;color:#a1a1aa;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+            <i class="fa-solid fa-chalkboard-user" style="color:#10b981;margin-right:0.3rem;"></i>
+            Classe à affecter <span style="color:#ef4444;">*</span>
+        </label>
+        <select id="pi-bulk-classe-sel"
+                style="width:100%;background:#111;border:1.5px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:0.7rem 0.9rem;font-size:0.95rem;outline:none;cursor:pointer;transition:border-color 0.2s;margin-bottom:0.85rem;"
+                onchange="this.style.borderColor=this.value?'#10b981':'rgba(255,255,255,0.12)';">
+            <option value="">— Choisir une classe —</option>
+        </select>
+        <div id="pi-bulk-modal-err" style="display:none;align-items:center;gap:0.5rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.55rem 0.9rem;margin-bottom:0.85rem;font-size:0.85rem;color:#f87171;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Veuillez sélectionner une classe.
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+            <button type="button" id="pi-bulk-confirm-btn" style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+                <i class="fa-solid fa-user-check"></i> Créer les stagiaires
+            </button>
+            <button type="button" onclick="document.getElementById('pi-bulk-modal').style.display='none';" style="padding:0.65rem 1rem;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#a1a1aa;font-weight:600;font-size:0.9rem;cursor:pointer;">
+                Annuler
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form for bulk operations -->
+<form id="pi-bulk-form" method="post" style="display:none;">
+    <?= csrf_hidden() ?>
+    <div id="pi-bulk-ids-container"></div>
+    <input type="hidden" name="bulk_id_classe" id="pi-bulk-form-classe">
+    <input type="hidden" name="bulk_action" id="pi-bulk-form-action">
+</form>
+
+<script>
+// ── Bulk selection ────────────────────────────────────────────────────────────
+var _bulkSelected = new Set();
+
+function updateBulkBar() {
+    var n = _bulkSelected.size;
+    var bar = document.getElementById('pi-bulk-bar');
+    var countEl = document.getElementById('pi-bulk-n');
+    if (bar) { bar.classList.toggle('visible', n > 0); }
+    if (countEl) countEl.textContent = n;
+}
+
+function clearBulkSelection() {
+    _bulkSelected.clear();
+    document.querySelectorAll('.pi-row-cb').forEach(function(cb) {
+        cb.checked = false;
+        var row = cb.closest('.pi-row');
+        if (row) row.classList.remove('pi-row-selected');
+    });
+    var selectAll = document.getElementById('pi-select-all');
+    if (selectAll) selectAll.checked = false;
+    updateBulkBar();
+}
+
+document.querySelectorAll('.pi-row-cb').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        var id = this.dataset.id;
+        var row = this.closest('.pi-row');
+        if (this.checked) {
+            _bulkSelected.add(id);
+            if (row) row.classList.add('pi-row-selected');
+        } else {
+            _bulkSelected.delete(id);
+            if (row) row.classList.remove('pi-row-selected');
+        }
+        // Update select-all state
+        var allCbs = document.querySelectorAll('.pi-row-cb');
+        var checkedCount = document.querySelectorAll('.pi-row-cb:checked').length;
+        var selectAll = document.getElementById('pi-select-all');
+        if (selectAll) {
+            selectAll.checked = checkedCount > 0 && checkedCount === allCbs.length;
+            selectAll.indeterminate = checkedCount > 0 && checkedCount < allCbs.length;
+        }
+        updateBulkBar();
+    });
+});
+
+var selectAllEl = document.getElementById('pi-select-all');
+if (selectAllEl) {
+    selectAllEl.addEventListener('change', function() {
+        var checked = this.checked;
+        document.querySelectorAll('.pi-row-cb').forEach(function(cb) {
+            // Only select visible rows
+            var row = cb.closest('.pi-row');
+            if (row && row.style.display !== 'none') {
+                cb.checked = checked;
+                var id = cb.dataset.id;
+                if (checked) {
+                    _bulkSelected.add(id);
+                    if (row) row.classList.add('pi-row-selected');
+                } else {
+                    _bulkSelected.delete(id);
+                    if (row) row.classList.remove('pi-row-selected');
+                }
+            }
+        });
+        updateBulkBar();
+    });
+}
+
+function bulkRefuse() {
+    if (_bulkSelected.size === 0) return;
+    var n = _bulkSelected.size;
+    showGdsConfirm(
+        'Marquer ' + n + ' pré-inscription(s) comme abandonnée(s) ?',
+        function() {
+            var form = document.getElementById('pi-bulk-form');
+            document.getElementById('pi-bulk-ids-container').innerHTML = '';
+            _bulkSelected.forEach(function(id) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden'; inp.name = 'bulk_ids[]'; inp.value = id;
+                document.getElementById('pi-bulk-ids-container').appendChild(inp);
+            });
+            var actionInp = document.createElement('input');
+            actionInp.type = 'hidden'; actionInp.name = 'bulk_refuser'; actionInp.value = '1';
+            document.getElementById('pi-bulk-ids-container').appendChild(actionInp);
+            form.submit();
+        }
+    );
+}
+
+function bulkAccept() {
+    if (_bulkSelected.size === 0) return;
+    var n = _bulkSelected.size;
+
+    // Build class options — gather unique filières from selected rows
+    var filIds = new Set();
+    _bulkSelected.forEach(function(id) {
+        var row = document.getElementById('pi-row-' + id);
+        if (row) filIds.add(parseInt(row.dataset.id_filiere || 0));
+    });
+
+    var allClasses = [];
+    filIds.forEach(function(fid) {
+        if (GDS_CLASSES_BY_FILIERE[fid]) {
+            GDS_CLASSES_BY_FILIERE[fid].forEach(function(cls) { allClasses.push(cls); });
+        }
+    });
+    // De-duplicate by id_classe
+    var seen = new Set();
+    allClasses = allClasses.filter(function(c) {
+        if (seen.has(c.id_classe)) return false;
+        seen.add(c.id_classe); return true;
+    });
+
+    var sel = document.getElementById('pi-bulk-classe-sel');
+    sel.innerHTML = '<option value="">— Choisir une classe —</option>';
+    allClasses.forEach(function(cls) {
+        var opt = document.createElement('option');
+        opt.value = cls.id_classe;
+        opt.textContent = cls.nom_classe + ' — ' + cls.niveau + ' (' + cls.annee_scolaire + ')';
+        sel.appendChild(opt);
+    });
+    sel.value = '';
+    sel.style.borderColor = 'rgba(255,255,255,0.12)';
+
+    document.getElementById('pi-bulk-modal-desc').textContent =
+        n + ' candidat(s) sélectionné(s). Choisissez la classe dans laquelle ils seront inscrits.';
+    document.getElementById('pi-bulk-modal-err').style.display = 'none';
+
+    document.getElementById('pi-bulk-confirm-btn').onclick = function() {
+        var clsId = sel.value;
+        if (!clsId) {
+            document.getElementById('pi-bulk-modal-err').style.display = 'flex';
+            sel.focus(); return;
+        }
+        // Submit bulk accept form
+        var form = document.getElementById('pi-bulk-form');
+        document.getElementById('pi-bulk-ids-container').innerHTML = '';
+        _bulkSelected.forEach(function(id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'bulk_ids[]'; inp.value = id;
+            document.getElementById('pi-bulk-ids-container').appendChild(inp);
+        });
+        var actionInp = document.createElement('input');
+        actionInp.type = 'hidden'; actionInp.name = 'bulk_accepter'; actionInp.value = '1';
+        document.getElementById('pi-bulk-ids-container').appendChild(actionInp);
+        document.getElementById('pi-bulk-form-classe').value = clsId;
+        document.getElementById('pi-bulk-modal').style.display = 'none';
+        form.submit();
+    };
+
+    document.getElementById('pi-bulk-modal').style.display = 'flex';
+    setTimeout(function() { sel.focus(); }, 80);
+}
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
