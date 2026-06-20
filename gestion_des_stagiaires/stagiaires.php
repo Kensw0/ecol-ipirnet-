@@ -1065,7 +1065,7 @@ if (isset($_GET['id'])) {
                 <!-- Delete form (hidden, submitted by JS) -->
                 <?php if (gds_is_directeur()): ?>
                 <form id="form-delete-stagiaire" method="post" style="display:none;">
-                    <?= csrf_field() ?>
+                    <?= csrf_hidden() ?>
                     <input type="hidden" name="delete_id" id="delete-stag-id" value="">
                 </form>
                 <?php endif; ?>
