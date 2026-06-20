@@ -318,7 +318,7 @@ require __DIR__ . '/includes/header.php';
                             onclick="openEditModal(<?= $cls['id_classe'] ?>, <?= htmlspecialchars(json_encode($cls['nom_classe']), ENT_QUOTES) ?>, <?= $cap ?>)">
                             <i class="fa-solid fa-pen"></i> Modifier
                         </button>
-                        <a href="stagiaires.php?classe=<?= $cls['id_classe'] ?>" class="gc-btn-voir">
+                        <a href="stagiaires.php?a=<?= urlencode((string)$cls['annee_scolaire']) ?>&f=<?= (int)$cls['id_filiere'] ?>&niv=<?= urlencode((string)$cls['niveau']) ?>&c=<?= (int)$cls['id_classe'] ?>" class="gc-btn-voir">
                             <i class="fa-solid fa-users"></i> Étudiants
                         </a>
                     </div>
