@@ -75,7 +75,6 @@ $fAnnee   = isset($_GET['a'])   ? trim((string)$_GET['a'])   : ($_SESSION['globa
 $fFiliere = isset($_GET['f'])   ? (int)$_GET['f']            : 0;
 $fNiveau  = isset($_GET['niv']) ? trim((string)$_GET['niv']) : '';
 $fSearch  = isset($_GET['q'])   ? trim((string)$_GET['q'])   : '';
-$fStatus  = isset($_GET['st'])  ? trim((string)$_GET['st'])  : '';
 
 // ── Build query with server-side filters ─────────────────────────────────────
 $where  = ['1=1'];
@@ -114,17 +113,6 @@ $sql = "SELECT c.id_classe, c.nom_classe, c.annee_scolaire, c.niveau,
 $stClasses = $pdo->prepare($sql);
 $stClasses->execute($params);
 $classes = $stClasses->fetchAll();
-
-// Status filter is applied in PHP (it's a computed value)
-if ($fStatus !== '') {
-    $classes = array_values(array_filter($classes, function($cls) use ($fStatus) {
-        $libres = max(0, (int)$cls['capacite'] - (int)$cls['effectif']);
-        if ($fStatus === 'full') return $libres === 0;
-        if ($fStatus === 'low')  return $libres > 0 && $libres <= 5;
-        if ($fStatus === 'ok')   return $libres > 5;
-        return true;
-    }));
-}
 
 $totalAll = (int)$pdo->query("SELECT COUNT(*) FROM classes")->fetchColumn();
 
@@ -228,12 +216,12 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
 
 <!-- ── Filter bar ── -->
-<form method="get" action="gestion_classes.php" class="gc-filters">
-    <input type="search" name="q" class="gc-filter-input"
+<form method="get" action="gestion_classes.php" id="gc-filter-form" class="gc-filters">
+    <input type="search" name="q" id="gc-search" class="gc-filter-input"
            placeholder="🔍 Rechercher une classe…"
            value="<?= h($fSearch) ?>" autocomplete="off">
 
-    <select name="f" class="gc-filter-sel">
+    <select name="f" class="gc-filter-sel" onchange="this.form.submit()">
         <option value="0">Toutes les filières</option>
         <?php foreach ($filieres as $f): ?>
         <option value="<?= (int)$f['id_filiere'] ?>" <?= $fFiliere === (int)$f['id_filiere'] ? 'selected' : '' ?>>
@@ -242,29 +230,19 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     </select>
 
-    <select name="niv" class="gc-filter-sel">
+    <select name="niv" class="gc-filter-sel" onchange="this.form.submit()">
         <option value="">Tous les niveaux</option>
         <option value="1ère année" <?= $fNiveau === '1ère année' ? 'selected' : '' ?>>1ère année</option>
         <option value="2ème année" <?= $fNiveau === '2ème année' ? 'selected' : '' ?>>2ème année</option>
     </select>
 
-    <select name="a" class="gc-filter-sel">
+    <select name="a" class="gc-filter-sel" onchange="this.form.submit()">
         <option value="">Toutes les années</option>
         <?php foreach ($annees as $ay): ?>
         <option value="<?= h($ay) ?>" <?= $fAnnee === $ay ? 'selected' : '' ?>><?= h($ay) ?></option>
         <?php endforeach; ?>
     </select>
 
-    <select name="st" class="gc-filter-sel">
-        <option value="">Tous les statuts</option>
-        <option value="ok"   <?= $fStatus === 'ok'   ? 'selected' : '' ?>>Places disponibles</option>
-        <option value="low"  <?= $fStatus === 'low'  ? 'selected' : '' ?>>Bientôt pleine (≤5)</option>
-        <option value="full" <?= $fStatus === 'full' ? 'selected' : '' ?>>Pleine</option>
-    </select>
-
-    <button type="submit" class="gc-filter-reset" style="background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.3);color:#c4b5fd;">
-        <i class="fa-solid fa-filter"></i> Filtrer
-    </button>
     <a href="gestion_classes.php" class="gc-filter-reset">
         <i class="fa-solid fa-rotate-left"></i> Réinitialiser
     </a>
@@ -440,6 +418,18 @@ require __DIR__ . '/includes/header.php';
 <script>
 var _editId = 0;
 var _csrf   = <?= json_encode(csrf_token()) ?>;
+
+// Auto-submit search with debounce
+(function() {
+    var searchInput = document.getElementById('gc-search');
+    var form        = document.getElementById('gc-filter-form');
+    if (!searchInput || !form) return;
+    var timer = null;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() { form.submit(); }, 450);
+    });
+})();
 
 function showToast(msg, ok) {
     var t = document.getElementById('gc-toast');
