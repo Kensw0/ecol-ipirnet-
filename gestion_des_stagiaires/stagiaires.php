@@ -75,16 +75,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // ── tarifs par défaut par filière ──────────────────────────────
         $tarifs = [2 => 700.0, 3 => 600.0, 4 => 800.0]; // TSDI=700, TGI=600, TSGE=800
-        // Fetch stagiaire's filiere
-        $stRow = $pdo->prepare("SELECT c.id_filiere FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?");
+        // Fetch stagiaire's filiere + remise_mensuelle
+        $stRow = $pdo->prepare("SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) as remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?");
         $stRow->execute([$sid]);
         $stRow = $stRow->fetch(PDO::FETCH_ASSOC);
         $fidStag = (int)($stRow['id_filiere'] ?? 0);
         $montantDu = $tarifs[$fidStag] ?? 700.0;
+        // Apply student's global monthly discount → effective amount
+        $remiseMensuelleStag = max(0.0, (float)($stRow['remise_mensuelle'] ?? 0));
+        $montantEffectif = max(0.0, $montantDu - $remiseMensuelleStag);
 
         $datePaie  = ($_POST['date_paiement'] ?? '') !== '' ? (string)$_POST['date_paiement'] : null;
-        // ── LIMIT: montant_total is always the filière's standard tarif — ignore any tampered POST value ──
-        $montantTotal = $montantDu; // use server-side filière tarif, not client POST
+        // ── LIMIT: cap is montant_effectif (tarif - remise_mensuelle) ──
+        $montantTotal = $montantDu; // raw tarif stored
         $modeAjout = isset($_POST['mode_ajout']) && (int)$_POST['mode_ajout'] === 1;
 
         // MODE AJOUT: accumulate on top of existing montant_paye
@@ -93,11 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($modeAjout) {
             $ancienPaye    = (float)($_POST['ancien_montant_paye'] ?? 0);
             $nouveauVers   = (float)($_POST['nouveau_versement'] ?? 0);
-            // Cap: total paid can never exceed montant_total
-            $montantPaye   = min($ancienPaye + $nouveauVers, $montantTotal);
+            // Cap: total paid can never exceed montant_effectif
+            $montantPaye   = min($ancienPaye + $nouveauVers, $montantEffectif);
             // Auto-determine statut
-            if ($montantPaye >= $montantTotal) {
-                $montantPaye = $montantTotal; // cap at total
+            if ($montantPaye >= $montantEffectif) {
+                $montantPaye = $montantEffectif; // cap at effectif
                 $statut      = 'payé';
             } elseif ($montantPaye > 0) {
                 $statut = 'partiel';
@@ -107,22 +110,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $statut      = (string)($_POST['statut_paiement'] ?? 'impayé');
             $montantPaye = ($_POST['montant_paye'] ?? '') !== '' ? (float)$_POST['montant_paye'] : null;
-            // ── LIMIT: montant_paye cannot exceed the filière's standard tarif ──
-            if ($montantPaye !== null && $montantPaye > $montantTotal) {
-                $montantPaye = $montantTotal;
+            // ── LIMIT: montant_paye cannot exceed montant_effectif ──
+            if ($montantPaye !== null && $montantPaye > $montantEffectif) {
+                $montantPaye = $montantEffectif;
             }
         }
 
-        // Auto-compute montant_restant
+        // Auto-compute montant_restant (based on effectif)
         $montantRestant = null;
         if ($statut === 'payé') {
-            $montantPaye    = $montantTotal;
+            $montantPaye    = $montantEffectif;
             $montantRestant = 0.0;
         } elseif ($statut === 'partiel' && $montantPaye !== null) {
-            $montantRestant = max(0.0, $montantTotal - $montantPaye);
+            $montantRestant = max(0.0, $montantEffectif - $montantPaye);
         } elseif ($statut === 'impayé') {
             $montantPaye    = 0.0;
-            $montantRestant = $montantTotal;
+            $montantRestant = $montantEffectif;
         }
         $estPaye = ($statut === 'payé') ? 1 : 0;
 
@@ -245,6 +248,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pwHash = $pw !== '' ? password_hash($pw, PASSWORD_DEFAULT) : null;
+        // Director-only: global monthly discount for this student
+        $remiseMensuelle = gds_is_directeur()
+            ? max(0.0, (float)str_replace(',', '.', (string)($_POST['remise_mensuelle'] ?? '0')))
+            : null; // null = don't modify the column
 
         if (isset($_POST['id_stagiaire']) && (int) $_POST['id_stagiaire'] > 0) {
             $id = (int) $_POST['id_stagiaire'];
@@ -265,6 +272,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $sql = 'UPDATE stagiaires SET num_inscri=?, cin=?, nom=?, prenom=?, date_naissance=?, adresse=?, email=?, telephone=?, telephone_parent=?, nom_tuteur=?, photo=?, date_inscription=?, id_classe=?';
             $params = [$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $photo === '' ? null : $photo, $di, $cid];
+            if ($remiseMensuelle !== null) {
+                $sql .= ', remise_mensuelle=?';
+                $params[] = $remiseMensuelle;
+            }
             if ($pwHash) {
                 $sql .= ', mot_de_passe=? WHERE id_stagiaire=?';
                 $params[] = $pwHash; $params[] = $id;
@@ -322,8 +333,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mat = 'INS-' . $year . '-' . str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
             }
             $hash = $pwHash ?? password_hash('changeme', PASSWORD_DEFAULT);
-            $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid]);
+            $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, remise_mensuelle) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid, $remiseMensuelle ?? 0.0]);
             $_newId = (int)$pdo->lastInsertId();
             flash_set('Stagiaire créé avec succès (N° Inscription: ' . $mat . ').', 'success');
             // PRG: redirect to the new student's hub page — no year filter so smart default applies
@@ -699,7 +710,8 @@ if (isset($_GET['id'])) {
     $targetId = (int) $_GET['id'];
     
     // FETCH SELECTED STUDENT (Independent of Nav Filters)
-    $stSel = $pdo->prepare("SELECT v.*, s.date_naissance, s.adresse, s.photo, s.email, s.telephone, s.date_inscription, s.cin 
+    $stSel = $pdo->prepare("SELECT v.*, s.date_naissance, s.adresse, s.photo, s.email, s.telephone, s.date_inscription, s.cin,
+                                   COALESCE(s.remise_mensuelle, 0) as remise_mensuelle
                             FROM v_stagiaires_detail v 
                             LEFT JOIN stagiaires s ON s.id_stagiaire = v.id_stagiaire
                             WHERE v.id_stagiaire = ?");
@@ -755,6 +767,8 @@ if (isset($_GET['id'])) {
         $tarifsDefaut = [2 => 700.0, 3 => 600.0, 4 => 800.0];
         $fidHub = (int)($selectedStudent['id_filiere'] ?? 0);
         $montantDuHub = $tarifsDefaut[$fidHub] ?? 700.0;
+        $remiseMensuelleHub = max(0.0, (float)($selectedStudent['remise_mensuelle'] ?? 0));
+        $montantEffectifHub = max(0.0, $montantDuHub - $remiseMensuelleHub);
         $isExceptionTarif = false;
 
         // Compute global payment status for this student
@@ -768,7 +782,7 @@ if (isset($_GET['id'])) {
             if ((int)$men['est_paye'] === 1 || $sp === 'payé') $payeCount++;
             elseif ($sp === 'partiel') $partielCount++;
             else $impayeCount++;
-            $totalDu      += (float)($men['montant_total'] ?? $montantDuHub);
+            $totalDu      += (float)($men['montant_total'] !== null ? max(0.0, (float)$men['montant_total'] - max(0.0, (float)($men['remise'] ?? $remiseMensuelleHub))) : $montantEffectifHub);
             $totalPaye    += (float)($men['montant_paye'] ?? 0);
             $totalRestant += (float)($men['montant_restant'] ?? 0);
             if ((float)($men['cumul_restant'] ?? 0) > $latestCumulRestant) $latestCumulRestant = (float)$men['cumul_restant'];
@@ -917,6 +931,15 @@ if (isset($_GET['id'])) {
                             </label>
                             <?php endif; ?>
                             <label style="grid-column: span 2">Mot de passe <input name="mot_de_passe" type="password" placeholder="Laissez vide pour garder l'actuel"></label>
+                            <?php if (gds_is_directeur()): ?>
+                            <label style="grid-column: span 2;">
+                                Remise mensuelle (MAD)
+                                <input type="number" name="remise_mensuelle" id="form-remise-mensuelle" min="0" step="0.01" placeholder="0.00"
+                                    value="<?= $edit ? number_format((float)($edit['remise_mensuelle'] ?? 0), 2, '.', '') : '0.00' ?>"
+                                    style="border-color:rgba(168,85,247,.3);">
+                                <span style="font-size:0.73rem;color:#a1a1aa;margin-top:0.2rem;">Réduction mensuelle appliquée à ce stagiaire. Sera pré-remplie dans le modal de paiement.</span>
+                            </label>
+                            <?php endif; ?>
                             <?php if (!gds_is_secretaire()): ?>
                             <label style="grid-column: span 2; display:none;" id="form-raison-wrap">
                                 Raison du changement <span style="color:#71717a; font-weight:400; font-size:0.8rem;">(optionnel — affiché dans l'historique)</span>
@@ -961,6 +984,9 @@ if (isset($_GET['id'])) {
             const el = form.querySelector('[name="' + f + '"]');
             if (el) el.value = s[f] || '';
         });
+        // Pre-fill remise_mensuelle (Director-only field)
+        const remMensEl = document.getElementById('form-remise-mensuelle');
+        if (remMensEl) remMensEl.value = (parseFloat(s.remise_mensuelle) || 0).toFixed(2);
 
         const cSelect    = document.getElementById('form-classe-select');
         const fSelect    = document.getElementById('form-filiere-select');
