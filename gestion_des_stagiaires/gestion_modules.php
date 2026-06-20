@@ -233,7 +233,7 @@
                       <?php endif; ?>
                       <td><span class="badge-note <?= $thCl ?>"><?= $th !== null ? h(number_format($th, 2)) : '—' ?></span></td>
                       <td><span class="badge-note <?= $prCl ?>"><?= $pr !== null ? h(number_format($pr, 2)) : '—' ?></span></td>
-                      <td><a href="stagiaire_hub.php?id=<?= (int)$s['id_stagiaire'] ?>" class="link-hub"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:.75rem;margin-right:.3rem;"></i>Hub</a></td>
+                      <td><a href="stagiaires.php?id=<?= (int)$s['id_stagiaire'] ?>" class="link-hub"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:.75rem;margin-right:.3rem;"></i>Hub</a></td>
                   </tr>
                   <?php endforeach; ?>
               </tbody>
