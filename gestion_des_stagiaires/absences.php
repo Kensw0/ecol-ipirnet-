@@ -122,41 +122,46 @@
   if (isset($_GET['action']) && $_GET['action'] === 'get_stagiaires_non_justifies') {
       header('Content-Type: application/json');
 
-      $idClasseBillets = (int)($_GET['id_classe'] ?? 0);
-      $rechercheBillets = trim((string)($_GET['q'] ?? ''));
-      $modeRecent       = (int)($_GET['recent'] ?? 0); // 1 = uniquement ceux avec abs non justifiées
+      try {
+          $idClasseBillets  = (int)($_GET['id_classe'] ?? 0);
+          $rechercheBillets = trim((string)($_GET['q'] ?? ''));
+          $modeRecent       = (int)($_GET['recent'] ?? 0);
 
-      $clausesBillets = ['s.statut = \'actif\''];
-      $paramsBillets  = [];
+          $clausesBillets = [];
+          $paramsBillets  = [];
 
-      if ($idClasseBillets > 0) {
-          $clausesBillets[] = 's.id_classe = ?';
-          $paramsBillets[]  = $idClasseBillets;
+          if ($idClasseBillets > 0) {
+              $clausesBillets[] = 's.id_classe = ?';
+              $paramsBillets[]  = $idClasseBillets;
+          }
+
+          if ($rechercheBillets !== '') {
+              $clausesBillets[] = '(UPPER(s.nom) LIKE ? OR UPPER(s.prenom) LIKE ? OR s.num_inscri LIKE ? OR s.cin LIKE ?)';
+              $like = '%' . strtoupper($rechercheBillets) . '%';
+              $paramsBillets = array_merge($paramsBillets, [$like, $like, '%'.$rechercheBillets.'%', '%'.$rechercheBillets.'%']);
+          }
+
+          $whereBillets = $clausesBillets ? 'WHERE ' . implode(' AND ', $clausesBillets) : '';
+
+          $sqlBillets = "SELECT s.id_stagiaire, s.num_inscri, UPPER(s.nom) AS nom, s.prenom,
+                                COALESCE(s.cin, '') AS cin,
+                                (SELECT COUNT(*) FROM absences a WHERE a.id_stagiaire = s.id_stagiaire AND a.est_justifiee = 0) AS nb_non_justifiees
+                           FROM stagiaires s
+                           $whereBillets
+                          ORDER BY s.nom, s.prenom";
+
+          $stmtBillets = $pdo->prepare($sqlBillets);
+          $stmtBillets->execute($paramsBillets);
+          $lignesBillets = $stmtBillets->fetchAll();
+
+          if ($modeRecent) {
+              $lignesBillets = array_values(array_filter($lignesBillets, fn($l) => (int)$l['nb_non_justifiees'] > 0));
+          }
+
+          echo json_encode($lignesBillets);
+      } catch (\Throwable $e) {
+          echo json_encode(['error' => $e->getMessage()]);
       }
-
-      if ($rechercheBillets !== '') {
-          $clausesBillets[] = '(UPPER(s.nom) LIKE ? OR UPPER(s.prenom) LIKE ? OR s.num_inscri LIKE ? OR s.cin LIKE ?)';
-          $like = '%' . strtoupper($rechercheBillets) . '%';
-          $paramsBillets = array_merge($paramsBillets, [$like, $like, '%'.$rechercheBillets.'%', '%'.$rechercheBillets.'%']);
-      }
-
-      $whereBillets = $clausesBillets ? 'WHERE ' . implode(' AND ', $clausesBillets) : '';
-
-      $sqlBillets = "SELECT s.id_stagiaire, s.num_inscri, UPPER(s.nom) AS nom, s.prenom, s.cin,
-                           (SELECT COUNT(*) FROM absences a WHERE a.id_stagiaire = s.id_stagiaire AND a.est_justifiee = 0) AS nb_non_justifiees
-                      FROM stagiaires s
-                      $whereBillets
-                     ORDER BY s.nom, s.prenom";
-
-      $stmtBillets = $pdo->prepare($sqlBillets);
-      $stmtBillets->execute($paramsBillets);
-      $lignesBillets = $stmtBillets->fetchAll();
-
-      if ($modeRecent) {
-          $lignesBillets = array_values(array_filter($lignesBillets, fn($l) => (int)$l['nb_non_justifiees'] > 0));
-      }
-
-      echo json_encode($lignesBillets);
       exit;
   }
 
@@ -1722,10 +1727,20 @@ function _chargerListeBilletsNow() {
   if (q) url += '&q=' + encodeURIComponent(q);
 
   fetch(url, { credentials: 'same-origin' })
-    .then(r => r.json())
-    .then(lignes => rendreListeBillets(lignes))
-    .catch(() => {
-      liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur de chargement.</p>';
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      if (!Array.isArray(data)) {
+        const msg = data && data.error ? data.error : 'Réponse inattendue du serveur.';
+        liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur : ' + echapperHtml(msg) + '</p>';
+        return;
+      }
+      rendreListeBillets(data);
+    })
+    .catch(err => {
+      liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur de chargement : ' + echapperHtml(err.message) + '</p>';
     });
 }
 

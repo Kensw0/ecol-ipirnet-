@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-// ---- School constants ----
 $SCHOOL_ORG         = 'GROUPE IPIRNET';
 $SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique Réseau et Nouvelles";
 $SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
@@ -12,126 +11,113 @@ $SCHOOL_CITY        = 'Berrechid';
 $SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
 $SCHOOL_LEGAL       = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
 
-// ---- Filtres ----
-$idClasse    = (int)($_GET['id_classe']  ?? 0);
-$annee       = trim((string)($_GET['annee']       ?? ''));
-$mois        = trim((string)($_GET['mois']        ?? ''));   // format YYYY-MM
-$dateDebut   = trim((string)($_GET['date_debut']  ?? ''));
-$dateFin     = trim((string)($_GET['date_fin']    ?? ''));
+// ---- Params ----
+$idClasse  = (int)($_GET['id_classe']  ?? 0);
+$annee     = trim((string)($_GET['annee']      ?? ''));
+$mois      = trim((string)($_GET['mois']       ?? ''));
+$dateDebut = trim((string)($_GET['date_debut'] ?? ''));
+$dateFin   = trim((string)($_GET['date_fin']   ?? ''));
 
-// Validation des dates
 if ($dateDebut !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateDebut)) $dateDebut = '';
 if ($dateFin   !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFin))   $dateFin   = '';
-if ($mois      !== '' && !preg_match('/^\d{4}-\d{2}$/', $mois))             $mois      = '';
+if ($mois      !== '' && !preg_match('/^\d{4}-\d{2}$/',        $mois))      $mois      = '';
 
-// Si un mois est choisi, il prime sur date_debut/date_fin
 if ($mois !== '') {
-    [$annMois, $numMois] = explode('-', $mois);
     $dateDebut = $mois . '-01';
     $dateFin   = date('Y-m-t', strtotime($dateDebut));
 }
 
-// ---- Chargement des filtres en cascade ----
+// ---- Dropdown data ----
 $toutesLesAnnees = $pdo->query(
-    "SELECT DISTINCT annee_scolaire FROM classes WHERE annee_scolaire REGEXP '^[0-9]{4}/[0-9]{4}$' ORDER BY annee_scolaire DESC"
+    "SELECT DISTINCT annee_scolaire FROM classes ORDER BY annee_scolaire DESC"
 )->fetchAll(PDO::FETCH_COLUMN);
 
 if ($annee === '' && !empty($toutesLesAnnees)) {
     $annee = $_SESSION['global_annee_scolaire'] ?? $toutesLesAnnees[0];
 }
 
-$toutesLesFilieres = $pdo->query(
-    "SELECT DISTINCT f.id_filiere, f.nom_filiere FROM filieres f
-      INNER JOIN classes c ON c.id_filiere = f.id_filiere ORDER BY f.nom_filiere"
-)->fetchAll();
-
 $toutesLesClasses = [];
 if ($annee !== '') {
-    $stmtC = $pdo->prepare("SELECT c.id_classe, c.nom_classe, f.nom_filiere, c.niveau
-                              FROM classes c JOIN filieres f ON f.id_filiere = c.id_filiere
-                             WHERE c.annee_scolaire = ? ORDER BY f.nom_filiere, c.niveau, c.nom_classe");
-    $stmtC->execute([$annee]);
-    $toutesLesClasses = $stmtC->fetchAll();
+    $stC = $pdo->prepare("SELECT c.id_classe, c.nom_classe, f.nom_filiere, c.niveau
+                            FROM classes c JOIN filieres f ON f.id_filiere = c.id_filiere
+                           WHERE c.annee_scolaire = ? ORDER BY f.nom_filiere, c.niveau, c.nom_classe");
+    $stC->execute([$annee]);
+    $toutesLesClasses = $stC->fetchAll();
 }
 
-// ---- Info classe sélectionnée ----
+// ---- Info classe ----
 $infoClasse = null;
 if ($idClasse > 0) {
-    $stmtIC = $pdo->prepare(
-        "SELECT c.nom_classe, c.niveau, c.annee_scolaire, f.nom_filiere
-           FROM classes c JOIN filieres f ON f.id_filiere = c.id_filiere
-          WHERE c.id_classe = ?"
-    );
-    $stmtIC->execute([$idClasse]);
-    $infoClasse = $stmtIC->fetch();
+    $stI = $pdo->prepare("SELECT c.nom_classe, c.niveau, c.annee_scolaire, f.nom_filiere
+                            FROM classes c JOIN filieres f ON f.id_filiere = c.id_filiere
+                           WHERE c.id_classe = ?");
+    $stI->execute([$idClasse]);
+    $infoClasse = $stI->fetch();
 }
 
-// ---- Requête des absences ----
-$lignesAbsences = [];
+// ---- Absences ----
+$absences = [];
 if ($idClasse > 0) {
     $clauses = ['s.id_classe = ?'];
     $params  = [$idClasse];
-
     if ($dateDebut !== '') { $clauses[] = 'a.date_absence >= ?'; $params[] = $dateDebut; }
     if ($dateFin   !== '') { $clauses[] = 'a.date_absence <= ?'; $params[] = $dateFin; }
 
-    $sql = "SELECT s.id_stagiaire, UPPER(s.nom) AS nom, s.prenom, s.num_inscri,
-                   a.id_absence, a.date_absence, a.heure_debut, a.heure_fin,
-                   a.est_justifiee, a.justificatif, m.nom_module
-              FROM stagiaires s
-              JOIN absences a ON a.id_stagiaire = s.id_stagiaire
-              LEFT JOIN modules m ON m.id_module = a.id_module
-             WHERE " . implode(' AND ', $clauses) . "
-             ORDER BY s.nom, s.prenom, a.date_absence, a.heure_debut";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $lignesAbsences = $stmt->fetchAll();
+    $st = $pdo->prepare(
+        "SELECT s.id_stagiaire, UPPER(s.nom) AS nom, s.prenom, s.num_inscri,
+                a.date_absence, a.heure_debut, a.heure_fin,
+                a.est_justifiee, a.justificatif, m.nom_module
+           FROM stagiaires s
+           JOIN absences a ON a.id_stagiaire = s.id_stagiaire
+           LEFT JOIN modules m ON m.id_module = a.id_module
+          WHERE " . implode(' AND ', $clauses) . "
+          ORDER BY s.nom, s.prenom, a.date_absence, a.heure_debut"
+    );
+    $st->execute($params);
+    $absences = $st->fetchAll();
 }
 
-// Grouper par stagiaire
+// ---- Group by student ----
 $parStagiaire = [];
-foreach ($lignesAbsences as $ligne) {
-    $sid = (int)$ligne['id_stagiaire'];
+foreach ($absences as $r) {
+    $sid = (int)$r['id_stagiaire'];
     if (!isset($parStagiaire[$sid])) {
-        $parStagiaire[$sid] = [
-            'nom'       => $ligne['nom'],
-            'prenom'    => $ligne['prenom'],
-            'num_inscri'=> $ligne['num_inscri'],
-            'absences'  => [],
-        ];
+        $parStagiaire[$sid] = ['nom' => $r['nom'], 'prenom' => $r['prenom'], 'num_inscri' => $r['num_inscri'], 'rows' => []];
     }
-    $parStagiaire[$sid]['absences'][] = $ligne;
+    $parStagiaire[$sid]['rows'][] = $r;
 }
 
-$auto = isset($_GET['auto']) && $_GET['auto'] === '1';
+$totA = count($absences);
+$totJ = count(array_filter($absences, fn($r) => (int)$r['est_justifiee'] === 1));
+$totN = $totA - $totJ;
 
-// Libellé de la période
-function libellePeriode(string $dd, string $df): string {
+// ---- Helpers ----
+$fmtDate = fn(string $d): string => preg_replace('/^(\d{4})-(\d{2})-(\d{2})$/', '$3/$2/$1', $d);
+$fmtHor  = fn($r): string => !empty($r['heure_debut'])
+    ? substr((string)$r['heure_debut'], 0, 5) . ' – ' . substr((string)($r['heure_fin'] ?? ''), 0, 5)
+    : 'Journée';
+
+function libPeriode(string $dd, string $df, string $mois): string {
+    if ($mois !== '') {
+        $mn = ['','Janvier','Février','Mars','Avril','Mai','Juin',
+               'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+        $m = (int)substr($mois, 5, 2);
+        return $mn[$m] . ' ' . substr($mois, 0, 4);
+    }
     if ($dd === '' && $df === '') return 'Toute la période';
     $fmt = fn(string $d) => preg_replace('/^(\d{4})-(\d{2})-(\d{2})$/', '$3/$2/$1', $d);
-    if ($dd !== '' && $df !== '') {
-        // Même mois ?
-        if (substr($dd, 0, 7) === substr($df, 0, 7)) {
-            $moisFr = ['','Janvier','Février','Mars','Avril','Mai','Juin',
-                       'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-            $m = (int)substr($dd, 5, 2);
-            $y = substr($dd, 0, 4);
-            return $moisFr[$m] . ' ' . $y;
-        }
-        return 'Du ' . $fmt($dd) . ' au ' . $fmt($df);
-    }
+    if ($dd !== '' && $df !== '') return 'Du ' . $fmt($dd) . ' au ' . $fmt($df);
     if ($dd !== '') return 'À partir du ' . $fmt($dd);
     return "Jusqu'au " . $fmt($df);
 }
 
-$libPeriode = libellePeriode($dateDebut, $dateFin);
+$auto = isset($_GET['auto']) && $_GET['auto'] === '1';
 ?><!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Relevé d'Absences — <?= $infoClasse ? h((string)$infoClasse['nom_classe']) : 'Toutes classes' ?></title>
+    <title>Relevé d'Absences<?= $infoClasse ? ' — ' . h((string)$infoClasse['nom_classe']) : '' ?></title>
     <style>
         @page { size: A4; margin: 12mm; }
         * { box-sizing: border-box; }
@@ -141,141 +127,135 @@ $libPeriode = libellePeriode($dateDebut, $dateFin);
             padding: 18px 0 40px;
             font-family: "Cambria", "Times New Roman", "Liberation Serif", serif;
             color: #111;
-            font-size: 10pt;
+            font-size: 12pt;
         }
 
-        /* ── Formulaire de filtre (no-print) ── */
+        /* ── Filter bar (screen only) ── */
         .filter-bar {
+            max-width: 880px;
+            margin: 0 auto 14px;
             background: #fff;
             border: 1px solid #cdd0d4;
             border-radius: 10px;
-            padding: 14px 20px;
-            max-width: 880px;
-            margin: 0 auto 18px;
+            padding: 12px 18px;
             display: flex;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
             align-items: flex-end;
         }
-        .filter-bar label { display: flex; flex-direction: column; gap: 3px; font-size: 8.5pt; font-weight: 600; color: #555; }
-        .filter-bar select, .filter-bar input[type="date"], .filter-bar input[type="month"] {
-            border: 1px solid #ccc; border-radius: 6px; padding: 4px 8px; font-size: 9pt; background: #fafafa;
-        }
-        .filter-bar button {
-            background: #1a3a6e; color: #fff; border: none; border-radius: 8px;
-            padding: 6px 18px; font-size: 9pt; font-weight: 600; cursor: pointer;
-        }
-        .filter-bar button:hover { background: #25529e; }
-        .print-btns { text-align: center; margin: 0 auto 14px; max-width: 880px; }
-        .print-btns button, .print-btns a {
-            background: #f4f4f5; border: 1px solid #ccc; padding: .35rem .8rem;
-            border-radius: 8px; font-size: .85rem; cursor: pointer; text-decoration: none;
-            color: #111; margin: 0 4px;
-        }
+        .filter-bar label { display: flex; flex-direction: column; gap: 3px; font-size: 9pt; font-weight: 600; color: #555; }
+        .filter-bar select, .filter-bar input { border: 1px solid #ccc; border-radius: 6px; padding: 4px 8px; font-size: 9pt; }
+        .filter-bar button { background: #1a3a6e; color: #fff; border: none; border-radius: 8px;
+            padding: 6px 18px; font-size: 9pt; font-weight: 600; cursor: pointer; }
 
-        /* ── Document principal ── */
+        /* ── cs-doc (identical to print_certificat_scolarite.php) ── */
         .cs-doc {
             max-width: 880px;
             margin: 0 auto;
             background: #fff;
-            padding: 22px 28px 18px;
+            padding: 28px 34px 18px;
             box-shadow: 0 4px 14px rgba(0,0,0,0.08);
             border: 1px solid #cdd0d4;
         }
+        .cs-print-btns { text-align: center; margin-bottom: 14px; }
+        .cs-print-btns button, .cs-print-btns a {
+            background: #f4f4f5; border: 1px solid #ccc;
+            padding: .35rem .8rem; border-radius: 8px; font-size: .85rem;
+            cursor: pointer; text-decoration: none; color: #111; margin: 0 4px;
+        }
 
-        /* ── En-tête ── */
-        .cs-head { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        .cs-head td { border: 1px solid #111; padding: 7px 9px; vertical-align: middle; text-align: center; }
+        /* ── Letterhead (identical) ── */
+        .cs-head { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .cs-head td { border: 1px solid #111; padding: 8px 10px; vertical-align: middle; text-align: center; }
         .cs-head .cs-head-left, .cs-head .cs-head-right { width: 18%; }
-        .cs-head-logo { max-width: 80px; max-height: 80px; }
-        .cs-stamp {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 76px; height: 76px; border-radius: 50%;
-            border: 2px solid #b8860b; color: #b8860b;
-            font-family: "Times New Roman", serif; font-weight: 700; font-size: .85rem;
-            background: radial-gradient(circle, #fff 55%, transparent 56%),
-                        repeating-conic-gradient(#b8860b 0 6deg, transparent 6deg 12deg);
-            padding: 4px;
-        }
-        .cs-head-mid .cs-org  { font-weight: 700; font-size: 1.35rem; letter-spacing: 0.03em; }
-        .cs-head-mid .cs-tag  { font-style: italic; font-size: .85rem; margin-top: 2px; }
-        .cs-head-mid .cs-auth { font-size: .72rem; margin-top: 1px; }
+        .cs-head-logo { max-width: 90px; max-height: 90px; display: inline-block; }
+        .cs-head-mid .cs-org  { font-weight: 700; font-size: 1.6rem; letter-spacing: 0.03em; }
+        .cs-head-mid .cs-tag  { font-style: italic; font-size: .95rem; margin-top: 2px; }
+        .cs-head-mid .cs-auth { font-size: .8rem; margin-top: 4px; }
 
-        /* ── Titre oval ── */
-        .cs-title-wrap { display: flex; justify-content: center; margin: 10px 0 6px; }
+        /* ── Oval title (identical) ── */
+        .cs-title-wrap { display: flex; justify-content: center; margin: 24px 0 16px; }
         .cs-title-oval {
-            border: 1.5px solid #1a1a1a;
-            border-radius: 50%;
-            padding: 8px 40px;
-            min-width: 55%;
-            text-align: center;
+            border: 1.5px solid #1a1a1a; border-radius: 50%;
+            padding: 14px 60px; min-width: 55%; text-align: center;
             font-family: "Monotype Corsiva", "Lucida Handwriting", "Brush Script MT", cursive;
-            font-style: italic;
-            font-size: 1.45rem;
-            color: #0b3b66;
+            font-style: italic; font-size: 1.65rem; color: #0b3b66;
+            letter-spacing: 0.02em; white-space: nowrap;
         }
 
-        /* ── Méta classe ── */
-        .cs-meta { text-align: center; margin-bottom: 10px; font-size: 9.5pt; }
-        .cs-meta strong { font-size: 11pt; }
+        /* ── Meta line ── */
+        .cs-meta { text-align: center; margin-bottom: 16px; font-size: 11pt; line-height: 1.6; }
 
-        /* ── Tableau par stagiaire ── */
-        .stag-block { margin-bottom: 14px; break-inside: avoid; }
-        .stag-header {
-            background: #1a3a6e;
-            color: #fff;
-            padding: 5px 10px;
-            font-weight: 700;
-            font-size: 9.5pt;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 4px 4px 0 0;
-        }
-        .stag-header .stag-code { font-family: monospace; font-size: 8pt; opacity: .82; }
-        .abs-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+        /* ── Main absence table ── */
+        .abs-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 20px; }
         .abs-table th {
-            background: #e8edf6;
-            border: 1px solid #c0c8d8;
-            padding: 4px 7px;
-            text-align: left;
-            font-weight: 700;
-            font-size: 8pt;
+            background: #1a3a6e; color: #fff;
+            border: 1px solid #1a3a6e;
+            padding: 6px 8px; text-align: left; font-weight: 700; font-size: 9.5pt;
+        }
+        .abs-table td { border: 1px solid #ccc; padding: 5px 8px; vertical-align: middle; }
+        /* Student sub-header row */
+        .abs-table tr.stag-row td {
+            background: #e8edf6; font-weight: 700; font-size: 10pt;
+            border-top: 2px solid #1a3a6e; border-bottom: 1px solid #b0bcd8;
             color: #1a3a6e;
         }
-        .abs-table td { border: 1px solid #d0d5df; padding: 3px 7px; vertical-align: top; }
-        .abs-table tr:nth-child(even) td { background: #f7f9fc; }
-        .badge-j   { color: #166534; font-weight: 700; }
-        .badge-nj  { color: #991b1b; font-weight: 700; }
+        .abs-table tr.stag-row td .inscri {
+            font-weight: 400; font-size: 8.5pt; color: #6b7280;
+            font-family: monospace; margin-left: 8px;
+        }
+        /* Alternating rows per student (reset per student block) */
+        .abs-table tr.abs-row-even td { background: #f7f9fc; }
+        .abs-table tr.abs-row-odd  td { background: #fff; }
+        /* Subtotal row */
+        .abs-table tr.sub-total td {
+            background: #f0f4fa; font-size: 9pt; font-style: italic; color: #444;
+            border-top: 1px solid #b0bcd8;
+        }
+        /* Status badges */
+        .badge-j  { color: #166534; font-weight: 700; }
+        .badge-nj { color: #991b1b; font-weight: 700; }
 
-        /* ── Résumé par stagiaire ── */
-        .stag-summary { background: #f0f4fa; border: 1px solid #c0c8d8; border-top: none;
-            padding: 3px 10px; font-size: 7.5pt; color: #333; border-radius: 0 0 4px 4px; }
+        /* ── Grand total box ── */
+        .totaux { margin: 6px 0 22px; display: flex; gap: 24px; justify-content: center; }
+        .totaux div {
+            border: 1px solid #ccc; border-radius: 8px; padding: 8px 22px;
+            text-align: center; font-size: 11pt;
+        }
+        .totaux div span { display: block; font-size: 1.5rem; font-weight: 700; }
+        .t-total { color: #111; }
+        .t-just  { color: #166534; }
+        .t-nj    { color: #991b1b; }
 
-        /* ── Totaux globaux ── */
-        .totaux-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 9pt; }
-        .totaux-table th { background: #1a3a6e; color: #fff; border: 1px solid #1a3a6e; padding: 5px 8px; }
-        .totaux-table td { border: 1px solid #c0c8d8; padding: 4px 8px; }
-        .totaux-table tr:nth-child(even) td { background: #f7f9fc; }
+        /* ── Signatures ── */
+        .cs-sign { margin: 22px 0 18px; width: 100%; border-collapse: collapse; }
+        .cs-sign th, .cs-sign td { border: 1px solid #111; padding: 10px 14px; vertical-align: top; width: 33.33%; }
+        .cs-sign th {
+            font-weight: 400; font-style: italic;
+            font-family: "Monotype Corsiva", "Lucida Handwriting", "Brush Script MT", cursive;
+            font-size: 1.15rem; color: #0b3b66; text-align: center; background: #fafafa;
+        }
+        .cs-sign td { height: 26mm; font-size: 10pt; }
 
-        /* ── Pied de page ── */
-        .cs-footer { border-top: 1px solid #111; padding-top: 4px; margin-top: 14px;
-            text-align: center; font-size: 7pt; color: #444; line-height: 1.4; }
+        /* ── Footer (identical) ── */
+        .cs-footer {
+            border-top: 1px solid #111; padding-top: 6px; margin: 18px 0 0;
+            text-align: center; font-size: .82rem; line-height: 1.45; color: #444;
+        }
 
         @media print {
             html, body { background: #fff; }
             body { padding: 0; }
-            .cs-doc { box-shadow: none; border: none; padding: 0; margin: 0; }
-            .no-print, .filter-bar, .print-btns { display: none !important; }
-            .stag-block { break-inside: avoid; }
+            .cs-doc { box-shadow: none; border: none; padding: 0; margin: 0; max-width: none; }
+            .no-print, .filter-bar, .cs-print-btns { display: none !important; }
         }
     </style>
 </head>
 <body>
 
-<!-- ── Barre de filtres (no-print) ─────────────────────────────────── -->
+<!-- Filter bar (screen only) -->
 <form method="get" action="print_releve_absences.php" class="filter-bar no-print">
-  <label>Année scolaire
+  <label>Année
     <select name="annee" onchange="this.form.submit()">
       <option value="">— Choisir —</option>
       <?php foreach ($toutesLesAnnees as $an): ?>
@@ -286,47 +266,45 @@ $libPeriode = libellePeriode($dateDebut, $dateFin);
 
   <label>Classe
     <select name="id_classe">
-      <option value="0">— Toutes les classes —</option>
+      <option value="0">— Toutes —</option>
       <?php foreach ($toutesLesClasses as $cl): ?>
         <option value="<?= (int)$cl['id_classe'] ?>" <?= $idClasse === (int)$cl['id_classe'] ? 'selected' : '' ?>>
-          <?= h(gds_filiere_code((string)$cl['nom_filiere'])) ?> · <?= h((string)$cl['niveau']) ?> · <?= h((string)$cl['nom_classe']) ?>
+          <?= h((string)$cl['nom_classe']) ?> (<?= h(gds_filiere_code((string)$cl['nom_filiere'])) ?> — <?= h((string)$cl['niveau']) ?>)
         </option>
       <?php endforeach; ?>
     </select>
   </label>
 
   <label>Mois
-    <input type="month" name="mois" value="<?= h($mois) ?>" placeholder="YYYY-MM">
+    <input type="month" name="mois" value="<?= h($mois) ?>">
   </label>
 
-  <label>Date début
+  <label>Du
     <input type="date" name="date_debut" value="<?= h($dateDebut) ?>">
   </label>
 
-  <label>Date fin
+  <label>Au
     <input type="date" name="date_fin" value="<?= h($dateFin) ?>">
   </label>
 
   <button type="submit">Filtrer</button>
 </form>
 
-<!-- ── Boutons (no-print) ──────────────────────────────────────────── -->
-<div class="print-btns no-print">
-  <button type="button" onclick="window.print()">🖨 Imprimer</button>
-  <a href="absences.php">← Retour absences</a>
-</div>
-
-<?php if (empty($parStagiaire) && $idClasse === 0): ?>
-<!-- Sélection vide -->
-<div style="max-width:880px;margin:0 auto;text-align:center;padding:3rem;color:#555;">
+<?php if ($idClasse === 0 && empty($absences)): ?>
+<div style="max-width:880px;margin:0 auto;text-align:center;padding:3rem;color:#555;font-family:Cambria,serif;">
   <p style="font-size:1.1rem;">Sélectionnez une classe et une période pour générer le relevé.</p>
 </div>
 <?php else: ?>
 
-<!-- ── Document imprimable ─────────────────────────────────────────── -->
 <div class="cs-doc">
 
-  <!-- En-tête -->
+  <!-- Print/back buttons (screen only) -->
+  <div class="cs-print-btns no-print">
+    <button type="button" onclick="window.print()">🖨 Imprimer</button>
+    <a href="absences.php">← Retour</a>
+  </div>
+
+  <!-- Letterhead -->
   <table class="cs-head">
     <tr>
       <td class="cs-head-left">
@@ -340,143 +318,109 @@ $libPeriode = libellePeriode($dateDebut, $dateFin);
         <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
       </td>
       <td class="cs-head-right">
-        <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:72px;height:72px;object-fit:contain;border-radius:50%;">
+        <img src="assets/img/stamp_accredite.jpg" alt="Accrédité"
+             style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
       </td>
     </tr>
   </table>
 
-  <!-- Titre -->
+  <!-- Oval title -->
   <div class="cs-title-wrap">
     <div class="cs-title-oval">Relevé des Absences</div>
   </div>
 
-  <!-- Méta -->
+  <!-- Meta -->
   <div class="cs-meta">
     <?php if ($infoClasse): ?>
       <strong>Classe : <?= h((string)$infoClasse['nom_classe']) ?></strong>
-      — Filière : <?= h(gds_filiere_code((string)$infoClasse['nom_filiere'])) ?>
-      — Niveau : <?= h((string)$infoClasse['niveau']) ?>
-      — Année : <?= h($annee) ?><br>
-    <?php else: ?>
-      <strong>Toutes les classes</strong> — Année : <?= h($annee) ?><br>
+      &nbsp;·&nbsp; Filière : <?= h(gds_filiere_code((string)$infoClasse['nom_filiere'])) ?>
+      &nbsp;·&nbsp; Niveau : <?= h((string)$infoClasse['niveau']) ?>
+      &nbsp;·&nbsp; Année : <?= h($annee) ?><br>
     <?php endif; ?>
-    <span style="font-size:9pt;color:#555;">Période : <?= h($libPeriode) ?>
-    &nbsp;·&nbsp; Édité le <?= h(date('d/m/Y H:i')) ?></span>
+    <span style="font-size:10pt;color:#555;">
+      Période : <?= h(libPeriode($dateDebut, $dateFin, $mois)) ?>
+      &nbsp;·&nbsp; Édité le <?= h(date('d/m/Y H:i')) ?>
+    </span>
   </div>
 
   <?php if (empty($parStagiaire)): ?>
-    <p style="text-align:center;color:#666;padding:2rem;">Aucune absence enregistrée pour cette sélection.</p>
+    <p style="text-align:center;color:#666;padding:2rem;">Aucune absence pour cette sélection.</p>
   <?php else: ?>
 
-  <!-- Blocs par stagiaire -->
-  <?php foreach ($parStagiaire as $sid => $stag):
-      $nbTotal = count($stag['absences']);
-      $nbJust  = count(array_filter($stag['absences'], fn($r) => (int)$r['est_justifiee'] === 1));
-      $nbNonJ  = $nbTotal - $nbJust;
-  ?>
-  <div class="stag-block">
-    <div class="stag-header">
-      <span><?= h($stag['nom']) ?> <?= h($stag['prenom']) ?></span>
-      <span class="stag-code"><?= h($stag['num_inscri']) ?></span>
-    </div>
-    <table class="abs-table">
-      <thead>
-        <tr>
-          <th style="width:12%">Date</th>
-          <th style="width:14%">Horaire</th>
-          <th style="width:20%">Module</th>
-          <th style="width:13%">Statut</th>
-          <th>Justification</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($stag['absences'] as $abs):
-            $d = (string)($abs['date_absence'] ?? '');
-            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $mm3)) {
-                $d = "$mm3[3]/$mm3[2]/$mm3[1]";
-            }
-            $hor = '—';
-            if (!empty($abs['heure_debut'])) {
-                $hor = substr((string)$abs['heure_debut'], 0, 5) . ' – ' . substr((string)($abs['heure_fin'] ?? ''), 0, 5);
-            }
-            $estJ  = (int)$abs['est_justifiee'] === 1;
-            $motif = trim((string)($abs['justificatif'] ?? ''));
-        ?>
-        <tr>
-          <td><?= h($d) ?></td>
-          <td><?= h($hor) ?></td>
-          <td><?= h((string)($abs['nom_module'] ?? '—')) ?></td>
-          <td class="<?= $estJ ? 'badge-j' : 'badge-nj' ?>"><?= $estJ ? 'Justifiée' : 'Non justifiée' ?></td>
-          <td style="font-style:<?= $motif ? 'normal' : 'italic' ?>;color:<?= $motif ? '#111' : '#888' ?>;"><?= h($motif ?: '—') ?></td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-    <div class="stag-summary">
-      Total : <strong><?= $nbTotal ?></strong> absence(s) &nbsp;|&nbsp;
-      Justifiées : <strong style="color:#166534;"><?= $nbJust ?></strong> &nbsp;|&nbsp;
-      Non justifiées : <strong style="color:#991b1b;"><?= $nbNonJ ?></strong>
-    </div>
-  </div>
-  <?php endforeach; ?>
-
-  <!-- Totaux globaux -->
-  <?php
-    $totA = array_sum(array_map(fn($s) => count($s['absences']), $parStagiaire));
-    $totJ = array_sum(array_map(fn($s) => count(array_filter($s['absences'], fn($r) => (int)$r['est_justifiee'] === 1)), $parStagiaire));
-    $totN = $totA - $totJ;
-  ?>
-  <table class="totaux-table">
+  <!-- Single absence table, all students, sub-header row per student -->
+  <table class="abs-table">
     <thead>
       <tr>
-        <th>Stagiaire</th>
-        <th style="text-align:center;">Total absences</th>
-        <th style="text-align:center;">Justifiées</th>
-        <th style="text-align:center;">Non justifiées</th>
+        <th style="width:13%">Date</th>
+        <th style="width:14%">Horaire</th>
+        <th style="width:22%">Module</th>
+        <th style="width:12%">Statut</th>
+        <th>Justification</th>
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($parStagiaire as $stag2):
-          $t2 = count($stag2['absences']);
-          $j2 = count(array_filter($stag2['absences'], fn($r) => (int)$r['est_justifiee'] === 1));
-          $n2 = $t2 - $j2;
+    <?php foreach ($parStagiaire as $stag):
+        $nbT = count($stag['rows']);
+        $nbJ = count(array_filter($stag['rows'], fn($r) => (int)$r['est_justifiee'] === 1));
+        $nbN = $nbT - $nbJ;
+        $i   = 0;
+    ?>
+      <!-- Student name row -->
+      <tr class="stag-row">
+        <td colspan="5">
+          <?= h($stag['nom']) ?> <?= h($stag['prenom']) ?>
+          <span class="inscri"><?= h($stag['num_inscri']) ?></span>
+        </td>
+      </tr>
+      <!-- Absence rows -->
+      <?php foreach ($stag['rows'] as $abs):
+          $estJ  = (int)$abs['est_justifiee'] === 1;
+          $motif = trim((string)($abs['justificatif'] ?? ''));
       ?>
-      <tr>
-        <td><?= h($stag2['nom']) ?> <?= h($stag2['prenom']) ?> <span style="font-size:7.5pt;color:#888;"><?= h($stag2['num_inscri']) ?></span></td>
-        <td style="text-align:center;font-weight:700;"><?= $t2 ?></td>
-        <td style="text-align:center;color:#166534;font-weight:700;"><?= $j2 ?></td>
-        <td style="text-align:center;color:#991b1b;font-weight:700;"><?= $n2 ?></td>
+      <tr class="<?= $i % 2 === 0 ? 'abs-row-even' : 'abs-row-odd' ?>">
+        <td><?= h($fmtDate((string)$abs['date_absence'])) ?></td>
+        <td><?= h($fmtHor($abs)) ?></td>
+        <td><?= h((string)($abs['nom_module'] ?? '—')) ?></td>
+        <td class="<?= $estJ ? 'badge-j' : 'badge-nj' ?>"><?= $estJ ? '✓ Justifiée' : '✗ Non justifiée' ?></td>
+        <td style="font-style:<?= $motif ? 'normal' : 'italic' ?>;color:<?= $motif ? '#111' : '#999' ?>;"><?= h($motif ?: '—') ?></td>
       </tr>
-      <?php endforeach; ?>
+      <?php $i++; endforeach; ?>
+      <!-- Sub-total -->
+      <tr class="sub-total">
+        <td colspan="5">
+          Sous-total : <strong><?= $nbT ?></strong> absence(s) &mdash;
+          <span class="badge-j"><?= $nbJ ?> justifiée(s)</span> &mdash;
+          <span class="badge-nj"><?= $nbN ?> non justifiée(s)</span>
+        </td>
+      </tr>
+    <?php endforeach; ?>
     </tbody>
-    <tfoot>
-      <tr style="background:#e8edf6;">
-        <td style="font-weight:700;font-size:9pt;">TOTAL</td>
-        <td style="text-align:center;font-weight:700;font-size:9pt;"><?= $totA ?></td>
-        <td style="text-align:center;font-weight:700;color:#166534;font-size:9pt;"><?= $totJ ?></td>
-        <td style="text-align:center;font-weight:700;color:#991b1b;font-size:9pt;"><?= $totN ?></td>
-      </tr>
-    </tfoot>
   </table>
+
+  <!-- Grand totals -->
+  <div class="totaux">
+    <div class="t-total"><span><?= $totA ?></span>Total absences</div>
+    <div class="t-just"><span><?= $totJ ?></span>Justifiées</div>
+    <div class="t-nj"><span><?= $totN ?></span>Non justifiées</div>
+  </div>
 
   <?php endif; ?>
 
   <!-- Signatures -->
-  <table style="width:100%;border-collapse:collapse;margin-top:22px;">
+  <table class="cs-sign">
     <tr>
-      <td style="width:33%;text-align:center;border:1px solid #111;padding:6px 10px;font-style:italic;font-family:'Monotype Corsiva','Lucida Handwriting',cursive;font-size:10pt;color:#0b3b66;">Secrétaire</td>
-      <td style="width:34%;text-align:center;border:1px solid #111;padding:6px 10px;font-style:italic;font-family:'Monotype Corsiva','Lucida Handwriting',cursive;font-size:10pt;color:#0b3b66;">Directeur</td>
-      <td style="width:33%;text-align:center;border:1px solid #111;padding:6px 10px;font-style:italic;font-family:'Monotype Corsiva','Lucida Handwriting',cursive;font-size:10pt;color:#0b3b66;">Cachet</td>
+      <th>Secrétaire</th>
+      <th>Directeur</th>
+      <th>Cachet</th>
     </tr>
     <tr>
-      <td style="border:1px solid #111;height:22mm;padding:4px 8px;font-size:8pt;vertical-align:bottom;">
-        <p style="margin:0;">Fait à <?= h($SCHOOL_CITY) ?> le : <?= h(date('d/m/Y')) ?></p>
-      </td>
-      <td style="border:1px solid #111;height:22mm;">&nbsp;</td>
-      <td style="border:1px solid #111;height:22mm;">&nbsp;</td>
+      <td>Fait à <?= h($SCHOOL_CITY) ?> le : <?= h(date('d/m/Y')) ?></td>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
     </tr>
   </table>
 
+  <!-- Footer -->
   <div class="cs-footer">
     <?= h($SCHOOL_ORG) ?> — <?= h($SCHOOL_ADDRESS) ?><br>
     <?= h($SCHOOL_LEGAL) ?><br>
@@ -487,7 +431,7 @@ $libPeriode = libellePeriode($dateDebut, $dateFin);
 <?php endif; ?>
 
 <?php if ($auto): ?>
-<script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 300); });</script>
+<script>window.addEventListener('load',function(){ setTimeout(function(){ window.print(); },300); });</script>
 <?php endif; ?>
 </body>
 </html>
