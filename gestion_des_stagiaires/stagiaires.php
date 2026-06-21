@@ -30,7 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['success' => false, 'error' => 'Invalid params']);
             }
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            error_log('[stagiaires.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
