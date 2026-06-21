@@ -47,14 +47,11 @@ if ($selClasse > 0) {
     $tempStag = $stSt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get all stages for these students in this academic year
-    // Note: We filter by annee_scolaire added recently
     foreach ($tempStag as $s) {
         $sid = (int)$s['id_stagiaire'];
         $stStages = $pdo->prepare(
               "SELECT st.* FROM stages st
-               JOIN stagiaires s ON s.id_stagiaire = st.id_stagiaire
-               JOIN classes c ON c.id_classe = s.id_classe
-               WHERE st.id_stagiaire = ? AND c.annee_scolaire = ?
+               WHERE st.id_stagiaire = ? AND st.annee_scolaire = ?
                ORDER BY st.type_stage"
           );
           $stStages->execute([$sid, $selAnnee]);
@@ -125,6 +122,14 @@ if (isset($_POST['quick_save_stage'])) {
                     ->execute([$ts, $su===''?null:$su, $en===''?null:$en, $dd, $df, $ns, $cu===''?null:$cu, $ru===''?null:$ru, $ev===''?null:$ev, $ds, $ju===''?null:$ju, $as, $edit_id, $sid]);
                 $msg = 'Stage mis à jour.';
             } else {
+                // Server-side duplicate guard: one stage_entreprise + one PFE per student per year
+                $chk = $pdo->prepare('SELECT id_stage FROM stages WHERE id_stagiaire=? AND type_stage=? AND annee_scolaire=? LIMIT 1');
+                $chk->execute([$sid, $ts, $as]);
+                if ($chk->fetch()) {
+                    $typeLabel = $ts === 'pfe' ? 'PFE' : 'stage en entreprise';
+                    echo json_encode(['success' => false, 'msg' => "Ce stagiaire a déjà un $typeLabel pour l'année $as."]);
+                    exit;
+                }
                 $pdo->prepare('INSERT INTO stages (type_stage,sujet,entreprise,date_debut,date_fin,note_stage,convention_url,rapport_url,evaluation_entreprise,date_soutenance,jury,id_stagiaire,annee_scolaire) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
                     ->execute([$ts, $su===''?null:$su, $en===''?null:$en, $dd, $df, $ns, $cu===''?null:$cu, $ru===''?null:$ru, $ev===''?null:$ev, $ds, $ju===''?null:$ju, $sid, $as]);
                 $msg = 'Stage ajouté.';
