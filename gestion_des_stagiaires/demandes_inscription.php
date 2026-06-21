@@ -271,10 +271,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $dbMsg = $e->getMessage();
-            if (str_contains($dbMsg, 'email'))       flash_set('Erreur : cet email est déjà utilisé.');
-            elseif (str_contains($dbMsg, 'cin'))     flash_set('Erreur : ce CIN est déjà utilisé.');
-            elseif (str_contains($dbMsg, 'num_inscri')) flash_set('Erreur : conflit de numéro, réessayez.');
-            else flash_set('Erreur technique : ' . $e->getMessage());
+            error_log('[demandes_inscription.php] ' . $dbMsg);
+            if (str_contains($dbMsg, 'email'))          flash_set('Erreur : cet email est déjà utilisé.');
+            elseif (str_contains($dbMsg, 'cin'))         flash_set('Erreur : ce CIN est déjà utilisé.');
+            elseif (str_contains($dbMsg, 'num_inscri'))  flash_set('Erreur : conflit de numéro, réessayez.');
+            else flash_set('Une erreur est survenue. Veuillez réessayer.');
         }
         redirect('demandes_inscription.php');
     }
