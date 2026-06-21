@@ -880,12 +880,14 @@ function getAvatarInitials($nom, $prenom) {
     <!-- Bulk action bar — appears when rows are checked -->
     <div id="pi-bulk-bar">
         <span class="pi-bulk-count"><span id="pi-bulk-n">0</span> sélectionné(s)</span>
+        <?php if (gds_is_directeur()): ?>
         <button type="button" class="pi-bulk-btn pi-bulk-accept" onclick="bulkAccept()">
             <i class="fa-solid fa-user-check"></i> Valider la sélection
         </button>
         <button type="button" class="pi-bulk-btn pi-bulk-refuse" onclick="bulkRefuse()">
             <i class="fa-solid fa-ban"></i> Refuser la sélection
         </button>
+        <?php endif; ?>
         <button type="button" class="pi-bulk-btn pi-bulk-deselect" onclick="clearBulkSelection()">
             <i class="fa-solid fa-xmark"></i> Désélectionner
         </button>
@@ -994,6 +996,7 @@ function getAvatarInitials($nom, $prenom) {
                     <i class="fa-solid fa-print"></i>
                     <span>Imprimer la fiche</span>
                 </a>
+                <?php if (gds_is_directeur()): ?>
                 <form method="post" id="form-accept-<?= $did ?>" style="margin:0;display:contents;">
                     <?= csrf_hidden() ?>
                     <input type="hidden" name="accepter_id" value="<?= $did ?>">
@@ -1012,6 +1015,7 @@ function getAvatarInitials($nom, $prenom) {
                         <span>Marquer comme abandonnée</span>
                     </button>
                 </form>
+                <?php endif; ?>
             </div>
         </div>
         <?php endforeach; ?>
@@ -1149,8 +1153,13 @@ function getAvatarInitials($nom, $prenom) {
         <form method="post">
             <?= csrf_hidden() ?>
             <input type="hidden" name="nouvelle_preinscription" id="pi-modal-nouvelle" value="1">
+            <?php if (gds_is_directeur()): ?>
             <input type="hidden" name="accepter_id" id="pi-modal-accepter-id" value="">
             <input type="hidden" name="refuser_id"  id="pi-modal-refuser-id"  value="">
+            <?php else: ?>
+            <input type="hidden" id="pi-modal-accepter-id" value="">
+            <input type="hidden" id="pi-modal-refuser-id"  value="">
+            <?php endif; ?>
             <input type="hidden" name="action" id="pi-modal-action" value="ajouter_demande">
             <input type="hidden" name="modifier_id" id="pi-modal-modifier-id" value="">
 
@@ -1332,7 +1341,8 @@ function getAvatarInitials($nom, $prenom) {
                 <button type="submit" id="pi-submit-btn" class="btn" style="background:rgba(168,85,247,0.2);color:#a855f7;border:1px solid rgba(168,85,247,0.4);padding:0.6rem 1.5rem;">
                     <i class="fa-solid fa-save"></i> Enregistrer
                 </button>
-                <!-- VIEW mode -->
+                <!-- VIEW mode — Director only -->
+                <?php if (gds_is_directeur()): ?>
                 <button type="button" id="pi-modal-refuse-btn" class="btn"
                         style="display:none;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:0.6rem 1.2rem;"
                         onclick="confirmRefuse(document.getElementById('pi-modal-refuser-id').value)">
@@ -1343,6 +1353,10 @@ function getAvatarInitials($nom, $prenom) {
                         onclick="confirmAccept(document.getElementById('pi-modal-accepter-id').value)">
                     <i class="fa-solid fa-user-check"></i> Valider l'inscription
                 </button>
+                <?php else: ?>
+                <button type="button" id="pi-modal-refuse-btn" style="display:none;" disabled></button>
+                <button type="button" id="pi-modal-accept-btn" style="display:none;" disabled></button>
+                <?php endif; ?>
             </div>
         </form>
     </div>
