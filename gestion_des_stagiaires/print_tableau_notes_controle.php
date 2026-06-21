@@ -2,10 +2,14 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$SCHOOL_ORG         = 'Groupe IPIRNET';
-$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique, Réseau et Nouvelles Etudes de Télécommunication";
-$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N°: 03/02/2003  Du : 19/02/2003";
-$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° : 21/DFP/F0301/199  du : 29/11/2021";
+// ── Constantes établissement (source unique de vérité pour toutes les pages d'impression) ──
+$SCHOOL_ORG         = 'GROUPE IPIRNET';
+$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique Réseau et Nouvelles";
+$SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
+$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
+$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
+$SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
+$SCHOOL_LEGAL       = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
 
 $idClasse   = (int)($_GET['id_classe']   ?? 0);
 $idModule   = (int)($_GET['id_module']   ?? 0);
@@ -83,14 +87,17 @@ if ($idClasse > 0) {
         }
         .print-btns button:hover, .print-btns a:hover { background: #e4e4e7; }
 
-        .lh-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        .lh-table td { border: 1px solid #111; padding: 7px 10px; vertical-align: middle; }
-        .lh-left, .lh-right { width: 16%; text-align: center; }
-        .lh-mid  { text-align: center; }
-        .lh-logo { max-width: 80px; max-height: 80px; }
-        .lh-org  { font-weight: 700; font-size: 1.3rem; letter-spacing: .03em; }
-        .lh-tag  { font-size: .82rem; margin-top: 2px; }
-        .lh-auth { font-size: .75rem; margin-top: 3px; }
+        /* ===== En-tête 3 colonnes (identique aux autres pages d'impression) ===== */
+        .cs-head { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .cs-head td { border: 1px solid #111; padding: 7px 10px; vertical-align: middle; text-align: center; }
+        .cs-head .cs-head-left, .cs-head .cs-head-right { width: 16%; }
+        .cs-head-logo { max-width: 80px; max-height: 80px; }
+        .cs-head-mid .cs-org { font-weight: 700; font-size: 1.3rem; letter-spacing: .03em; }
+        .cs-head-mid .cs-tag { font-size: .82rem; margin-top: 2px; }
+        .cs-head-mid .cs-auth { font-size: .75rem; margin-top: 3px; }
+
+        /* ===== Pied de page ===== */
+        .cs-footer { border-top: 1px solid #111; padding-top: 6px; margin-top: 16px; text-align: center; font-size: .78rem; line-height: 1.4; }
 
         .doc-title { text-align: center; font-size: 1.2rem; font-weight: 700; margin: 14px 0 4px; letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; }
         .doc-subtitle { text-align: center; font-size: .95rem; margin-bottom: 10px; color: #333; }
@@ -144,23 +151,8 @@ if ($idClasse > 0) {
         <a href="javascript:history.back()">← Retour</a>
     </div>
 
-    <!-- Letterhead -->
-    <table class="lh-table">
-        <tr>
-            <td class="lh-left">
-                <img src="assets/img/logo.png" alt="IPIRNET" class="lh-logo">
-            </td>
-            <td class="lh-mid">
-                <div class="lh-org"><?= h($SCHOOL_ORG) ?></div>
-                <div class="lh-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
-                <div class="lh-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
-                <div class="lh-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
-            </td>
-            <td class="lh-right">
-                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
-            </td>
-        </tr>
-    </table>
+    <!-- ===== En-tête officiel (partagé entre toutes les pages d'impression) ===== -->
+    <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
     <div class="doc-title">Tableau de Notes de Contrôle</div>
     <div class="doc-subtitle">Contrôle N° <?= $controleNo ?></div>
@@ -237,6 +229,9 @@ if ($idClasse > 0) {
             <tr><td></td><td></td></tr>
         </tbody>
     </table>
+
+    <!-- ===== Pied de page ===== -->
+    <?php require __DIR__ . '/includes/print_footer.php'; ?>
 
 </div>
 </body>
