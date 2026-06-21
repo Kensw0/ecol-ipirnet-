@@ -9,9 +9,10 @@
  *   - Naviguer vers la liste des stagiaires d'une classe
  *
  * Actions POST (réponse JSON) :
- *   • add_classe     — création d'une nouvelle classe
- *   • edit_classe    — mise à jour du nom et de la capacité d'une classe
- *   • delete_classe  — suppression d'une classe (bloquée si des stagiaires y sont inscrits)
+ *   • add_classe       — création d'une nouvelle classe
+ *   • edit_classe      — mise à jour du nom et de la capacité d'une classe
+ *   • delete_classe    — suppression d'une classe (bloquée si des stagiaires y sont inscrits)
+ *   • move_stagiaires  — déplacement en masse de tous les stagiaires d'une classe vers une autre
  *
  * Tables : classes, filieres, stagiaires
  */
@@ -150,6 +151,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ── Déplacement en masse des stagiaires d'une classe vers une autre ───────
+    if (isset($_POST['move_stagiaires'])) {
+        $idClasseSource = (int)($_POST['id_classe_source'] ?? 0);
+        $idClasseCible  = (int)($_POST['id_classe_cible']  ?? 0);
+
+        if ($idClasseSource <= 0 || $idClasseCible <= 0 || $idClasseSource === $idClasseCible) {
+            echo json_encode(['success' => false, 'error' => 'Classes source et destination invalides.']);
+            exit;
+        }
+
+        // Vérifier que les deux classes existent bien en base
+        $reqVerifDeux = $pdo->prepare('SELECT COUNT(*) FROM classes WHERE id_classe IN (?,?)');
+        $reqVerifDeux->execute([$idClasseSource, $idClasseCible]);
+        if ((int)$reqVerifDeux->fetchColumn() < 2) {
+            echo json_encode(['success' => false, 'error' => 'Une ou les deux classes sont introuvables.']);
+            exit;
+        }
+
+        // Vérifier la capacité disponible dans la classe cible
+        $reqCapCible = $pdo->prepare(
+            'SELECT COALESCE(c.capacite,30) - COUNT(s.id_stagiaire) AS places_libres,
+                    COUNT(s.id_stagiaire) AS effectif_cible
+               FROM classes c
+               LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
+              WHERE c.id_classe = ?
+              GROUP BY c.id_classe'
+        );
+        $reqCapCible->execute([$idClasseCible]);
+        $infoCible = $reqCapCible->fetch();
+
+        // Compter les stagiaires à déplacer
+        $reqNbSource = $pdo->prepare('SELECT COUNT(*) FROM stagiaires WHERE id_classe = ?');
+        $reqNbSource->execute([$idClasseSource]);
+        $nbADeplacer = (int)$reqNbSource->fetchColumn();
+
+        if ($infoCible && (int)$infoCible['places_libres'] < $nbADeplacer) {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'La classe destination n\'a que ' . (int)$infoCible['places_libres']
+                           . ' place(s) libre(s) pour ' . $nbADeplacer . ' stagiaire(s) à déplacer.',
+            ]);
+            exit;
+        }
+
+        try {
+            $reqDeplacement = $pdo->prepare('UPDATE stagiaires SET id_classe = ? WHERE id_classe = ?');
+            $reqDeplacement->execute([$idClasseCible, $idClasseSource]);
+            $nbDeplaces = $reqDeplacement->rowCount();
+            echo json_encode([
+                'success'     => true,
+                'msg'         => $nbDeplaces . ' stagiaire(s) déplacé(s) avec succès.',
+                'nb_deplaces' => $nbDeplaces,
+            ]);
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     echo json_encode(['success' => false, 'error' => 'Action inconnue.']);
     exit;
 }
@@ -220,6 +280,20 @@ $listeClasses = $reqClasses->fetchAll();
 // Nombre total de classes toutes années confondues (pour l'affichage du compteur)
 $totalToutesClasses = (int)$pdo->query("SELECT COUNT(*) FROM classes")->fetchColumn();
 
+// Liste complète des classes (toutes filières, tous filtres ignorés) pour le sélecteur de destination
+$toutesClassesPourDeplacement = $pdo->query(
+    "SELECT c.id_classe, c.nom_classe, c.annee_scolaire, c.niveau,
+            COALESCE(c.capacite,30) AS capacite,
+            f.nom_filiere,
+            COUNT(s.id_stagiaire) AS effectif,
+            GREATEST(0, COALESCE(c.capacite,30) - COUNT(s.id_stagiaire)) AS places_libres
+       FROM classes c
+       JOIN filieres f ON f.id_filiere = c.id_filiere
+       LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
+      GROUP BY c.id_classe, c.nom_classe, c.annee_scolaire, c.niveau, c.capacite, f.nom_filiere
+      ORDER BY c.annee_scolaire DESC, f.nom_filiere ASC, c.niveau ASC"
+)->fetchAll();
+
 require __DIR__ . '/includes/header.php';
 ?>
 <style>
@@ -254,6 +328,8 @@ require __DIR__ . '/includes/header.php';
 .gc-btn-voir:hover { background:rgba(99,102,241,0.22); }
 .gc-btn-del { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.28); color:#fca5a5; border-radius:7px; padding:0.35rem 0.8rem; font-size:0.78rem; font-weight:600; cursor:pointer; transition:background .15s; white-space:nowrap; }
 .gc-btn-del:hover { background:rgba(239,68,68,0.22); }
+.gc-btn-move { background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.28); color:#fcd34d; border-radius:7px; padding:0.35rem 0.8rem; font-size:0.78rem; font-weight:600; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.gc-btn-move:hover { background:rgba(245,158,11,0.22); }
 
 /* ── Modales (ajout / modification) ── */
 .gc-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9000; align-items:center; justify-content:center; padding:1rem; }
@@ -453,6 +529,16 @@ require __DIR__ . '/includes/header.php';
                            class="gc-btn-voir">
                             <i class="fa-solid fa-users"></i> Étudiants
                         </a>
+                        <?php if ($effectif > 0): ?>
+                        <button class="gc-btn-move"
+                            onclick="ouvrirModaleDeplacement(
+                                <?= (int)$classe['id_classe'] ?>,
+                                <?= htmlspecialchars(json_encode($classe['nom_classe']), ENT_QUOTES) ?>,
+                                <?= $effectif ?>
+                            )">
+                            <i class="fa-solid fa-right-left"></i> Déplacer
+                        </button>
+                        <?php endif; ?>
                         <button class="gc-btn-del"
                             onclick="ouvrirModaleSupprimer(
                                 <?= (int)$classe['id_classe'] ?>,
@@ -570,10 +656,15 @@ require __DIR__ . '/includes/header.php';
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        <!-- Avertissement affiché si la classe a des stagiaires -->
+        <!-- Avertissement affiché si la classe a des stagiaires — propose d'ouvrir la modale de déplacement -->
         <div id="gc-del-warning" style="display:none;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:8px;padding:0.65rem 0.9rem;margin-bottom:1rem;font-size:0.83rem;color:#fb923c;">
             <i class="fa-solid fa-circle-exclamation" style="margin-right:0.35rem;"></i>
             <span id="gc-del-warning-text"></span>
+            <br>
+            <button type="button" onclick="ouvrirDeplacementDepuisSuppression()"
+                    style="margin-top:0.5rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);color:#fcd34d;border-radius:6px;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:700;cursor:pointer;">
+                <i class="fa-solid fa-right-left" style="margin-right:0.3rem;"></i> Déplacer les étudiants d'abord
+            </button>
         </div>
         <p id="gc-del-msg" style="margin:0 0 1.25rem;font-size:0.9rem;color:#a1a1aa;line-height:1.55;"></p>
         <div id="gc-del-err" class="gc-err-box"></div>
@@ -590,6 +681,50 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- ── MODALE : Déplacement des stagiaires vers une autre classe ──────────────── -->
+<div id="gc-move-modal" class="gc-modal">
+    <div class="gc-modal-box" style="max-width:460px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="margin:0;font-size:1rem;color:#f59e0b;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fa-solid fa-right-left"></i> Déplacer les étudiants
+            </h3>
+            <button type="button" onclick="fermerModale('gc-move-modal')" style="background:none;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Résumé de la source -->
+        <div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1.1rem;font-size:0.85rem;color:#a1a1aa;">
+            <i class="fa-solid fa-chalkboard" style="color:#f59e0b;margin-right:0.4rem;"></i>
+            Déplacer <strong id="mv-effectif-label" style="color:#fcd34d;"></strong> depuis
+            <strong id="mv-source-label" style="color:#fff;"></strong>
+        </div>
+
+        <!-- Sélecteur de classe destination -->
+        <div class="gc-field">
+            <label><i class="fa-solid fa-arrow-right" style="color:#f59e0b;margin-right:0.3rem;"></i> Classe destination <span style="color:#ef4444;">*</span></label>
+            <select id="mv-cible" style="width:100%;background:#111;border:1.5px solid rgba(255,255,255,0.1);border-radius:8px;color:#fff;padding:0.62rem 0.85rem;font-size:0.88rem;outline:none;box-sizing:border-box;cursor:pointer;">
+                <option value="">— Sélectionner une classe —</option>
+            </select>
+        </div>
+
+        <!-- Info places disponibles dans la classe cible -->
+        <div id="mv-cap-info" style="display:none;font-size:0.8rem;margin:-0.5rem 0 0.9rem;padding:0.45rem 0.75rem;border-radius:7px;"></div>
+
+        <div id="gc-move-err" class="gc-err-box"></div>
+        <div style="display:flex;gap:0.65rem;">
+            <button type="button" onclick="fermerModale('gc-move-modal')"
+                    style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a1a1aa;font-weight:600;font-size:0.88rem;cursor:pointer;">
+                Annuler
+            </button>
+            <button type="button" onclick="soumettreDeplacement()"
+                    style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;font-weight:700;font-size:0.88rem;cursor:pointer;">
+                <i class="fa-solid fa-right-left" style="margin-right:0.35rem;"></i> Déplacer
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Notification toast (succès / erreur) -->
 <div id="gc-toast" class="gc-toast"></div>
 
@@ -597,7 +732,13 @@ require __DIR__ . '/includes/header.php';
 // ── Variables globales ─────────────────────────────────────────────────────────
 var idClasseEnEdition  = 0;
 var idClasseASupprimer = 0;
+var idClasseSource     = 0;   // pour la modale de déplacement
+var nomClasseSource    = '';
+var effectifSource     = 0;
 var jetonCsrf          = <?= json_encode(csrf_token()) ?>;
+
+// Données de toutes les classes (chargées depuis PHP) pour alimenter le sélecteur de destination
+var toutesClassesData  = <?= json_encode(array_values($toutesClassesPourDeplacement)) ?>;
 
 // ── Soumission recherche avec délai (évite un rechargement par frappe) ────────
 (function () {
@@ -637,7 +778,7 @@ function fermerModale(idModale) {
 }
 
 // Fermeture par clic sur le fond de la modale ou par touche Échap
-['gc-edit-modal', 'gc-add-modal', 'gc-del-modal'].forEach(function (idModale) {
+['gc-edit-modal', 'gc-add-modal', 'gc-del-modal', 'gc-move-modal'].forEach(function (idModale) {
     document.getElementById(idModale).addEventListener('click', function (e) {
         if (e.target === this) this.style.display = 'none';
     });
@@ -647,6 +788,7 @@ document.addEventListener('keydown', function (e) {
         fermerModale('gc-edit-modal');
         fermerModale('gc-add-modal');
         fermerModale('gc-del-modal');
+        fermerModale('gc-move-modal');
     }
 });
 
@@ -852,6 +994,184 @@ function soumettreAjout() {
                     var compteurEl = document.getElementById('gc-count-visible');
                     if (compteurEl) compteurEl.textContent = parseInt(compteurEl.textContent, 10) + 1;
                 }
+            } else {
+                boiteErreur.textContent = resultat.error || 'Erreur inconnue.';
+                boiteErreur.style.display = 'block';
+            }
+        })
+        .catch(function () {
+            boiteErreur.textContent = 'Erreur réseau.';
+            boiteErreur.style.display = 'block';
+        });
+}
+
+// ============================================================
+//  Modale : Déplacement des stagiaires vers une autre classe
+// ============================================================
+
+/**
+ * Remplit le sélecteur de destination et affiche la modale de déplacement.
+ * @param {number} idClasse  - ID de la classe source.
+ * @param {string} nomClasse - Nom de la classe source.
+ * @param {number} effectif  - Nombre de stagiaires à déplacer.
+ */
+function ouvrirModaleDeplacement(idClasse, nomClasse, effectif) {
+    idClasseSource  = idClasse;
+    nomClasseSource = nomClasse;
+    effectifSource  = effectif;
+
+    document.getElementById('mv-source-label').textContent  = nomClasse;
+    document.getElementById('mv-effectif-label').textContent =
+        effectif + ' stagiaire(s)';
+    document.getElementById('gc-move-err').style.display    = 'none';
+    document.getElementById('mv-cap-info').style.display    = 'none';
+
+    // Construire dynamiquement les options du sélecteur de destination
+    var sel = document.getElementById('mv-cible');
+    sel.innerHTML = '<option value="">— Sélectionner une classe —</option>';
+    toutesClassesData.forEach(function (cls) {
+        if (parseInt(cls.id_classe, 10) === idClasse) return; // exclure la source
+        var libres = parseInt(cls.places_libres, 10);
+        var label  = cls.nom_classe + ' — ' + cls.nom_filiere + ' (' + cls.annee_scolaire + ')'
+                   + ' · ' + libres + ' place(s) libre(s)';
+        var opt = document.createElement('option');
+        opt.value       = cls.id_classe;
+        opt.textContent = label;
+        opt.disabled    = libres < effectif; // grisé si capacité insuffisante
+        if (opt.disabled) opt.textContent += ' ⚠ capacité insuffisante';
+        sel.appendChild(opt);
+    });
+
+    document.getElementById('gc-move-modal').style.display = 'flex';
+    setTimeout(function () { sel.focus(); }, 80);
+}
+
+/**
+ * Raccourci : ferme la modale de suppression et ouvre directement
+ * la modale de déplacement pour la même classe.
+ * Utilisé par le bouton "Déplacer les étudiants d'abord" dans la modale de suppression.
+ */
+function ouvrirDeplacementDepuisSuppression() {
+    fermerModale('gc-del-modal');
+    // Récupérer les infos depuis les variables déjà remplies par ouvrirModaleSupprimer
+    ouvrirModaleDeplacement(idClasseASupprimer,
+        document.querySelector('.gc-row[data-id="' + idClasseASupprimer + '"] .gc-nom-classe')
+            ? document.querySelector('.gc-row[data-id="' + idClasseASupprimer + '"] .gc-nom-classe').textContent
+            : 'cette classe',
+        effectifSource
+    );
+}
+
+/**
+ * Soumet le déplacement en AJAX.
+ * En cas de succès :
+ *   - Remet l'effectif de la ligne source à 0 (barre, %, places libres, boutons)
+ *   - Met à jour la ligne de destination si elle est visible dans le tableau
+ *   - Retire le bouton "Déplacer" de la ligne source
+ */
+function soumettreDeplacement() {
+    var idCible     = document.getElementById('mv-cible').value;
+    var boiteErreur = document.getElementById('gc-move-err');
+    boiteErreur.style.display = 'none';
+
+    if (!idCible) {
+        boiteErreur.textContent = 'Veuillez sélectionner une classe destination.';
+        boiteErreur.style.display = 'block';
+        return;
+    }
+
+    var donneesFormulaire = new FormData();
+    donneesFormulaire.append('move_stagiaires',  '1');
+    donneesFormulaire.append('csrf_token',       jetonCsrf);
+    donneesFormulaire.append('id_classe_source', idClasseSource);
+    donneesFormulaire.append('id_classe_cible',  idCible);
+
+    fetch('gestion_classes.php', { method: 'POST', body: donneesFormulaire })
+        .then(function (reponse) { return reponse.json(); })
+        .then(function (resultat) {
+            if (resultat.success) {
+                fermerModale('gc-move-modal');
+                afficherToast(resultat.msg, true);
+
+                // ── Mettre à jour la ligne SOURCE : effectif → 0 ──────────────
+                var rangeeSource = document.querySelector('.gc-row[data-id="' + idClasseSource + '"]');
+                if (rangeeSource) {
+                    var capSrc = parseInt(rangeeSource.querySelector('.gc-cap-val').textContent, 10) || 0;
+                    // Effectif
+                    var effEl = rangeeSource.querySelector('.gc-eff-val');
+                    if (effEl) { effEl.textContent = '0'; effEl.style.color = '#10b981'; }
+                    // Barre
+                    var fillEl = rangeeSource.querySelector('.gc-cap-fill');
+                    if (fillEl) { fillEl.style.width = '0%'; fillEl.style.background = '#10b981'; }
+                    // Pourcentage
+                    var pctEl = rangeeSource.querySelector('.gc-pct-val');
+                    if (pctEl) pctEl.textContent = '0%';
+                    // Places libres
+                    var libresEl = rangeeSource.querySelector('.gc-libres-cell');
+                    if (libresEl) libresEl.innerHTML =
+                        '<span style="font-weight:700;color:#10b981;">' + capSrc + ' place(s)</span>';
+                    // Retirer le bouton Déplacer (plus d'effectif)
+                    var btnMove = rangeeSource.querySelector('.gc-btn-move');
+                    if (btnMove) btnMove.remove();
+                    // Retirer l'avertissement dans la modale de suppression si réouverture
+                    document.getElementById('gc-del-warning').style.display = 'none';
+                }
+
+                // ── Mettre à jour la ligne DESTINATION si visible ─────────────
+                var rangeeCible = document.querySelector('.gc-row[data-id="' + idCible + '"]');
+                if (rangeeCible) {
+                    var capDst  = parseInt(rangeeCible.querySelector('.gc-cap-val').textContent, 10) || 0;
+                    var effDst  = parseInt(rangeeCible.querySelector('.gc-eff-val').textContent, 10) || 0;
+                    var nouvelEff = effDst + resultat.nb_deplaces;
+                    var pct    = capDst > 0 ? Math.min(100, Math.round(nouvelEff / capDst * 100)) : 0;
+                    var couleur = pct >= 100 ? '#ef4444' : (pct >= 80 ? '#fb923c' : '#10b981');
+                    var libres  = Math.max(0, capDst - nouvelEff);
+
+                    var effElD = rangeeCible.querySelector('.gc-eff-val');
+                    if (effElD) { effElD.textContent = nouvelEff; effElD.style.color = couleur; }
+                    var fillElD = rangeeCible.querySelector('.gc-cap-fill');
+                    if (fillElD) { fillElD.style.width = pct + '%'; fillElD.style.background = couleur; }
+                    var pctElD = rangeeCible.querySelector('.gc-pct-val');
+                    if (pctElD) pctElD.textContent = pct + '%';
+                    var libresElD = rangeeCible.querySelector('.gc-libres-cell');
+                    if (libresElD) {
+                        if (libres === 0) {
+                            libresElD.innerHTML = '<span style="font-weight:700;color:#ef4444;font-size:0.82rem;"><i class="fa-solid fa-ban"></i> Pleine</span>';
+                        } else if (libres <= 5) {
+                            libresElD.innerHTML = '<span style="font-weight:700;color:#fb923c;">' + libres + ' place(s)</span>';
+                        } else {
+                            libresElD.innerHTML = '<span style="font-weight:700;color:#10b981;">' + libres + ' place(s)</span>';
+                        }
+                    }
+                    // Ajouter le bouton Déplacer sur la destination si non présent
+                    if (!rangeeCible.querySelector('.gc-btn-move')) {
+                        var btnDel = rangeeCible.querySelector('.gc-btn-del');
+                        if (btnDel) {
+                            var newBtn = document.createElement('button');
+                            newBtn.className = 'gc-btn-move';
+                            var nomDst = rangeeCible.querySelector('.gc-nom-classe')
+                                ? rangeeCible.querySelector('.gc-nom-classe').textContent : '';
+                            newBtn.setAttribute('onclick',
+                                'ouvrirModaleDeplacement(' + idCible + ',' +
+                                JSON.stringify(nomDst) + ',' + nouvelEff + ')');
+                            newBtn.innerHTML = '<i class="fa-solid fa-right-left"></i> Déplacer';
+                            btnDel.parentNode.insertBefore(newBtn, btnDel);
+                        }
+                    }
+                }
+
+                // Mettre à jour toutesClassesData pour les ouvertures futures de la modale
+                toutesClassesData.forEach(function (cls) {
+                    var cid = parseInt(cls.id_classe, 10);
+                    if (cid === idClasseSource) {
+                        cls.effectif     = 0;
+                        cls.places_libres = parseInt(cls.capacite, 10);
+                    }
+                    if (cid === parseInt(idCible, 10)) {
+                        cls.effectif      = (parseInt(cls.effectif, 10) || 0) + resultat.nb_deplaces;
+                        cls.places_libres = Math.max(0, parseInt(cls.capacite, 10) - cls.effectif);
+                    }
+                });
             } else {
                 boiteErreur.textContent = resultat.error || 'Erreur inconnue.';
                 boiteErreur.style.display = 'block';
