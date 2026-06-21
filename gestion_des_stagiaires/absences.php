@@ -619,14 +619,6 @@
          title="Générer une feuille d'appel A4 pour le professeur">
         <i class="fa-solid fa-print" style="font-size:.9rem;"></i> Feuille d'appel
       </a>
-      <a href="print_releve_absences.php<?= $idClasseSelecte > 0 ? '?id_classe='.$idClasseSelecte.'&annee='.urlencode($anneeSelectionnee) : '' ?>" target="_blank"
-         style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
-                background:rgba(251,191,36,.1);color:#fde047;border:1px solid rgba(251,191,36,.3);text-decoration:none;transition:all .18s;"
-         onmouseover="this.style.background='rgba(251,191,36,.2)'"
-         onmouseout="this.style.background='rgba(251,191,36,.1)'"
-         title="Imprimer le relevé d'absences par classe et par mois">
-        <i class="fa-solid fa-file-lines" style="font-size:.9rem;"></i> Relevé d'absences
-      </a>
     </div>
   </div>
 
@@ -672,10 +664,6 @@
               <option value="<?= (int)$classe['id_classe'] ?>" <?= $idClasseSelecte === (int)$classe['id_classe'] ? 'selected' : '' ?>><?= h($classe['nom_classe']) ?></option>
             <?php endforeach; ?>
           </select>
-        </label>
-
-        <label>Date
-          <input type="date" name="date_filter" value="<?= h($dateFiltreUnique) ?>" <?= $idClasseSelecte === 0 ? 'disabled' : '' ?>>
         </label>
 
         <label>Rechercher (Nom / CIN)
@@ -748,30 +736,6 @@
         <i class="fa-solid fa-certificate"></i> Justifier la sélection
       </button>
       <?php endif; ?>
-    </div>
-  </div>
-
-  <!-- Statistiques récapitulatives -->
-  <div class="abs-stats-row">
-    <div class="abs-stat-card" style="border-top:3px solid #a855f7;">
-      <div class="abs-stat-val" style="color:#c084fc;"><?= count($stagiaires) ?></div>
-      <div class="abs-stat-lbl">Stagiaires</div>
-    </div>
-    <div class="abs-stat-card" style="border-top:3px solid #ef4444;">
-      <div class="abs-stat-val" style="color:#fca5a5;"><?= $totalAbsences ?></div>
-      <div class="abs-stat-lbl">Absences <?= $dateFiltreUnique ? '(ce jour)' : '(total)' ?></div>
-    </div>
-    <div class="abs-stat-card" style="border-top:3px solid #22c55e;">
-      <div class="abs-stat-val" style="color:#86efac;"><?= $totalJustifiees ?></div>
-      <div class="abs-stat-lbl">Justifiées</div>
-    </div>
-    <div class="abs-stat-card" style="border-top:3px solid #f59e0b;">
-      <div class="abs-stat-val" style="color:#fde047;"><?= $totalNonJustifiees ?></div>
-      <div class="abs-stat-lbl">Non justifiées</div>
-    </div>
-    <div class="abs-stat-card" style="border-top:3px solid #a855f7;">
-      <div class="abs-stat-val" style="color:#c084fc;"><?= $nbAvecAbsences ?></div>
-      <div class="abs-stat-lbl">Avec absences</div>
     </div>
   </div>
 
