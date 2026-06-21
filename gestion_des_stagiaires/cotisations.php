@@ -92,14 +92,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             foreach ($sids as $sid) {
-                $stStag = $pdo->prepare('SELECT c.id_filiere FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
+                $stStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
                 $stStag->execute([$sid]);
                 $stagRow = $stStag->fetch();
-                $tarif = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
-                $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le)
-                    VALUES (?, ?, 1, ?, ?, 0, 0, 'payé', NOW(), NOW())
-                    ON DUPLICATE KEY UPDATE est_paye=1, montant_total=VALUES(montant_total), montant_paye=VALUES(montant_total), montant_restant=0, cumul_restant=0, statut_paiement='payé', date_paiement=NOW(), marque_le=NOW()")
-                    ->execute([$sid, $moisRef, $tarif, $tarif]);
+                $tarif    = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
+                $remise   = (float)($stagRow['remise_mensuelle'] ?? 0);
+                $effectif = max(0.0, $tarif - $remise);
+                $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, remise, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le)
+                    VALUES (?, ?, 1, ?, ?, ?, 0, 0, 'payé', NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE est_paye=1, montant_total=VALUES(montant_total), remise=VALUES(remise), montant_paye=VALUES(montant_paye), montant_restant=0, cumul_restant=0, statut_paiement='payé', date_paiement=NOW(), marque_le=NOW()")
+                    ->execute([$sid, $moisRef, $tarif, $remise, $effectif]);
                 $updated++;
             }
             $pdo->commit();
@@ -124,10 +126,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             foreach ($sids as $sid) {
-                $stStag = $pdo->prepare('SELECT c.id_filiere FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
+                $stStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
                 $stStag->execute([$sid]);
-                $stagRow = $stStag->fetch();
-                $tarif = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
+                $stagRow  = $stStag->fetch();
+                $tarif    = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
+                $remise   = (float)($stagRow['remise_mensuelle'] ?? 0);
+                $effectif = max(0.0, $tarif - $remise);
 
                 $stExist = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=?');
                 $stExist->execute([$sid, $moisRef]);
@@ -135,18 +139,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($existing) {
                     $ancienPaye = (float)($existing['montant_paye'] ?? 0);
-                    $newPaye = min($tarif, $ancienPaye + $montant);
-                    $newRestant = max(0, $tarif - $newPaye);
-                    $newStatut = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
-                    $pdo->prepare("UPDATE mensualites SET montant_paye=?, montant_restant=?, statut_paiement=?, est_paye=?, date_paiement=COALESCE(?,date_paiement), marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
-                        ->execute([$newPaye, $newRestant, $newStatut, ($newRestant <= 0 ? 1 : 0), $datePaie, $sid, $moisRef]);
+                    $newPaye    = min($effectif, $ancienPaye + $montant);
+                    $newRestant = max(0.0, $effectif - $newPaye);
+                    $newStatut  = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
+                    $pdo->prepare("UPDATE mensualites SET remise=?, montant_paye=?, montant_restant=?, statut_paiement=?, est_paye=?, date_paiement=COALESCE(?,date_paiement), marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
+                        ->execute([$remise, $newPaye, $newRestant, $newStatut, ($newRestant <= 0 ? 1 : 0), $datePaie, $sid, $moisRef]);
                 } else {
-                    $newPaye = min($tarif, $montant);
-                    $newRestant = max(0, $tarif - $newPaye);
-                    $newStatut = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
-                    $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le)
-                        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, NOW())")
-                        ->execute([$sid, $moisRef, ($newRestant <= 0 ? 1 : 0), $tarif, $newPaye, $newRestant, $newStatut, $datePaie]);
+                    $newPaye    = min($effectif, $montant);
+                    $newRestant = max(0.0, $effectif - $newPaye);
+                    $newStatut  = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
+                    $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, remise, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NOW())")
+                        ->execute([$sid, $moisRef, ($newRestant <= 0 ? 1 : 0), $tarif, $remise, $newPaye, $newRestant, $newStatut, $datePaie]);
                 }
                 $updated++;
             }
