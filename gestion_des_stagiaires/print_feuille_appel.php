@@ -248,10 +248,11 @@
               border: 1px solid #000; padding: 5px 8px;
               vertical-align: middle; line-height: 1.4;
           }
-          .fa-table .col-n    { width: 6%;  text-align: center; }
-          .fa-table .col-nom  { width: 50%; font-weight: 600; }
-          .fa-table .col-cb   { width: 12%; text-align: center; font-size: 14pt; letter-spacing: .1em; }
-          .fa-table .col-obs  { width: 32%; }
+          .fa-table .col-n     { width: 6%;  text-align: center; }
+          .fa-table .col-nom   { width: 44%; font-weight: 600; }
+          .fa-table .col-heure { width: 16%; text-align: center; font-size: 9.5pt; }
+          .fa-table .col-cb    { width: 10%; text-align: center; font-size: 14pt; letter-spacing: .1em; }
+          .fa-table .col-obs   { width: 24%; }
           /* Hauteur minimale pour que le prof puisse écrire */
           .fa-table tbody td { height: 22px; }
 
@@ -422,6 +423,9 @@
               <tr>
                   <th class="col-n">N°</th>
                   <th class="col-nom" style="text-align:left;">Nom &amp; Prénom</th>
+                  <?php if ($horaireAffiche !== ''): ?>
+                  <th class="col-heure">Heure</th>
+                  <?php endif; ?>
                   <th class="col-cb">[ ]</th>
                   <th class="col-obs" style="text-align:left;">Observations</th>
               </tr>
@@ -431,14 +435,26 @@
               <tr>
                   <td class="col-n"><?= $idx + 1 ?></td>
                   <td class="col-nom"><?= h(strtoupper($stag['nom']) . ' ' . $stag['prenom']) ?></td>
-                  <td class="col-cb">&#9633;</td><!-- &#9633; = □ carré vide pour coche manuelle -->
+                  <?php if ($horaireAffiche !== ''): ?>
+                  <td class="col-heure"><?= h($horaireAffiche) ?></td>
+                  <?php endif; ?>
+                  <td class="col-cb">&#9633;</td>
                   <td class="col-obs">&nbsp;</td>
               </tr>
               <?php endforeach; ?>
 
               <!-- Lignes vides supplémentaires pour les stagiaires non inscrits éventuels -->
-              <tr><td class="col-n"><?= count($stagiaires)+1 ?></td><td class="col-nom">&nbsp;</td><td class="col-cb">&#9633;</td><td class="col-obs">&nbsp;</td></tr>
-              <tr><td class="col-n"><?= count($stagiaires)+2 ?></td><td class="col-nom">&nbsp;</td><td class="col-cb">&#9633;</td><td class="col-obs">&nbsp;</td></tr>
+              <?php for ($extra = 1; $extra <= 2; $extra++): ?>
+              <tr>
+                  <td class="col-n"><?= count($stagiaires) + $extra ?></td>
+                  <td class="col-nom">&nbsp;</td>
+                  <?php if ($horaireAffiche !== ''): ?>
+                  <td class="col-heure">&nbsp;</td>
+                  <?php endif; ?>
+                  <td class="col-cb">&#9633;</td>
+                  <td class="col-obs">&nbsp;</td>
+              </tr>
+              <?php endfor; ?>
           </tbody>
       </table>
 
