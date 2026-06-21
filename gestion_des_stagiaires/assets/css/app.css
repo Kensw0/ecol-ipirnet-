@@ -63,15 +63,16 @@ h1, h2, h3, h4, .font-serif {
 
 .sidebar {
     width: 280px;
-    background: var(--sidebar-bg);
+    background: linear-gradient(180deg, hsl(var(--primary-h), var(--primary-s), 7%) 0%, hsl(var(--primary-h), var(--primary-s), 4%) 100%);
     color: var(--sidebar-fg);
     display: flex;
     flex-direction: column;
     position: sticky;
     top: 0;
     height: 100vh;
-    border-right: 1px solid rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(255,255,255,0.06);
     z-index: 1000;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
 }
 
 .main-content {
@@ -108,7 +109,7 @@ h1, h2, h3, h4, .font-serif {
 .logo-icon {
     width: 44px;
     height: 44px;
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), hsl(var(--accent-h), var(--accent-s), 55%));
     color: var(--sidebar-bg);
     border-radius: 12px;
     display: flex;
@@ -118,7 +119,7 @@ h1, h2, h3, h4, .font-serif {
     font-size: 1.8rem;
     font-weight: bold;
     font-style: italic;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
 }
 
 .brand-name {
@@ -173,14 +174,21 @@ h1, h2, h3, h4, .font-serif {
     font-size: 0.95rem;
 }
 
-.nav-item:hover, .nav-item.active {
-    background: rgba(255,255,255,0.05);
+.nav-item:hover {
+    background: rgba(255,255,255,0.06);
     color: #fff;
+    transform: translateX(2px);
 }
 
 .nav-item.active {
-    background: radial-gradient(circle at center, rgba(191, 207, 23, 0.1) 0%, rgba(255,255,255,0.05) 100%);
-    border: 1px solid rgba(191, 207, 23, 0.2);
+    background: linear-gradient(90deg, rgba(168,85,247,.18) 0%, rgba(168,85,247,.05) 100%);
+    border: 1px solid rgba(168,85,247,.28);
+    color: #e9d5ff;
+    box-shadow: inset 3px 0 0 #a855f7, 0 2px 12px rgba(168,85,247,.12);
+}
+
+.nav-item.active i {
+    color: #c084fc;
 }
 
 .nav-item i {
@@ -198,15 +206,16 @@ h1, h2, h3, h4, .font-serif {
     background: var(--card-bg);
     border-radius: var(--radius);
     border: 1px solid var(--border-color);
-    box-shadow: 0 4px 12px -2px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px -4px rgba(0,0,0,0.08);
     padding: var(--spacing);
     margin-bottom: var(--spacing);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 24px -8px rgba(0,0,0,0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px -6px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+    border-color: rgba(168,85,247,0.2);
 }
 
 .glass-card {
@@ -314,13 +323,15 @@ tr:hover td {
 }
 
 .btn-primary {
-    background: var(--primary);
+    background: linear-gradient(135deg, hsl(var(--primary-h), var(--primary-s), 18%), hsl(var(--primary-h), var(--primary-s), 25%));
     color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
 .btn-primary:hover {
-    background: hsl(var(--primary-h), var(--primary-s), 15%);
-    transform: scale(1.02);
+    background: linear-gradient(135deg, hsl(var(--primary-h), var(--primary-s), 22%), hsl(var(--primary-h), var(--primary-s), 30%));
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
 }
 
 .btn-accent {
@@ -368,8 +379,26 @@ tr:hover td {
 
 /* Global fix for select dropdown readability */
 select, select optgroup, select option {
-    background-color: #ffffff !important;
-    color: #000000 !important;
+    background-color: #111113 !important;
+    color: #e4e4e7 !important;
+}
+
+/* ── Global input focus glow ── */
+.admin-layout input:not([type="checkbox"]):not([type="radio"]):focus,
+.admin-layout select:focus,
+.admin-layout textarea:focus {
+    outline: none;
+    border-color: rgba(168,85,247,.5) !important;
+    box-shadow: 0 0 0 3px rgba(168,85,247,.12) !important;
+}
+
+/* ── Top gradient bar ── */
+.main-content::before {
+    content: '';
+    display: block;
+    height: 3px;
+    background: linear-gradient(90deg, #7c3aed, #a855f7, hsl(var(--accent-h), var(--accent-s), var(--accent-l)));
+    flex-shrink: 0;
 }
 
 /* ── Stagiaires UI Redesign ─────────────────────────── */
@@ -424,15 +453,15 @@ select, select optgroup, select option {
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
-    box-shadow: 0 10px 25px -5px rgba(168,85,247,0.5);
+    box-shadow: 0 8px 24px -4px rgba(168,85,247,0.55), 0 0 0 1px rgba(168,85,247,0.2);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
     z-index: 900;
 }
 .fab-button:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 15px 30px -5px rgba(168,85,247,0.6);
-    background: #b062f9;
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 16px 32px -4px rgba(168,85,247,0.65), 0 0 0 1px rgba(168,85,247,0.3);
+    background: linear-gradient(135deg, #b062f9, #c084fc);
 }
 
 /* Modal Overlay */
