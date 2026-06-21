@@ -229,23 +229,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
         <a href="stagiaires.php">Retour au Hub</a>
     </div>
 
-    <table class="cs-head">
-        <tr>
-            <td class="cs-head-left">
-                <img src="assets/img/logo.png" alt="" class="cs-head-logo">
-            </td>
-            <td class="cs-head-mid">
-                <div class="cs-org"><?= h($SCHOOL_ORG) ?></div>
-                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
-                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_2) ?></div>
-                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
-                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
-            </td>
-            <td class="cs-head-right">
-                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
-            </td>
-        </tr>
-    </table>
+    <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
     <div class="cs-title-wrap">
         <div class="cs-title-oval">
@@ -351,10 +335,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
         </tr>
     </table>
 
-    <div class="cs-footer">
-        <?= h($SCHOOL_ADDRESS) ?><br>
-        <?= h($SCHOOL_LEGAL) ?>
-    </div>
+    <?php require __DIR__ . '/includes/print_footer.php'; ?>
 </div>
 <?php if ($auto): ?>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 200); });</script>
