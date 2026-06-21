@@ -418,6 +418,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$ts, $su===''?null:$su, $en===''?null:$en, $dd, $df, $ns, $cu===''?null:$cu, $ru===''?null:$ru, $ev===''?null:$ev, $ds, $ju===''?null:$ju, $as, $edit_id, $sid]);
                 $stageMsg = 'Stage mis à jour.';
             } else {
+                $chk = $pdo->prepare('SELECT id_stage FROM stages WHERE id_stagiaire=? AND type_stage=? AND annee_scolaire=? LIMIT 1');
+                $chk->execute([$sid, $ts, $as]);
+                if ($chk->fetch()) {
+                    $typeLabel = $ts === 'pfe' ? 'PFE' : 'stage en entreprise';
+                    echo json_encode(['success' => false, 'msg' => "Ce stagiaire a déjà un $typeLabel pour l'année $as."]);
+                    exit;
+                }
                 $pdo->prepare('INSERT INTO stages (type_stage,sujet,entreprise,date_debut,date_fin,note_stage,convention_url,rapport_url,evaluation_entreprise,date_soutenance,jury,id_stagiaire,annee_scolaire) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
                     ->execute([$ts, $su===''?null:$su, $en===''?null:$en, $dd, $df, $ns, $cu===''?null:$cu, $ru===''?null:$ru, $ev===''?null:$ev, $ds, $ju===''?null:$ju, $sid, $as]);
                 $stageMsg = 'Stage / PFE ajouté.';
