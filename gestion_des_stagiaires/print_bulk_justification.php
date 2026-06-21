@@ -186,16 +186,19 @@
           .stag-num-inscri { font-size: 9pt; font-weight: 400; color: #555; }
 
           /* ── Tableau des absences ───────────────────────────────── */
-          .abs-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          .abs-table {
+              width: 100%; border-collapse: collapse;
+              border: 2px solid #000; font-size: 10.5pt; margin-bottom: 4px;
+          }
           .abs-table th {
-              background: #e8e8e8; border: 1px solid #bbb;
-              padding: 4px 8px; text-align: left; font-weight: 600; font-size: 9.5pt;
+              background: #e8e8e8; border: 1px solid #000;
+              padding: 6px 8px; text-align: center; font-weight: bold; font-size: 10pt;
+              -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           .abs-table td {
-              border: 1px solid #ccc; padding: 4px 8px;
+              border: 1px solid #000; padding: 5px 8px;
               vertical-align: middle; line-height: 1.4;
           }
-          .abs-table tr:nth-child(even) td { background: #fafafa; }
 
           /* ── Zone de signature ──────────────────────────────────── */
           .cs-sign {
