@@ -2,14 +2,14 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-// ---- School / footer constants (edit here to update across all fiches) ----
-$SCHOOL_ORG          = 'Groupe IPIRNET';
-$SCHOOL_TAGLINE_1    = "Institut Privé d'Informatique, Réseau";
-$SCHOOL_TAGLINE_2    = 'et Nouvelles Etudes de Télécommunication';
-$SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N°   : 3/03/2/2003     Du : 19/02/2003";
-$SCHOOL_AUTH_LINE_2  = "Décision de l'accréditation N°    21/ DFP /F0301/ 199    du 29/11/2021";
-$SCHOOL_ADDRESS      = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13';
-$SCHOOL_LEGAL        = 'Email : ipirnet@menara.ma,  R.C :6693, Patente N° : 40724575, IF :14374293';
+// ── Constantes établissement (source unique de vérité pour toutes les pages d'impression) ──
+$SCHOOL_ORG         = 'GROUPE IPIRNET';
+$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique Réseau et Nouvelles";
+$SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
+$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
+$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
+$SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
+$SCHOOL_LEGAL       = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
 $FORMATION_TYPE      = 'Formation Continue';
 
 $id = (int) ($_GET['id'] ?? 0);
