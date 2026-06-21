@@ -358,8 +358,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $cinChkNew->execute([$cin]);
                 $cinOwnerNew = $cinChkNew->fetch();
                 if ($cinOwnerNew) {
-                    flash_set('⚠️ Ce CIN est déjà utilisé par ' . trim((string)$cinOwnerNew['prenom'] . ' ' . (string)$cinOwnerNew['nom']) . ' (N° ' . (string)$cinOwnerNew['num_inscri'] . '). Veuillez corriger le CIN.', 'error');
-                    redirect('stagiaires.php?new=1');
+                    flash_set('⚠️ Ce CIN appartient déjà à ' . trim((string)$cinOwnerNew['prenom'] . ' ' . (string)$cinOwnerNew['nom']) . ' (N° ' . (string)$cinOwnerNew['num_inscri'] . '). Vous avez été redirigé vers sa fiche.', 'warning');
+                    redirect('stagiaires.php?id=' . (int)$cinOwnerNew['id_stagiaire'] . '&highlight=1');
                 }
             }
             // ── Vérification doublon email avant insertion ─────────────────────────────
@@ -3699,6 +3699,41 @@ function saveInlineNote(sid, mid, field, val) {
     
 <?php endif; ?>
 
+
+<?php
+/* ── Highlight du profil hub si redirigé depuis un doublon CIN lors de la création ── */
+$highlightHub = isset($_GET['highlight']) && (int)$_GET['highlight'] === 1 && isset($selectedStudent);
+if ($highlightHub): ?>
+<style>
+@keyframes gds-hub-highlight {
+    0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.6), 0 4px 32px rgba(245,158,11,0.25); background: rgba(245,158,11,0.10); border-color: rgba(245,158,11,0.6); }
+    40%  { box-shadow: 0 0 0 8px rgba(245,158,11,0.0), 0 4px 40px rgba(245,158,11,0.35); background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.8); }
+    100% { box-shadow: 0 0 0 0 rgba(245,158,11,0), 0 4px 24px rgba(245,158,11,0.10); background: rgba(245,158,11,0.04); border-color: rgba(245,158,11,0.3); }
+}
+.hub-header-v3.gds-hub-highlighted {
+    animation: gds-hub-highlight 1s ease-out 0.2s 3;
+    border-radius: 16px;
+    border: 2px solid rgba(245,158,11,0.3);
+    transition: border-color 0.4s, background 0.4s;
+}
+</style>
+<script>
+(function () {
+    function highlightHub() {
+        var header = document.querySelector('.hub-header-v3');
+        if (header) {
+            header.classList.add('gds-hub-highlighted');
+            header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', highlightHub);
+    } else {
+        setTimeout(highlightHub, 150);
+    }
+})();
+</script>
+<?php endif; ?>
 
 <?php
 /* ── Highlight a specific stagiaire row if redirected from pre-inscription duplicate check ── */
