@@ -334,17 +334,17 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <style>
-.cot-filter-card{background:#18181b;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem;}
+.cot-filter-card{background:linear-gradient(135deg,#1c1c20,#18181b);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.25);}
 .cot-filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;align-items:end;}
 .cot-filter-grid label{display:flex;flex-direction:column;gap:0.35rem;font-size:0.78rem;font-weight:600;color:#a1a1aa;text-transform:uppercase;letter-spacing:.05em;}
 .cot-filter-grid select,.cot-filter-grid input[type="month"]{background:#09090b;border:1px solid rgba(255,255,255,0.12);color:#e4e4e7;border-radius:8px;padding:0.5rem 0.75rem;font-size:0.9rem;width:100%;color-scheme:dark;}
 .cot-filter-grid select:disabled{opacity:0.4;cursor:not-allowed;}
 .cot-filter-grid select:focus,.cot-filter-grid input:focus{outline:none;border-color:rgba(168,85,247,0.5);box-shadow:0 0 0 2px rgba(168,85,247,0.15);}
 .cot-stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem;}
-.cot-stat-card{background:#18181b;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:1rem 1.25rem;text-align:center;}
+.cot-stat-card{background:linear-gradient(135deg,#1c1c20,#18181b);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:1rem 1.25rem;text-align:center;transition:border-color .2s,box-shadow .2s;}.cot-stat-card:hover{border-color:rgba(168,85,247,.25);box-shadow:0 4px 16px rgba(168,85,247,.1);}
 .cot-stat-val{font-size:1.6rem;font-weight:800;line-height:1.1;}
 .cot-stat-lbl{font-size:0.72rem;color:#71717a;margin-top:0.35rem;text-transform:uppercase;letter-spacing:.05em;}
-.cot-table-wrap{background:#18181b;border:1px solid rgba(255,255,255,0.07);border-radius:14px;overflow:hidden;}
+.cot-table-wrap{background:#18181b;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.2);}
 .cot-table-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.07);}
 .cot-table{width:100%;border-collapse:collapse;}
 .cot-table th{padding:.7rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:#71717a;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.06);}
@@ -352,15 +352,15 @@ require __DIR__ . '/includes/header.php';
 .cot-table tbody tr:hover td{background:rgba(168,85,247,0.06);}
 .cot-table .cb-col{width:40px;text-align:center;}
 .cot-table input[type="checkbox"]{accent-color:#a855f7;width:16px;height:16px;cursor:pointer;}
-.badge-cot{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;white-space:nowrap;}
+.badge-cot{display:inline-flex;align-items:center;gap:4px;padding:3px 12px;border-radius:20px;font-size:.73rem;font-weight:700;white-space:nowrap;letter-spacing:.02em;}
 .badge-cot.paye{background:rgba(52,211,153,.13);color:#34d399;border:1px solid rgba(52,211,153,.3);}
 .badge-cot.partiel{background:rgba(251,146,60,.13);color:#fb923c;border:1px solid rgba(251,146,60,.3);}
 .badge-cot.impaye{background:rgba(248,113,113,.13);color:#f87171;border:1px solid rgba(248,113,113,.3);}
 .badge-cot.aucun{background:rgba(113,113,122,.13);color:#a1a1aa;border:1px solid rgba(113,113,122,.2);}
-.btn-cot{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:.8rem;font-weight:600;border:none;cursor:pointer;transition:all .15s;}
-.btn-cot.primary{background:#a855f7;color:#fff;}.btn-cot.primary:hover{background:#9333ea;}
-.btn-cot.ghost{background:rgba(168,85,247,.1);color:#c084fc;border:1px solid rgba(168,85,247,.25);}.btn-cot.ghost:hover{background:rgba(168,85,247,.2);}
-.btn-cot.success{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);}.btn-cot.success:hover{background:rgba(52,211,153,.25);}
+.btn-cot{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;font-size:.8rem;font-weight:600;border:none;cursor:pointer;transition:all .18s cubic-bezier(.16,1,.3,1);}
+.btn-cot.primary{background:linear-gradient(135deg,#9333ea,#a855f7);color:#fff;box-shadow:0 4px 14px rgba(168,85,247,.38);transition:all .2s;}.btn-cot.primary:hover{background:linear-gradient(135deg,#a855f7,#9333ea);box-shadow:0 6px 20px rgba(168,85,247,.52);transform:translateY(-1px);}
+.btn-cot.ghost{background:linear-gradient(135deg,rgba(168,85,247,.14),rgba(139,92,246,.08));color:#c084fc;border:1px solid rgba(168,85,247,.32);position:relative;overflow:hidden;}.btn-cot.ghost:hover{background:linear-gradient(135deg,rgba(168,85,247,.28),rgba(139,92,246,.18));border-color:rgba(168,85,247,.6);box-shadow:0 0 14px rgba(168,85,247,.28),0 3px 10px rgba(0,0,0,.25);transform:translateY(-1px);color:#d8b4fe;}
+.btn-cot.success{background:linear-gradient(135deg,rgba(52,211,153,.15),rgba(16,185,129,.1));color:#34d399;border:1px solid rgba(52,211,153,.32);}.btn-cot.success:hover{background:linear-gradient(135deg,rgba(52,211,153,.28),rgba(16,185,129,.18));box-shadow:0 0 12px rgba(52,211,153,.22);transform:translateY(-1px);}
 .btn-cot.danger{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2);}.btn-cot.danger:hover{background:rgba(239,68,68,.25);}
 .btn-cot.sm{padding:3px 9px;font-size:.75rem;}
 .bulk-bar{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(20px);background:#1c1c1f;border:1px solid rgba(168,85,247,.35);border-radius:14px;padding:.85rem 1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:900;opacity:0;transition:all .25s;pointer-events:none;flex-wrap:wrap;min-width:460px;}
@@ -369,9 +369,9 @@ require __DIR__ . '/includes/header.php';
 .bulk-sep{width:1px;height:24px;background:rgba(255,255,255,.1);}
 .empty-state{text-align:center;padding:3.5rem 2rem;color:#52525b;}
 .empty-state i{font-size:2.5rem;margin-bottom:1rem;display:block;color:#3f3f46;}
-.cot-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:none;align-items:center;justify-content:center;}
-.cot-modal-card{background:#18181b;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:0;width:min(480px,95vw);display:flex;flex-direction:column;overflow:hidden;}
-.cot-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.07);}
+.cot-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;display:none;align-items:center;justify-content:center;}
+.cot-modal-card{background:#18181b;border:1px solid rgba(168,85,247,.18);border-radius:20px;padding:0;width:min(480px,95vw);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.85),0 0 0 1px rgba(168,85,247,.1);animation:cotModalIn .28s cubic-bezier(.16,1,.3,1);}@keyframes cotModalIn{from{transform:translateY(18px) scale(.98);opacity:0;}to{transform:translateY(0) scale(1);opacity:1;}}
+.cot-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(168,85,247,.18);background:linear-gradient(135deg,rgba(168,85,247,.1),rgba(139,92,246,.05));position:relative;}.cot-modal-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#7c3aed,#a855f7,#c084fc,#a855f7,#7c3aed);border-radius:20px 20px 0 0;}
 .cot-modal-header h3{margin:0;font-size:1.05rem;font-weight:700;color:#f4f4f5;}
 .cot-modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem;}
 .cot-modal-footer{padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,.07);display:flex;justify-content:flex-end;gap:.75rem;}
@@ -383,7 +383,7 @@ require __DIR__ . '/includes/header.php';
 .cot-form-group input,.cot-form-group select{background:#09090b;border:1px solid rgba(255,255,255,.1);color:#e4e4e7;border-radius:8px;padding:.5rem .75rem;font-size:.9rem;width:100%;box-sizing:border-box;}
 .cot-form-group input:focus,.cot-form-group select:focus{outline:none;border-color:rgba(168,85,247,.5);}
 .ajout-banner{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.75rem 1rem;font-size:.84rem;display:flex;flex-direction:column;gap:.4rem;}
-.gds-toast{position:fixed;top:1.25rem;right:1.25rem;z-index:99998;border-radius:10px;padding:.8rem 1.25rem;font-weight:600;font-size:.88rem;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid;max-width:360px;line-height:1.4;animation:toastIn .2s ease;}
+.gds-toast{position:fixed;top:1.25rem;right:1.25rem;z-index:99998;border-radius:12px;padding:.85rem 1.35rem;font-weight:600;font-size:.88rem;box-shadow:0 8px 32px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04);border:1px solid;max-width:380px;line-height:1.45;animation:toastIn .22s cubic-bezier(.16,1,.3,1);}
 @keyframes toastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
 .gds-toast.success{background:#18181b;border-color:rgba(34,197,94,.4);color:#86efac;}
 .gds-toast.error{background:#18181b;border-color:rgba(239,68,68,.4);color:#fca5a5;}
@@ -786,7 +786,7 @@ require __DIR__ . '/includes/header.php';
     </div>
     <div class="cot-modal-footer">
       <button type="button" class="btn-cot ghost" onclick="closePayModal()">Annuler</button>
-      <button type="button" class="btn-cot primary" id="pay-save-btn" onclick="savePayment()">
+      <button type="button" class="btn-cot primary" id="pay-save-btn" onclick="savePayment()" style="padding:.65rem 1.75rem;font-size:.9rem;border-radius:10px;letter-spacing:.02em;">
         <i class="fa-solid fa-floppy-disk"></i> Enregistrer
       </button>
     </div>
@@ -1079,7 +1079,20 @@ async function doBulkMarkPaid() {
     .then(data => {
       if (data.success) {
         showToast(`${data.updated} cotisation(s) marquée(s) comme payée(s).`, 'success');
-        setTimeout(() => location.reload(), 900);
+        ids.forEach(id => {
+          const tr = document.getElementById('row-' + id);
+          if (!tr) return;
+          tr.querySelector('.col-paye').textContent = fmtAmt(TARIF_CLASSE);
+          tr.querySelector('.col-paye').className = 'col-paye amount-green';
+          tr.querySelector('.col-restant').textContent = fmtAmt(0);
+          tr.querySelector('.col-restant').className = 'col-restant amount-gray';
+          tr.querySelector('.col-statut').innerHTML = '<span class="badge-cot paye">Payé</span>';
+          tr.style.transition = 'background .4s';
+          tr.style.background = 'rgba(52,211,153,.1)';
+          setTimeout(() => { tr.style.background = ''; }, 1400);
+        });
+        document.querySelectorAll('.row-cb:checked').forEach(cb => { cb.checked = false; });
+        updateBulkBar();
       } else { showToast('Erreur : ' + data.error, 'error'); }
     }).catch(e => showToast('Erreur réseau (' + e.message + ').', 'error'));
 }
@@ -1104,7 +1117,28 @@ async function doBulkPartial() {
     .then(data => {
       if (data.success) {
         showToast(`Paiement partiel appliqué à ${data.updated} stagiaire(s).`, 'success');
-        setTimeout(() => location.reload(), 900);
+        ids.forEach(id => {
+          const tr = document.getElementById('row-' + id);
+          if (!tr) return;
+          const payeCell = tr.querySelector('.col-paye');
+          const restCell = tr.querySelector('.col-restant');
+          const curPaye = parseFloat(payeCell.textContent) || 0;
+          const newPaye = Math.min(TARIF_CLASSE, curPaye + montant);
+          const newRest = Math.max(0, TARIF_CLASSE - newPaye);
+          const newStatut = newRest <= 0 ? 'paye' : 'partiel';
+          const newLabel  = newRest <= 0 ? 'Payé' : 'Partiel';
+          payeCell.textContent = fmtAmt(newPaye);
+          payeCell.className   = 'col-paye amount-green';
+          restCell.textContent = fmtAmt(newRest);
+          restCell.className   = 'col-restant ' + (newRest > 0 ? 'amount-red' : 'amount-gray');
+          tr.querySelector('.col-statut').innerHTML = `<span class="badge-cot ${newStatut}">${newLabel}</span>`;
+          tr.style.transition = 'background .4s';
+          tr.style.background = 'rgba(168,85,247,.1)';
+          setTimeout(() => { tr.style.background = ''; }, 1400);
+        });
+        document.getElementById('bulk-montant').value = '';
+        document.querySelectorAll('.row-cb:checked').forEach(cb => { cb.checked = false; });
+        updateBulkBar();
       } else { showToast('Erreur : ' + data.error, 'error'); }
     }).catch(e => showToast('Erreur réseau (' + e.message + ').', 'error'));
 }
