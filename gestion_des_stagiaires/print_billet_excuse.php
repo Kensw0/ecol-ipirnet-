@@ -10,26 +10,64 @@ $SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/200
 $SCHOOL_AUTH_LINE_2  = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
 $SCHOOL_CITY         = 'Berrechid';
 
-$id = (int) ($_GET['id'] ?? 0);
-$st = $pdo->prepare(
-    'SELECT a.*, s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere
-       FROM absences a
-       JOIN stagiaires s ON s.id_stagiaire = a.id_stagiaire
-       JOIN classes c    ON c.id_classe   = s.id_classe
-       JOIN filieres f   ON f.id_filiere  = c.id_filiere
-      WHERE a.id_absence = ?'
-);
-$st->execute([$id]);
-$a = $st->fetch();
-if (!$a) {
-    http_response_code(404);
-    exit('Absence introuvable');
+// Deux modes :
+//   ?id=<id_absence>          — billet pour une absence spécifique (mode historique)
+//   ?id_stagiaire=<sid>&auto=1 — liste toutes les absences justifiées du stagiaire sur une page
+$idAbsence   = (int)($_GET['id']            ?? 0);
+$idStagiaire = (int)($_GET['id_stagiaire']  ?? 0);
+
+if ($idAbsence > 0) {
+    // Mode classique : une seule absence
+    $st = $pdo->prepare(
+        'SELECT a.*, s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere
+           FROM absences a
+           JOIN stagiaires s ON s.id_stagiaire = a.id_stagiaire
+           JOIN classes c    ON c.id_classe   = s.id_classe
+           JOIN filieres f   ON f.id_filiere  = c.id_filiere
+          WHERE a.id_absence = ?'
+    );
+    $st->execute([$idAbsence]);
+    $a = $st->fetch();
+    if (!$a) { http_response_code(404); exit('Absence introuvable'); }
+    if ((int)($a['est_justifiee'] ?? 0) !== 1) {
+        http_response_code(403);
+        exit("Ce billet d'excuse ne peut pas être imprimé : l'absence n'est pas encore justifiée.");
+    }
+    log_document_gen($pdo, 'billet_excuse', (int)$a['id_stagiaire'], 'ABS-' . $idAbsence);
+    $modeMultiple = false;
+    $absences     = [$a];
+    $stagiaire    = $a; // nom, prenom, num_inscri, etc.
+} elseif ($idStagiaire > 0) {
+    // Mode multi : toutes les absences justifiées du stagiaire
+    $stS = $pdo->prepare(
+        'SELECT s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere
+           FROM stagiaires s
+           JOIN classes c  ON c.id_classe  = s.id_classe
+           JOIN filieres f ON f.id_filiere = c.id_filiere
+          WHERE s.id_stagiaire = ?'
+    );
+    $stS->execute([$idStagiaire]);
+    $stagiaire = $stS->fetch();
+    if (!$stagiaire) { http_response_code(404); exit('Stagiaire introuvable'); }
+
+    $stA = $pdo->prepare(
+        'SELECT a.*, m.nom_module FROM absences a
+           LEFT JOIN modules m ON m.id_module = a.id_module
+          WHERE a.id_stagiaire = ? AND a.est_justifiee = 1
+          ORDER BY a.date_absence DESC'
+    );
+    $stA->execute([$idStagiaire]);
+    $absences = $stA->fetchAll();
+    if (empty($absences)) { http_response_code(404); exit('Aucune absence justifiée pour ce stagiaire.'); }
+    log_document_gen($pdo, 'billet_excuse', $idStagiaire, 'STAG-' . $idStagiaire);
+    $modeMultiple = true;
+    $a = $absences[0]; // pour la compatibilité des variables ci-dessous
+} else {
+    http_response_code(400);
+    exit('Paramètre manquant.');
 }
-if ((int)($a['est_justifiee'] ?? 0) !== 1) {
-    http_response_code(403);
-    exit("Ce billet d'excuse ne peut pas être imprimé : l'absence n'est pas encore justifiée.");
-}
-log_document_gen($pdo, 'billet_excuse', (int) $a['id_stagiaire'], 'ABS-' . $id);
+
+$id = $idAbsence; // compatibilité pour la suite
 
 // Numbering like the cert: "01/25-26".
 $seq = (int) $pdo->query("SELECT COUNT(*) FROM documents_generes WHERE type_document='billet_excuse'")->fetchColumn();
@@ -43,9 +81,11 @@ if (preg_match('/^(\d{4})[\/\-](\d{4})$/', $annee, $mm)) {
 }
 $billetNum = sprintf('%02d/%s', max($seq, 1), $shortAnnee);
 
-$nomComplet = trim((string) $a['nom'] . ' ' . (string) $a['prenom']);
-$classe     = (string) ($a['nom_classe'] ?? '');
-$dateAbs    = (string) ($a['date_absence'] ?? '');
+$nomComplet = trim((string) $stagiaire['nom'] . ' ' . (string) $stagiaire['prenom']);
+$classe     = (string) ($stagiaire['nom_classe'] ?? '');
+
+// Variables pour mode simple (première/seule absence)
+$dateAbs = (string) ($a['date_absence'] ?? '');
 if ($dateAbs && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $dateAbs, $mm)) {
     $dateAbs = sprintf('%s/%s/%s', $mm[3], $mm[2], $mm[1]);
 }
@@ -54,9 +94,7 @@ if (!empty($a['heure_debut'])) {
     $horaire = substr((string) $a['heure_debut'], 0, 5) . ' – ' . substr((string) ($a['heure_fin'] ?? ''), 0, 5);
 }
 $motif   = trim((string) ($a['justificatif'] ?? ''));
-if ($motif === '') {
-    $motif = '—';
-}
+if ($motif === '') { $motif = '—'; }
 $justifie = (int) ($a['est_justifiee'] ?? 0) === 1;
 
 $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
@@ -208,6 +246,67 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     </style>
 </head>
 <body>
+<?php if ($modeMultiple): ?>
+<!-- ═══ MODE MULTI : une carte A6 par absence ═════════════════════════ -->
+<div class="cs-print-btns no-print">
+    <button type="button" onclick="window.print()">Imprimer tout</button>
+    <a href="stagiaires.php">Retour au Hub</a>
+</div>
+<?php foreach ($absences as $absItem):
+    $dAbs = (string)($absItem['date_absence'] ?? '');
+    if ($dAbs && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $dAbs, $mm2)) {
+        $dAbs = sprintf('%s/%s/%s', $mm2[3], $mm2[2], $mm2[1]);
+    }
+    $hor = 'journée';
+    if (!empty($absItem['heure_debut'])) {
+        $hor = substr((string)$absItem['heure_debut'], 0, 5) . ' – ' . substr((string)($absItem['heure_fin'] ?? ''), 0, 5);
+    }
+    $mot = trim((string)($absItem['justificatif'] ?? ''));
+    if ($mot === '') $mot = '—';
+?>
+<div class="cs-doc" style="margin-bottom:14px;">
+    <table class="cs-head">
+        <tr>
+            <td class="cs-head-left"><img src="assets/img/logo.png" alt="" class="cs-head-logo"></td>
+            <td class="cs-head-mid">
+                <div class="cs-org"><?= h($SCHOOL_ORG) ?></div>
+                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
+                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_2) ?></div>
+                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
+                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
+            </td>
+            <td class="cs-head-right">
+                <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
+            </td>
+        </tr>
+    </table>
+    <div class="cs-title-wrap">
+        <div class="cs-title-oval">Billet d'Excuse <span class="cs-num">N° <?= h($billetNum) ?></span></div>
+    </div>
+    <p class="cs-year">Année scolaire <?= h($annee) ?></p>
+    <table class="cs-fields">
+        <tr><td>Élève</td><td class="cs-sep">:</td><td><strong><?= h($nomComplet) ?></strong></td></tr>
+        <tr><td>N° Inscription</td><td class="cs-sep">:</td><td><strong><?= h((string)$stagiaire['num_inscri']) ?></strong></td></tr>
+        <tr><td>Classe</td><td class="cs-sep">:</td><td><strong><?= h($classe) ?></strong></td></tr>
+        <tr><td>Date de l'absence</td><td class="cs-sep">:</td><td><strong><?= h($dAbs) ?></strong></td></tr>
+        <tr><td>Horaire</td><td class="cs-sep">:</td><td><?= h($hor) ?></td></tr>
+        <tr><td>Motif / justificatif</td><td class="cs-sep">:</td><td><?= h($mot) ?></td></tr>
+        <?php if (!empty($absItem['nom_module'])): ?>
+        <tr><td>Module</td><td class="cs-sep">:</td><td><?= h((string)$absItem['nom_module']) ?></td></tr>
+        <?php endif; ?>
+        <tr><td>Statut</td><td class="cs-sep">:</td><td><strong>Justifiée</strong></td></tr>
+    </table>
+    <p class="cs-closing">L'élève désigné(e) ci-dessus est autorisé(e) à réintégrer sa classe.</p>
+    <table class="cs-sign">
+        <tr><th>Parent / tuteur</th><th>Surveillant général</th><th>Cachet</th></tr>
+        <tr><td>&nbsp;</td><td><p style="margin:0;">Fait à <?= h($SCHOOL_CITY) ?> le&nbsp;: <?= h(date('d/m/Y')) ?></p></td><td>&nbsp;</td></tr>
+    </table>
+    <div class="cs-footer"><?= h($SCHOOL_ORG) ?> — Berrechid &nbsp;•&nbsp; Document officiel généré le <?= h(date('d/m/Y H:i')) ?>.</div>
+</div>
+<?php endforeach; ?>
+
+<?php else: ?>
+<!-- ═══ MODE SIMPLE : une seule absence ══════════════════════════════ -->
 <div class="cs-doc">
     <div class="cs-print-btns no-print">
         <button type="button" onclick="window.print()">Imprimer</button>
@@ -250,7 +349,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
         <tr>
             <td>N° Inscription</td>
             <td class="cs-sep">:</td>
-            <td><strong><?= h((string) $a['num_inscri']) ?></strong></td>
+            <td><strong><?= h((string) $stagiaire['num_inscri']) ?></strong></td>
         </tr>
         <tr>
             <td>Classe</td>
@@ -302,6 +401,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
         <?= h($SCHOOL_ORG) ?> — Berrechid &nbsp;•&nbsp; Document officiel généré le <?= h(date('d/m/Y H:i')) ?>.
     </div>
 </div>
+<?php endif; ?>
 <?php if ($auto): ?>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 200); });</script>
 <?php endif; ?>

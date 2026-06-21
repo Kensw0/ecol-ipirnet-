@@ -118,6 +118,48 @@
       exit;
   }
 
+  // ── SECTION 1c : Liste des stagiaires avec absences non justifiées (pour modale billets) ──
+  if (isset($_GET['action']) && $_GET['action'] === 'get_stagiaires_non_justifies') {
+      header('Content-Type: application/json');
+
+      $idClasseBillets = (int)($_GET['id_classe'] ?? 0);
+      $rechercheBillets = trim((string)($_GET['q'] ?? ''));
+      $modeRecent       = (int)($_GET['recent'] ?? 0); // 1 = uniquement ceux avec abs non justifiées
+
+      $clausesBillets = ['s.statut = \'actif\''];
+      $paramsBillets  = [];
+
+      if ($idClasseBillets > 0) {
+          $clausesBillets[] = 's.id_classe = ?';
+          $paramsBillets[]  = $idClasseBillets;
+      }
+
+      if ($rechercheBillets !== '') {
+          $clausesBillets[] = '(UPPER(s.nom) LIKE ? OR UPPER(s.prenom) LIKE ? OR s.num_inscri LIKE ? OR s.cin LIKE ?)';
+          $like = '%' . strtoupper($rechercheBillets) . '%';
+          $paramsBillets = array_merge($paramsBillets, [$like, $like, '%'.$rechercheBillets.'%', '%'.$rechercheBillets.'%']);
+      }
+
+      $whereBillets = $clausesBillets ? 'WHERE ' . implode(' AND ', $clausesBillets) : '';
+
+      $sqlBillets = "SELECT s.id_stagiaire, s.num_inscri, UPPER(s.nom) AS nom, s.prenom, s.cin,
+                           (SELECT COUNT(*) FROM absences a WHERE a.id_stagiaire = s.id_stagiaire AND a.est_justifiee = 0) AS nb_non_justifiees
+                      FROM stagiaires s
+                      $whereBillets
+                     ORDER BY s.nom, s.prenom";
+
+      $stmtBillets = $pdo->prepare($sqlBillets);
+      $stmtBillets->execute($paramsBillets);
+      $lignesBillets = $stmtBillets->fetchAll();
+
+      if ($modeRecent) {
+          $lignesBillets = array_values(array_filter($lignesBillets, fn($l) => (int)$l['nb_non_justifiees'] > 0));
+      }
+
+      echo json_encode($lignesBillets);
+      exit;
+  }
+
 
   // ============================================================
   //  SECTION 2 : Gestionnaires POST (toutes les réponses sont JSON)
@@ -328,11 +370,13 @@
   $idFiliereSelecte   = (int)($_GET['id_filiere'] ?? 0);
   $niveauSelectionne  = trim((string)($_GET['niveau']     ?? ''));
   $idClasseSelecte    = (int)($_GET['id_classe']  ?? 0);
-  $dateDebutFiltre    = trim((string)($_GET['date_from'] ?? ''));
-  $dateFinFiltre      = trim((string)($_GET['date_to']   ?? ''));
+  $dateFiltreUnique   = trim((string)($_GET['date_filter'] ?? ''));
 
-  if ($dateDebutFiltre !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateDebutFiltre)) $dateDebutFiltre = '';
-  if ($dateFinFiltre   !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFinFiltre))   $dateFinFiltre   = '';
+  if ($dateFiltreUnique !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFiltreUnique)) $dateFiltreUnique = '';
+
+  // On conserve date_from/date_to pour les AJAX existants, on les alimente depuis le filtre unique
+  $dateDebutFiltre    = $dateFiltreUnique;
+  $dateFinFiltre      = $dateFiltreUnique;
 
 
   // ============================================================
@@ -618,6 +662,22 @@
          title="Générer une feuille d'appel A4 pour le professeur">
         <i class="fa-solid fa-print" style="font-size:.9rem;"></i> Feuille d'appel
       </a>
+      <button type="button" onclick="ouvrirModalBillets()"
+         style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
+                background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.3);cursor:pointer;transition:all .18s;"
+         onmouseover="this.style.background='rgba(34,197,94,.22)'"
+         onmouseout="this.style.background='rgba(34,197,94,.12)'"
+         title="Imprimer des billets d'excuse pour plusieurs stagiaires">
+        <i class="fa-solid fa-ticket" style="font-size:.9rem;"></i> Imprimer les billets
+      </button>
+      <a href="print_releve_absences.php<?= $idClasseSelecte > 0 ? '?id_classe='.$idClasseSelecte.'&annee='.urlencode($anneeSelectionnee) : '' ?>" target="_blank"
+         style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
+                background:rgba(251,191,36,.1);color:#fde047;border:1px solid rgba(251,191,36,.3);text-decoration:none;transition:all .18s;"
+         onmouseover="this.style.background='rgba(251,191,36,.2)'"
+         onmouseout="this.style.background='rgba(251,191,36,.1)'"
+         title="Imprimer le relevé d'absences par classe et par mois">
+        <i class="fa-solid fa-file-lines" style="font-size:.9rem;"></i> Relevé d'absences
+      </a>
     </div>
   </div>
 
@@ -665,12 +725,8 @@
           </select>
         </label>
 
-        <label>Date début
-          <input type="date" name="date_from" value="<?= h($dateDebutFiltre) ?>" <?= $idClasseSelecte === 0 ? 'disabled' : '' ?>>
-        </label>
-
-        <label>Date fin
-          <input type="date" name="date_to" value="<?= h($dateFinFiltre) ?>" <?= $idClasseSelecte === 0 ? 'disabled' : '' ?>>
+        <label>Date
+          <input type="date" name="date_filter" value="<?= h($dateFiltreUnique) ?>" <?= $idClasseSelecte === 0 ? 'disabled' : '' ?>>
         </label>
 
         <label style="justify-content:flex-end;">
@@ -748,7 +804,7 @@
     </div>
     <div class="abs-stat-card" style="border-top:3px solid #ef4444;">
       <div class="abs-stat-val" style="color:#fca5a5;"><?= $totalAbsences ?></div>
-      <div class="abs-stat-lbl">Absences <?= ($dateDebutFiltre || $dateFinFiltre) ? '(période)' : '(total)' ?></div>
+      <div class="abs-stat-lbl">Absences <?= $dateFiltreUnique ? '(ce jour)' : '(total)' ?></div>
     </div>
     <div class="abs-stat-card" style="border-top:3px solid #22c55e;">
       <div class="abs-stat-val" style="color:#86efac;"><?= $totalJustifiees ?></div>
@@ -864,23 +920,51 @@
 </div><!-- /container principal -->
 
 
-<!-- ─── BANDEAU RÉIMPRESSION (persistant via localStorage) ─────────────── -->
-<div id="gds-reprint-banner"
-     style="display:none;position:fixed;top:1rem;left:50%;transform:translateX(-50%);
-            z-index:9999;background:#18181b;border:1px solid rgba(34,197,94,.4);
-            border-radius:10px;padding:.55rem 1rem;align-items:center;gap:.75rem;
-            font-size:.82rem;color:#86efac;box-shadow:0 4px 18px rgba(0,0,0,.5);
-            white-space:nowrap;">
-  <span>🖨 Dernière justification :</span>
-  <a id="gds-reprint-link" href="#" target="_blank" rel="noopener"
-     style="color:#fff;font-weight:700;text-decoration:none;background:rgba(255,255,255,.15);
-            padding:2px 12px;border-radius:5px;border:1px solid rgba(255,255,255,.25);">
-    Réimprimer le récapitulatif
-  </a>
-  <button onclick="gdsClearReprint()"
-          style="background:transparent;border:none;color:#71717a;cursor:pointer;
-                 font-size:.95rem;line-height:1;padding:0 2px;"
-          title="Effacer">✕</button>
+<!-- ─── MODALE IMPRIMER LES BILLETS D'EXCUSE ──────────────────────────── -->
+<div class="abs-modal-overlay" id="modal-billets" style="z-index:10000;">
+  <div class="abs-modal-card" style="width:min(640px,95vw);">
+    <div class="abs-modal-header">
+      <h3><i class="fa-solid fa-ticket" style="color:#22c55e;margin-right:.4rem;"></i>Imprimer les billets d'excuse</h3>
+      <button type="button" class="icon-btn-sm" onclick="fermerModal('modal-billets')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="abs-modal-body" style="padding:1rem 1.25rem;">
+
+      <!-- Barre de recherche & filtres billets -->
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.85rem;">
+        <input type="text" id="billets-search" placeholder="Rechercher par nom, CIN, code…"
+          style="flex:1;min-width:200px;background:#09090b;border:1px solid rgba(255,255,255,.12);color:#e4e4e7;border-radius:8px;padding:.45rem .75rem;font-size:.88rem;"
+          oninput="chargerListeBillets()">
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#a1a1aa;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="billets-recent" style="accent-color:#22c55e;width:14px;height:14px;" onchange="chargerListeBillets()">
+          Absences non just. seulement
+        </label>
+      </div>
+
+      <!-- Actions sélection -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;font-size:.8rem;color:#71717a;">
+        <div style="display:flex;gap:.5rem;">
+          <button type="button" onclick="billetsSelectAll(true)"  style="background:transparent;border:1px solid rgba(255,255,255,.1);color:#a1a1aa;border-radius:6px;padding:2px 9px;font-size:.77rem;cursor:pointer;">Tout sélectionner</button>
+          <button type="button" onclick="billetsSelectAll(false)" style="background:transparent;border:1px solid rgba(255,255,255,.1);color:#a1a1aa;border-radius:6px;padding:2px 9px;font-size:.77rem;cursor:pointer;">Tout désélectionner</button>
+        </div>
+        <span id="billets-count-sel" style="font-weight:700;color:#86efac;">0 sélectionné(s)</span>
+      </div>
+
+      <!-- Liste des stagiaires -->
+      <div id="billets-liste" style="max-height:340px;overflow-y:auto;border:1px solid rgba(255,255,255,.07);border-radius:10px;">
+        <div style="text-align:center;padding:2rem;color:#52525b;">
+          <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
+          <p style="margin-top:.5rem;">Chargement…</p>
+        </div>
+      </div>
+    </div>
+    <div class="abs-modal-footer">
+      <button type="button" class="btn-abs ghost" onclick="fermerModal('modal-billets')">Annuler</button>
+      <button type="button" class="btn-abs primary" id="billets-print-btn" onclick="imprimerBilletsSelectionnes()" disabled
+        style="padding:.65rem 1.75rem;font-size:.9rem;border-radius:10px;background:linear-gradient(135deg,#16a34a,#22c55e);">
+        <i class="fa-solid fa-print"></i> Imprimer
+      </button>
+    </div>
+  </div>
 </div>
 
 
@@ -1021,6 +1105,7 @@ var GDS_CSRF          = document.querySelector('meta[name="csrf-token"]')?.conte
 var GDS_IS_DIRECTEUR  = <?= gds_is_directeur() ? 'true' : 'false' ?>;
 var SEL_DATE_FROM     = <?= json_encode($dateDebutFiltre) ?>;
 var SEL_DATE_TO       = <?= json_encode($dateFinFiltre) ?>;
+var SEL_CLASSE_ID     = <?= $idClasseSelecte ?>;
 var SEL_CLASSE        = <?= $idClasseSelecte ?>;
 var HIGHLIGHT_AID     = <?= $highlightAid ?>;
 var HIGHLIGHT_SID     = <?= $highlightSid ?>;
@@ -1372,11 +1457,7 @@ async function confirmerJustification() {
 
       if (data.success) {
         fermerDrawerJustif();
-        const urlParams     = idsAbsences.map(id => 'ids[]=' + id).join('&') + '&motif=' + encodeURIComponent(justif);
-        const urlImpression = 'print_bulk_justification.php?' + urlParams;
-        afficherToastAvecLien(data.updated + ' absence(s) justifiée(s).', 'Imprimer le récapitulatif', urlImpression);
-        try { localStorage.setItem('gds_last_bulk_print', urlImpression); } catch(e) {}
-        afficherBandeauReprint(urlImpression);
+        afficherToast(data.updated + ' absence(s) justifiée(s).', 'success');
 
         const bilan = data.bilan_par_stag || {};
         Object.entries(bilan).forEach(([sid, nb]) => mettreAJourLigne(parseInt(sid), 0, +nb, -nb, null));
@@ -1611,51 +1692,94 @@ function afficherToast(message, type) {
   }, duree);
 }
 
-function afficherToastAvecLien(message, libelle, url) {
-  const toast = document.createElement('div');
-  toast.className = 'gds-toast success';
-  toast.style.cssText = 'display:flex;flex-direction:column;gap:.4rem;align-items:flex-start;min-width:230px;';
-  const spanMsg = document.createElement('span');
-  spanMsg.textContent = message;
-  const lienBtn = document.createElement('a');
-  lienBtn.href        = url;
-  lienBtn.target      = '_blank';
-  lienBtn.rel         = 'noopener';
-  lienBtn.textContent = '🖨 ' + libelle;
-  lienBtn.style.cssText = 'font-size:.79rem;font-weight:700;color:#fff;background:rgba(255,255,255,.18);'
-    + 'padding:3px 11px;border-radius:6px;text-decoration:none;border:1px solid rgba(255,255,255,.28);';
-  lienBtn.addEventListener('mouseover', () => lienBtn.style.background = 'rgba(255,255,255,.3)');
-  lienBtn.addEventListener('mouseout',  () => lienBtn.style.background = 'rgba(255,255,255,.18)');
-  toast.appendChild(spanMsg);
-  toast.appendChild(lienBtn);
-  document.body.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity    = '0';
-    toast.style.transition = 'opacity .4s';
-    setTimeout(() => toast.remove(), 400);
-  }, 7000);
+// ============================================================
+//  Modale — Imprimer les billets d'excuse
+// ============================================================
+
+var _billetsDebounce = null;
+
+function ouvrirModalBillets() {
+  document.getElementById('billets-search').value = '';
+  document.getElementById('billets-recent').checked = false;
+  document.getElementById('modal-billets').style.display = 'flex';
+  chargerListeBillets();
 }
 
-function afficherBandeauReprint(url) {
-  const banner = document.getElementById('gds-reprint-banner');
-  const lien   = document.getElementById('gds-reprint-link');
-  if (!banner || !lien) return;
-  lien.href = url;
-  banner.style.display = 'flex';
+function chargerListeBillets() {
+  clearTimeout(_billetsDebounce);
+  _billetsDebounce = setTimeout(_chargerListeBilletsNow, 250);
 }
 
-function gdsClearReprint() {
-  try { localStorage.removeItem('gds_last_bulk_print'); } catch(e) {}
-  const banner = document.getElementById('gds-reprint-banner');
-  if (banner) banner.style.display = 'none';
+function _chargerListeBilletsNow() {
+  const q      = document.getElementById('billets-search').value.trim();
+  const recent = document.getElementById('billets-recent').checked ? 1 : 0;
+  const liste  = document.getElementById('billets-liste');
+
+  liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-spinner fa-spin fa-lg"></i></div>';
+
+  let url = 'absences.php?action=get_stagiaires_non_justifies&recent=' + recent;
+  if (SEL_CLASSE_ID > 0) url += '&id_classe=' + SEL_CLASSE_ID;
+  if (q) url += '&q=' + encodeURIComponent(q);
+
+  fetch(url, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(lignes => rendreListeBillets(lignes))
+    .catch(() => {
+      liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur de chargement.</p>';
+    });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    const saved = localStorage.getItem('gds_last_bulk_print');
-    if (saved) afficherBandeauReprint(saved);
-  } catch(e) {}
-});
+function rendreListeBillets(lignes) {
+  const liste = document.getElementById('billets-liste');
+  if (!lignes.length) {
+    liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-users-slash"></i><p style="margin-top:.5rem;">Aucun stagiaire trouvé.</p></div>';
+    majCompteurBillets();
+    return;
+  }
+  let html = '';
+  lignes.forEach(s => {
+    const nbNonJ  = parseInt(s.nb_non_justifiees) || 0;
+    const badge   = nbNonJ > 0
+      ? '<span style="font-size:.72rem;font-weight:700;color:#fca5a5;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.22);padding:1px 8px;border-radius:12px;">' + nbNonJ + ' non just.</span>'
+      : '<span style="font-size:.72rem;color:#3f3f46;">0 non just.</span>';
+    html += '<label style="display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .12s;" '
+      + 'onmouseover="this.style.background=\'rgba(34,197,94,.06)\'" onmouseout="this.style.background=\'\'">'
+      + '<input type="checkbox" class="billet-cb" value="' + s.id_stagiaire + '" onchange="majCompteurBillets()"'
+      + ' style="accent-color:#22c55e;width:15px;height:15px;flex-shrink:0;">'
+      + '<div style="flex:1;">'
+      + '<span style="font-weight:700;color:#e4e4e7;font-size:.88rem;">' + echapperHtml(s.nom) + ' ' + echapperHtml(s.prenom) + '</span>'
+      + '<span style="font-size:.77rem;color:#71717a;font-family:monospace;margin-left:.5rem;">' + echapperHtml(s.num_inscri || '') + '</span>'
+      + (s.cin ? '<span style="font-size:.75rem;color:#52525b;margin-left:.4rem;">· ' + echapperHtml(s.cin) + '</span>' : '')
+      + '</div>'
+      + badge
+      + '</label>';
+  });
+  liste.innerHTML = html;
+  majCompteurBillets();
+}
+
+function majCompteurBillets() {
+  const n    = document.querySelectorAll('.billet-cb:checked').length;
+  const span = document.getElementById('billets-count-sel');
+  const btn  = document.getElementById('billets-print-btn');
+  if (span) span.textContent = n + ' sélectionné(s)';
+  if (btn)  btn.disabled = n === 0;
+}
+
+function billetsSelectAll(etat) {
+  document.querySelectorAll('.billet-cb').forEach(cb => { cb.checked = etat; });
+  majCompteurBillets();
+}
+
+function imprimerBilletsSelectionnes() {
+  const ids = Array.from(document.querySelectorAll('.billet-cb:checked')).map(cb => parseInt(cb.value));
+  if (!ids.length) { afficherToast('Sélectionnez au moins un stagiaire.', 'error'); return; }
+  ids.forEach(id => {
+    window.open('print_billet_excuse.php?id_stagiaire=' + id + '&auto=1', '_blank');
+  });
+  fermerModal('modal-billets');
+  afficherToast(ids.length + ' billet(s) ouvert(s) dans de nouveaux onglets.', 'success');
+}
 
 var _gdsConfirmCallback = null;
 
