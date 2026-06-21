@@ -1,23 +1,36 @@
 <?php
-declare(strict_types=1);
-require __DIR__ . '/includes/bootstrap.php';
+  /**
+   * cotisations.php — Gestion des cotisations mensuelles des stagiaires.
+   *
+   * Fonctionnalités :
+   *   - Enregistrement d'un paiement individuel (nouveau ou ajout sur existant)
+   *   - Marquage en masse comme « payé » (Directeur uniquement)
+   *   - Paiement partiel en masse
+   *   - Détail annuel des paiements d'un stagiaire (tiroir latéral)
+   *   - Filtrage par filière → niveau → classe → mois
+   *   - Impression de la liste des impayés
+   *
+   * Tables : mensualites, stagiaires, classes, filieres
+   */
+  declare(strict_types=1);
+  require __DIR__ . '/includes/bootstrap.php';
 
 $pageTitle = 'Gestion des Paiements';
 $curPage   = 'cotisations';
 
-// ── Tarifs par filière ────────────────────────────────────────────────────
+// ── Tarifs mensuels par filière (MAD) ─────────────────────────────────────
 $tarifsDefaut = [2 => 700.0, 3 => 600.0, 4 => 800.0];
 
 function getTarif(int $idFiliere, array $tarifsDefaut): float {
     return $tarifsDefaut[$idFiliere] ?? 700.0;
 }
 
-// ── POST HANDLERS (all JSON) ──────────────────────────────────────────────
+// ── Gestionnaires POST (toutes les réponses sont JSON) ─────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     header('Content-Type: application/json');
 
-    // ── Single payment ────────────────────────────────────────────────────
+    // ── Enregistrement d'un paiement individuel ────────────────────────────
     if (isset($_POST['save_payment'])) {
         $sid         = (int)($_POST['id_stagiaire'] ?? 0);
         $moisRef     = trim((string)($_POST['mois_ref'] ?? ''));
@@ -31,21 +44,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => false, 'error' => 'Données invalides.']); exit;
         }
         try {
-            $stStag = $pdo->prepare('SELECT c.id_filiere FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
-            $stStag->execute([$sid]);
-            $stagRow = $stStag->fetch();
-            if (!$stagRow) { echo json_encode(['success' => false, 'error' => 'Stagiaire introuvable.']); exit; }
-            $tarif = getTarif((int)$stagRow['id_filiere'], $tarifsDefaut);
+            $requeteClasseStag = $pdo->prepare('SELECT c.id_filiere FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
+            $requeteClasseStag->execute([$sid]);
+            $ligneStag = $requeteClasseStag->fetch();
+            if (!$ligneStag) { echo json_encode(['success' => false, 'error' => 'Stagiaire introuvable.']); exit; }
+            $tarif = getTarif((int)$ligneStag['id_filiere'], $tarifsDefaut);
 
-            $stExist = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire = ? AND mois_ref = ?');
-            $stExist->execute([$sid, $moisRef]);
-            $existing = $stExist->fetch();
+            $requeteExistant = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire = ? AND mois_ref = ?');
+            $requeteExistant->execute([$sid, $moisRef]);
+            $ligneExistante = $requeteExistant->fetch();
 
-            if ($isAjout && $existing) {
-                // Keep existing remise if none submitted, else use new one
-                $remiseEff  = isset($_POST['remise']) ? $remise : max(0.0, (float)($existing['remise'] ?? 0));
+            if ($isAjout && $ligneExistante) {
+                // Conserver l'ancienne remise si non soumise, sinon utiliser la nouvelle
+                $remiseEff  = isset($_POST['remise']) ? $remise : max(0.0, (float)($ligneExistante['remise'] ?? 0));
                 $effectif   = max(0.0, $tarif - $remiseEff);
-                $ancienPaye = (float)($existing['montant_paye'] ?? 0);
+                $ancienPaye = (float)($ligneExistante['montant_paye'] ?? 0);
                 $newPaye    = min($effectif, $ancienPaye + $nouveauVers);
                 $newRestant = max(0.0, $effectif - $newPaye);
                 $newStatut  = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
@@ -61,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $montantPaye    = min($montantPaye, $effectif);
                 $montantRestant = $statut === 'payé' ? 0.0 : max(0.0, $effectif - $montantPaye);
                 $estPaye        = ($statut === 'payé') ? 1 : 0;
-                // Check if record exists → UPDATE, else INSERT
-                if ($existing) {
+                // Enregistrement existant → UPDATE, sinon INSERT
+                if ($ligneExistante) {
                     $pdo->prepare("UPDATE mensualites SET est_paye=?, montant_total=?, remise=?, montant_paye=?, montant_restant=?, statut_paiement=?, date_paiement=?, marque_le=NOW() WHERE id_stagiaire=? AND mois_ref=?")
                         ->execute([$estPaye, $montantTotal, $remise, $montantPaye, $montantRestant, $statut, $datePaie, $sid, $moisRef]);
                 } else {
@@ -70,10 +83,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ->execute([$sid, $moisRef, $estPaye, $montantTotal, $remise, $montantPaye, $montantRestant, $statut, $datePaie]);
                 }
             }
-            $stUpd = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=? ORDER BY id_mensualite DESC LIMIT 1');
-            $stUpd->execute([$sid, $moisRef]);
-            $upd = $stUpd->fetch() ?: null;
-            echo json_encode(['success' => true, 'msg' => 'Paiement enregistré.', 'row' => $upd, 'tarif' => $tarif]);
+            $requeteMaj = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=? ORDER BY id_mensualite DESC LIMIT 1');
+            $requeteMaj->execute([$sid, $moisRef]);
+            $ligneMaj = $requeteMaj->fetch() ?: null;
+            echo json_encode(['success' => true, 'msg' => 'Paiement enregistré.', 'row' => $ligneMaj, 'tarif' => $tarif]);
         } catch (\Throwable $e) {
             error_log('[cotisations.php] ' . $e->getMessage());
             echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
@@ -81,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // ── Bulk mark as paid (Directeur only) ───────────────────────────────
+    // ── Marquage en masse comme « payé » (Directeur uniquement) ─────────────
     if (isset($_POST['bulk_mark_paid'])) {
         if (!gds_is_directeur()) { echo json_encode(['success' => false, 'error' => 'Action réservée au Directeur.']); exit; }
         $sids    = array_filter(array_map('intval', (array)($_POST['student_ids'] ?? [])));
@@ -93,11 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             foreach ($sids as $sid) {
-                $stStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
-                $stStag->execute([$sid]);
-                $stagRow = $stStag->fetch();
-                $tarif    = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
-                $remise   = (float)($stagRow['remise_mensuelle'] ?? 0);
+                $requeteTarifStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
+                $requeteTarifStag->execute([$sid]);
+                $ligneStag = $requeteTarifStag->fetch();
+                $tarif    = getTarif((int)($ligneStag['id_filiere'] ?? 0), $tarifsDefaut);
+                $remise   = (float)($ligneStag['remise_mensuelle'] ?? 0);
                 $effectif = max(0.0, $tarif - $remise);
                 $pdo->prepare("INSERT INTO mensualites (id_stagiaire, mois_ref, est_paye, montant_total, remise, montant_paye, montant_restant, cumul_restant, statut_paiement, date_paiement, marque_le)
                     VALUES (?, ?, 1, ?, ?, ?, 0, 0, 'payé', NOW(), NOW())
@@ -114,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // ── Bulk partial payment ──────────────────────────────────────────────
+    // ── Versement partiel en masse ────────────────────────────────────────
     if (isset($_POST['bulk_partial'])) {
         $sids      = array_filter(array_map('intval', (array)($_POST['student_ids'] ?? [])));
         $moisRef   = trim((string)($_POST['mois_ref'] ?? ''));
@@ -127,19 +140,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             foreach ($sids as $sid) {
-                $stStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
-                $stStag->execute([$sid]);
-                $stagRow  = $stStag->fetch();
-                $tarif    = getTarif((int)($stagRow['id_filiere'] ?? 0), $tarifsDefaut);
-                $remise   = (float)($stagRow['remise_mensuelle'] ?? 0);
+                $requeteTarifStag = $pdo->prepare('SELECT c.id_filiere, COALESCE(s.remise_mensuelle, 0) AS remise_mensuelle FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=?');
+                $requeteTarifStag->execute([$sid]);
+                $ligneStag  = $requeteTarifStag->fetch();
+                $tarif    = getTarif((int)($ligneStag['id_filiere'] ?? 0), $tarifsDefaut);
+                $remise   = (float)($ligneStag['remise_mensuelle'] ?? 0);
                 $effectif = max(0.0, $tarif - $remise);
 
-                $stExist = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=?');
-                $stExist->execute([$sid, $moisRef]);
-                $existing = $stExist->fetch();
+                $requeteExistantBulk = $pdo->prepare('SELECT * FROM mensualites WHERE id_stagiaire=? AND mois_ref=?');
+                $requeteExistantBulk->execute([$sid, $moisRef]);
+                $ligneExistante = $requeteExistantBulk->fetch();
 
-                if ($existing) {
-                    $ancienPaye = (float)($existing['montant_paye'] ?? 0);
+                if ($ligneExistante) {
+                    $ancienPaye = (float)($ligneExistante['montant_paye'] ?? 0);
                     $newPaye    = min($effectif, $ancienPaye + $montant);
                     $newRestant = max(0.0, $effectif - $newPaye);
                     $newStatut  = $newRestant <= 0 ? 'payé' : ($newPaye > 0 ? 'partiel' : 'impayé');
@@ -164,20 +177,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // ── Student full-year payment detail ─────────────────────────────────
+    // ── Détail annuel des paiements d'un stagiaire ────────────────────────
     if (isset($_POST['get_student_payments'])) {
         $sid = (int)($_POST['id_stagiaire'] ?? 0);
         if ($sid <= 0) { echo json_encode(['success' => false, 'error' => 'ID invalide.']); exit; }
 
         // Get student's class info for annee_scolaire + tarif
-        $stSt = $pdo->prepare(
+        $requeteInfoStag = $pdo->prepare(
             'SELECT s.nom, s.prenom, s.num_inscri, c.annee_scolaire, c.id_filiere,
                     COALESCE(s.remise_mensuelle, 0) as remise_mensuelle
              FROM stagiaires s JOIN classes c ON c.id_classe = s.id_classe
              WHERE s.id_stagiaire = ?'
         );
-        $stSt->execute([$sid]);
-        $info = $stSt->fetch();
+        $requeteInfoStag->execute([$sid]);
+        $info = $requeteInfoStag->fetch();
         if (!$info) { echo json_encode(['success' => false, 'error' => 'Stagiaire introuvable.']); exit; }
 
         $tarif  = getTarif((int)$info['id_filiere'], $tarifsDefaut);
@@ -194,35 +207,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             sprintf('%04d-05', $year2), sprintf('%04d-06', $year2),
         ];
 
-        // Fetch all existing records for these months
-        $ph = implode(',', array_fill(0, count($moisList), '?'));
-        $stPay = $pdo->prepare(
+        // Récupérer tous les enregistrements existants pour ces mois
+        $placeholders = implode(',', array_fill(0, count($moisList), '?'));
+        $requetePaiements = $pdo->prepare(
             "SELECT mois_ref, montant_total, remise, montant_paye, montant_restant,
                     statut_paiement, est_paye, date_paiement
-             FROM mensualites WHERE id_stagiaire = ? AND mois_ref IN ($ph)"
+             FROM mensualites WHERE id_stagiaire = ? AND mois_ref IN ($placeholders)"
         );
-        $stPay->execute(array_merge([$sid], $moisList));
+        $requetePaiements->execute(array_merge([$sid], $moisList));
         $records = [];
-        foreach ($stPay->fetchAll() as $r) { $records[$r['mois_ref']] = $r; }
+        foreach ($requetePaiements->fetchAll() as $ligneRecord) { $records[$ligneRecord['mois_ref']] = $ligneRecord; }
 
-        // Build month rows
-        $rows = [];
-        $totDu = 0; $totPaye = 0; $totRest = 0;
+        // Construire les lignes de mois avec calculs cumulatifs
+        $lignesMois = [];
+        $totalMoisDu = 0; $totalMoisPaye = 0; $totalMoisRestant = 0;
         $lastPayDate = null;
         foreach ($moisList as $m) {
-            $r       = $records[$m] ?? null;
+            $ligneExistante = $records[$m] ?? null;
             $remiseMensDef = max(0.0, (float)($info['remise_mensuelle'] ?? 0));
-            $remiseR = $r ? max(0.0, (float)($r['remise'] ?? 0)) : $remiseMensDef;
-            $du      = $r ? max(0.0, (float)$r['montant_total'] - $remiseR) : max(0.0, $tarif - $remiseMensDef);
-            $paye    = $r ? (float)$r['montant_paye']     : 0.0;
-            $rest    = $r ? (float)$r['montant_restant']  : $du;
-            $stat    = $r ? (string)$r['statut_paiement'] : '';
-            $date    = $r ? $r['date_paiement']            : null;
+            $remiseR = $ligneExistante ? max(0.0, (float)($ligneExistante['remise'] ?? 0)) : $remiseMensDef;
+            $du      = $ligneExistante ? max(0.0, (float)$ligneExistante['montant_total'] - $remiseR) : max(0.0, $tarif - $remiseMensDef);
+            $paye    = $ligneExistante ? (float)$ligneExistante['montant_paye']     : 0.0;
+            $rest    = $ligneExistante ? (float)$ligneExistante['montant_restant']  : $du;
+            $stat    = $ligneExistante ? (string)$ligneExistante['statut_paiement'] : '';
+            $date    = $ligneExistante ? $ligneExistante['date_paiement']            : null;
             if ($date) $lastPayDate = $date;
-            $totDu   += $du;
-            $totPaye += $paye;
-            $totRest += $rest;
-            $rows[] = ['mois' => $m, 'du' => $du, 'remise' => $remiseR, 'paye' => $paye,
+            $totalMoisDu   += $du;
+            $totalMoisPaye += $paye;
+            $totalMoisRestant += $rest;
+            $lignesMois[] = ['mois' => $m, 'du' => $du, 'remise' => $remiseR, 'paye' => $paye,
                        'restant' => $rest, 'statut' => $stat, 'date_paiement' => $date];
         }
 
@@ -232,10 +245,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'num_inscri'=> (string)$info['num_inscri'],
             'annee'     => $annee,
             'tarif'     => $tarif,
-            'rows'      => $rows,
-            'total_du'  => $totDu,
-            'total_paye'=> $totPaye,
-            'total_rest'=> $totRest,
+            'rows'      => $lignesMois,
+            'total_du'  => $totalMoisDu,
+            'total_paye'=> $totalMoisPaye,
+            'total_rest'=> $totalMoisRestant,
             'last_pay_date' => $lastPayDate,
         ]);
         exit;
@@ -244,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     echo json_encode(['success' => false, 'error' => 'Action inconnue.']); exit;
 }
 
-// ── FILTER PARAMS ─────────────────────────────────────────────────────────
+// ── Paramètres de filtrage (GET) ────────────────────────────────────────────
 $selAnnee   = trim((string)($_GET['annee']      ?? ''));
 $selFiliere = (int)($_GET['id_filiere'] ?? 0);
 $selNiveau  = trim((string)($_GET['niveau']     ?? ''));
@@ -252,7 +265,7 @@ $selClasse  = (int)($_GET['id_classe']  ?? 0);
 $selMois    = trim((string)($_GET['mois']       ?? date('Y-m')));
 if (!preg_match('/^\d{4}-\d{2}$/', $selMois)) $selMois = date('Y-m');
 
-// ── CASCADE DATA ──────────────────────────────────────────────────────────
+// ── Données en cascade : filière → niveau → classe ──────────────────────────
 $allAnnees   = $pdo->query("SELECT DISTINCT annee_scolaire FROM classes WHERE annee_scolaire REGEXP '^[0-9]{4}/[0-9]{4}$' ORDER BY annee_scolaire DESC")->fetchAll(PDO::FETCH_COLUMN);
 if ($selAnnee === '') { $selAnnee = $_SESSION['global_annee_scolaire'] ?? ($allAnnees[0] ?? ''); }
 $allFilieres = $pdo->query("SELECT DISTINCT f.id_filiere, f.nom_filiere FROM filieres f INNER JOIN classes c ON c.id_filiere=f.id_filiere ORDER BY f.nom_filiere")->fetchAll();
@@ -260,26 +273,26 @@ if ($selFiliere === 0 && !empty($allFilieres)) { $selFiliere = (int)$allFilieres
 
 $allNiveaux = [];
 if ($selFiliere > 0 && $selAnnee !== '') {
-    $st = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
-    $st->execute([$selFiliere, $selAnnee]); $allNiveaux = $st->fetchAll(PDO::FETCH_COLUMN);
+    $requeteNiveaux = $pdo->prepare("SELECT DISTINCT niveau FROM classes WHERE id_filiere=? AND annee_scolaire=? ORDER BY niveau");
+    $requeteNiveaux->execute([$selFiliere, $selAnnee]); $allNiveaux = $requeteNiveaux->fetchAll(PDO::FETCH_COLUMN);
     if (!empty($allNiveaux) && !in_array($selNiveau, $allNiveaux, true)) { $selNiveau = $allNiveaux[0]; }
 }
 $allClasses = [];
 if ($selFiliere > 0 && $selAnnee !== '' && $selNiveau !== '') {
-    $st = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
-    $st->execute([$selFiliere, $selAnnee, $selNiveau]); $allClasses = $st->fetchAll();
-    $_vcids = array_map('intval', array_column($allClasses, 'id_classe'));
-    if (!empty($allClasses) && !in_array($selClasse, $_vcids, true)) { $selClasse = (int)$allClasses[0]['id_classe']; }
+    $requeteClasses = $pdo->prepare("SELECT id_classe, nom_classe FROM classes WHERE id_filiere=? AND annee_scolaire=? AND niveau=? ORDER BY nom_classe");
+    $requeteClasses->execute([$selFiliere, $selAnnee, $selNiveau]); $allClasses = $requeteClasses->fetchAll();
+    $idClassesValides = array_map('intval', array_column($allClasses, 'id_classe'));
+    if (!empty($allClasses) && !in_array($selClasse, $idClassesValides, true)) { $selClasse = (int)$allClasses[0]['id_classe']; }
 }
 
-// ── STUDENT + PAYMENT DATA ────────────────────────────────────────────────
+// ── Données stagiaires et paiements du mois sélectionné ─────────────────────
 $stagiaires = []; $classeInfo = null; $tarifClasse = 700.0;
 if ($selClasse > 0) {
-    $r = $pdo->prepare("SELECT c.nom_classe, f.nom_filiere, c.annee_scolaire, c.niveau, c.id_filiere FROM classes c JOIN filieres f ON f.id_filiere=c.id_filiere WHERE c.id_classe=?");
-    $r->execute([$selClasse]); $classeInfo = $r->fetch();
+    $requeteClasse = $pdo->prepare("SELECT c.nom_classe, f.nom_filiere, c.annee_scolaire, c.niveau, c.id_filiere FROM classes c JOIN filieres f ON f.id_filiere=c.id_filiere WHERE c.id_classe=?");
+    $requeteClasse->execute([$selClasse]); $classeInfo = $requeteClasse->fetch();
     if ($classeInfo) { $tarifClasse = getTarif((int)$classeInfo['id_filiere'], $tarifsDefaut); }
 
-    $st = $pdo->prepare("
+    $requeteStags = $pdo->prepare("
         SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom,
                COALESCE(s.remise_mensuelle, 0) as remise_mensuelle,
                m.montant_total, m.remise, m.montant_paye, m.montant_restant, m.statut_paiement, m.est_paye, m.date_paiement
@@ -288,30 +301,30 @@ if ($selClasse > 0) {
         WHERE s.id_classe = ?
         ORDER BY s.nom, s.prenom
     ");
-    $st->execute([$selMois, $selClasse]);
-    $stagiaires = $st->fetchAll();
+    $requeteStags->execute([$selMois, $selClasse]);
+    $stagiaires = $requeteStags->fetchAll();
 }
 
-// ── SUMMARY STATS ─────────────────────────────────────────────────────────
+// ── Statistiques récapitulatives (totaux + compteurs par statut) ─────────────
 $totalDu      = 0; $totalPaye = 0; $totalRestant = 0;
 $nbPaye = 0; $nbPartiel = 0; $nbImpaye = 0;
 foreach ($stagiaires as $s) {
-    $mRemise = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : max(0.0, (float)($s['remise_mensuelle'] ?? 0));
-    $mTotal  = $s['montant_total']   !== null ? max(0.0, (float)$s['montant_total'] - $mRemise) : max(0.0, $tarifClasse - (float)($s['remise_mensuelle'] ?? 0));
-    $mPaye   = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0;
-    $mRest   = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mTotal;
-    $sp      = (string)($s['statut_paiement'] ?? '');
-    $isPaye  = (int)($s['est_paye'] ?? 0) === 1 || $sp === 'payé';
-    $isPartiel = $sp === 'partiel';
-    $totalDu   += $mTotal;
-    $totalPaye += $mPaye;
-    $totalRestant += $mRest;
-    if ($isPaye) $nbPaye++;
-    elseif ($isPartiel) $nbPartiel++;
+    $remiseLigne = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : max(0.0, (float)($s['remise_mensuelle'] ?? 0));
+    $montantEffectifLigne = $s['montant_total'] !== null ? max(0.0, (float)$s['montant_total'] - $remiseLigne) : max(0.0, $tarifClasse - (float)($s['remise_mensuelle'] ?? 0));
+    $montantPayeLigne    = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0;
+    $montantRestantLigne = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $montantEffectifLigne;
+    $statutLigne = (string)($s['statut_paiement'] ?? '');
+    $estPayeLigne  = (int)($s['est_paye'] ?? 0) === 1 || $statutLigne === 'payé';
+    $estPartielLigne = $statutLigne === 'partiel';
+    $totalDu   += $montantEffectifLigne;
+    $totalPaye += $montantPayeLigne;
+    $totalRestant += $montantRestantLigne;
+    if ($estPayeLigne) $nbPaye++;
+    elseif ($estPartielLigne) $nbPartiel++;
     else $nbImpaye++;
 }
 
-// ── BUILD MONTH LIST FOR FILTER ───────────────────────────────────────────
+// ── Liste des 12 derniers mois pour le filtre ───────────────────────────────
 $moisOptions = [];
 for ($i = 11; $i >= 0; $i--) {
     $moisOptions[] = date('Y-m', strtotime("-$i months"));
@@ -582,34 +595,34 @@ require __DIR__ . '/includes/header.php';
       </thead>
       <tbody>
       <?php foreach ($stagiaires as $s):
-        $sp       = (string)($s['statut_paiement'] ?? '');
-        $isPaye   = (int)($s['est_paye'] ?? 0) === 1 || $sp === 'payé';
-        $isPartiel= $sp === 'partiel';
-        $isImpaye = !$isPaye && !$isPartiel;
-        $sRemiseMens = max(0.0, (float)($s['remise_mensuelle'] ?? 0));
-        $mRemise  = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : $sRemiseMens;
-        $mTotal   = $s['montant_total']   !== null ? (float)$s['montant_total']   : $tarifClasse;
-        $mEffectif= max(0.0, $mTotal - $mRemise);
-        $mPaye    = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0.0;
-        $mRest    = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $mEffectif;
-        $hasRecord = $s['statut_paiement'] !== null;
-        if (!$hasRecord) { $mPaye = 0; $mRest = $mEffectif; }
-        $statusClass = $isPaye ? 'paye' : ($isPartiel ? 'partiel' : ($hasRecord ? 'impaye' : 'aucun'));
-        $statusLabel = $isPaye ? 'Payé' : ($isPartiel ? 'Partiel' : ($hasRecord ? 'Impayé' : 'Aucun'));
-        $rowData = json_encode([
+        $statutPaiement = (string)($s['statut_paiement'] ?? '');
+        $estPaye        = (int)($s['est_paye'] ?? 0) === 1 || $statutPaiement === 'payé';
+        $estPartiel     = $statutPaiement === 'partiel';
+        $estImpaye      = !$estPaye && !$estPartiel;
+        $remiseMensuelleStag = max(0.0, (float)($s['remise_mensuelle'] ?? 0));
+        $montantRemise       = $s['remise'] !== null ? max(0.0, (float)$s['remise']) : $remiseMensuelleStag;
+        $montantTotal        = $s['montant_total']   !== null ? (float)$s['montant_total']   : $tarifClasse;
+        $montantEffectif     = max(0.0, $montantTotal - $montantRemise);
+        $montantPayeStag     = $s['montant_paye']    !== null ? (float)$s['montant_paye']    : 0.0;
+        $montantRestantStag  = $s['montant_restant'] !== null ? (float)$s['montant_restant'] : $montantEffectif;
+        $aPaiement           = $s['statut_paiement'] !== null;
+        if (!$aPaiement) { $montantPayeStag = 0; $montantRestantStag = $montantEffectif; }
+        $classeStatut        = $estPaye ? 'paye' : ($estPartiel ? 'partiel' : ($aPaiement ? 'impaye' : 'aucun'));
+        $libelleStatut       = $estPaye ? 'Payé' : ($estPartiel ? 'Partiel' : ($aPaiement ? 'Impayé' : 'Aucun'));
+        $donneesLigne = json_encode([
           'id_stagiaire'    => (int)$s['id_stagiaire'],
           'nom'             => trim($s['nom'] . ' ' . $s['prenom']),
           'mois_ref'        => $selMois,
           'tarif'           => $tarifClasse,
-          'remise'          => $mRemise,
-          'remise_mensuelle'=> $sRemiseMens,
-          'montant_paye'    => $mPaye,
-          'montant_restant' => $mRest,
-          'has_record'      => $hasRecord,
-          'statut'          => $sp,
+          'remise'          => $montantRemise,
+          'remise_mensuelle'=> $remiseMensuelleStag,
+          'montant_paye'    => $montantPayeStag,
+          'montant_restant' => $montantRestantStag,
+          'has_record'      => $aPaiement,
+          'statut'          => $statutPaiement,
         ]);
       ?>
-        <tr data-sid="<?= (int)$s['id_stagiaire'] ?>" id="row-<?= (int)$s['id_stagiaire'] ?>"<?= $isImpaye ? ' style="background:rgba(255,60,60,.07);"' : '' ?>>
+        <tr data-sid="<?= (int)$s['id_stagiaire'] ?>" id="row-<?= (int)$s['id_stagiaire'] ?>"<?= $estImpaye ? ' style="background:rgba(255,60,60,.07);"' : '' ?>>
           <td class="cb-col">
             <input type="checkbox" class="row-cb" value="<?= (int)$s['id_stagiaire'] ?>" onchange="updateBulkBar()">
           </td>
@@ -619,20 +632,20 @@ require __DIR__ . '/includes/header.php';
             <div style="font-size:.76rem;color:#71717a;"><?= h((string)($s['num_inscri'] ?? '')) ?></div>
           </td>
           <td style="text-align:right;" class="col-du">
-            <?= number_format($mEffectif, 2) ?> MAD
-            <?php if ($mRemise > 0): ?><br><span style="font-size:.7rem;color:#a855f7;font-weight:600;">-<?= number_format($mRemise, 2) ?> réduc.</span><?php endif; ?>
+            <?= number_format($montantEffectif, 2) ?> MAD
+            <?php if ($montantRemise > 0): ?><br><span style="font-size:.7rem;color:#a855f7;font-weight:600;">-<?= number_format($montantRemise, 2) ?> réduc.</span><?php endif; ?>
           </td>
-          <td style="text-align:right;" class="col-paye <?= $mPaye > 0 ? 'amount-green' : 'amount-gray' ?>"><?= number_format($mPaye, 2) ?> MAD</td>
-          <td style="text-align:right;" class="col-restant <?= $mRest > 0 ? 'amount-red' : 'amount-gray' ?>"><?= number_format($mRest, 2) ?> MAD</td>
+          <td style="text-align:right;" class="col-paye <?= $montantPayeStag > 0 ? 'amount-green' : 'amount-gray' ?>"><?= number_format($montantPayeStag, 2) ?> MAD</td>
+          <td style="text-align:right;" class="col-restant <?= $montantRestantStag > 0 ? 'amount-red' : 'amount-gray' ?>"><?= number_format($montantRestantStag, 2) ?> MAD</td>
           <td style="text-align:center;" class="col-statut">
-            <span class="badge-cot <?= $statusClass ?>"><?= $statusLabel ?></span>
+            <span class="badge-cot <?= $classeStatut ?>"><?= $libelleStatut ?></span>
           </td>
           <td style="text-align:center;">
             <div style="display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;">
-              <button type="button" class="btn-cot ghost btn-cot sm" onclick='openPayModal(<?= htmlspecialchars($rowData, ENT_QUOTES) ?>)'>
+              <button type="button" class="btn-cot ghost btn-cot sm" onclick='openPayModal(<?= htmlspecialchars($donneesLigne, ENT_QUOTES) ?>)'>
                 <i class="fa-solid fa-money-bill-wave"></i> Paiement
               </button>
-              <?php if ($hasRecord): ?>
+              <?php if ($aPaiement): ?>
               <a href="print_recu_paiement.php?id=<?= (int)$s['id_stagiaire'] ?>&mois=<?= h($selMois) ?>" target="_blank"
                  class="btn-cot btn-cot sm"
                  style="text-decoration:none;background:rgba(250,204,21,.1);color:#fde047;border:1px solid rgba(250,204,21,.25);"
