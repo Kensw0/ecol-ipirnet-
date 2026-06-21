@@ -7,7 +7,7 @@
    *   - Ajout / modification d'une absence individuelle (modal AJAX)
    *   - Suppression d'une absence (Directeur uniquement)
    *   - Marquage en masse comme absent (bulk)
-   *   - Justification en masse des absences (Directeur uniquement)
+   *   - Justification en masse avec prévisualisation par absence (Directeur uniquement)
    *   - Détail annuel des absences par stagiaire (modal AJAX)
    *   - Toutes les actions AJAX mettent à jour le DOM sans rechargement de page
    *
@@ -56,6 +56,67 @@
       );
       $requeteDetail->execute($parametres);
       echo json_encode($requeteDetail->fetchAll());
+      exit;
+  }
+
+  // ── SECTION 1b : Prévisualisation des absences à justifier (GET, Directeur) ──
+  // Retourne les absences non justifiées groupées par stagiaire — aucune écriture
+  if (isset($_GET['action']) && $_GET['action'] === 'preview_bulk_justify') {
+      header('Content-Type: application/json');
+      if (!gds_is_directeur()) {
+          echo json_encode(['success' => false, 'error' => 'Accès refusé.']); exit;
+      }
+
+      $idsStagiairesPreview = array_filter(array_map('intval', (array)($_GET['ids'] ?? [])));
+      $datePrevDebut        = trim((string)($_GET['date_from'] ?? ''));
+      $datePrevFin          = trim((string)($_GET['date_to']   ?? ''));
+
+      if (empty($idsStagiairesPreview)) { echo json_encode([]); exit; }
+
+      if ($datePrevDebut !== '' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $datePrevDebut)) $datePrevDebut = '';
+      if ($datePrevFin   !== '' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $datePrevFin))   $datePrevFin   = '';
+
+      $phPreview       = implode(',', array_fill(0, count($idsStagiairesPreview), '?'));
+      $clausesDatePrev = '';
+      $paramDatePrev   = [];
+      if ($datePrevDebut !== '') { $clausesDatePrev .= ' AND a.date_absence >= ?'; $paramDatePrev[] = $datePrevDebut; }
+      if ($datePrevFin   !== '') { $clausesDatePrev .= ' AND a.date_absence <= ?'; $paramDatePrev[] = $datePrevFin; }
+
+      $requetePreview = $pdo->prepare(
+          "SELECT a.id_absence, a.date_absence, a.heure_debut, a.heure_fin,
+                  a.id_stagiaire, UPPER(s.nom) AS nom, s.prenom, m.nom_module
+             FROM absences a
+             JOIN stagiaires s ON s.id_stagiaire = a.id_stagiaire
+             LEFT JOIN modules m ON m.id_module = a.id_module
+            WHERE a.est_justifiee = 0
+              AND a.id_stagiaire IN ($phPreview)
+              $clausesDatePrev
+            ORDER BY s.nom, s.prenom, a.date_absence DESC"
+      );
+      $requetePreview->execute(array_merge(array_values($idsStagiairesPreview), $paramDatePrev));
+      $lignesPreview = $requetePreview->fetchAll();
+
+      $groupes = [];
+      foreach ($lignesPreview as $ligneAbs) {
+          $sidPreview = (int)$ligneAbs['id_stagiaire'];
+          if (!isset($groupes[$sidPreview])) {
+              $groupes[$sidPreview] = [
+                  'id_stagiaire' => $sidPreview,
+                  'nom'          => $ligneAbs['nom'],
+                  'prenom'       => $ligneAbs['prenom'],
+                  'absences'     => [],
+              ];
+          }
+          $groupes[$sidPreview]['absences'][] = [
+              'id_absence'   => (int)$ligneAbs['id_absence'],
+              'date_absence' => $ligneAbs['date_absence'],
+              'heure_debut'  => $ligneAbs['heure_debut'] ?? '',
+              'heure_fin'    => $ligneAbs['heure_fin']   ?? '',
+              'nom_module'   => $ligneAbs['nom_module']  ?? '',
+          ];
+      }
+
+      echo json_encode(array_values($groupes));
       exit;
   }
 
@@ -196,49 +257,83 @@
           exit;
       }
 
-      // ── Justification en masse (Directeur uniquement) ─────────────────────
+      // ── Justification ciblée par ID d'absence — après prévisualisation (Directeur) ──
+      // Phase 2 du flux en deux étapes : reçoit les IDs d'absence cochés dans la modale
+      // de prévisualisation + les IDs stagiaires pour contrôle de sécurité.
       if (isset($_POST['bulk_justify'])) {
           if (!gds_is_directeur()) {
               echo json_encode(['success' => false, 'error' => 'Action réservée au Directeur.']);
               exit;
           }
 
+          $idsAbsences   = array_filter(array_map('intval', (array)($_POST['absence_ids'] ?? [])));
           $idsStagiaires = array_filter(array_map('intval', (array)($_POST['student_ids'] ?? [])));
           $justificatif  = trim((string)($_POST['justificatif'] ?? '')) ?: null;
-          $dateDebut     = trim((string)($_POST['date_from'] ?? ''));
-          $dateFin       = trim((string)($_POST['date_to']   ?? ''));
 
+          if (empty($idsAbsences)) {
+              echo json_encode(['success' => false, 'error' => 'Aucune absence sélectionnée.']);
+              exit;
+          }
           if (empty($idsStagiaires)) {
-              echo json_encode(['success' => false, 'error' => 'Aucun stagiaire sélectionné.']);
+              echo json_encode(['success' => false, 'error' => 'Paramètres de sécurité manquants.']);
               exit;
           }
 
           try {
-              // Génération des placeholders pour la clause IN
-              $placeholders = implode(',', array_fill(0, count($idsStagiaires), '?'));
-              $requeteSQL   = "UPDATE absences SET est_justifiee = 1, justificatif = ? WHERE est_justifiee = 0 AND id_stagiaire IN ($placeholders)";
-              $parametres   = array_merge([$justificatif], array_values($idsStagiaires));
+              // ── Contrôle de sécurité ─────────────────────────────────────────────
+              // Chaque id_absence soumis doit appartenir à l'un des stagiaires
+              // sélectionnés. Toute absence orpheline indique une tentative de
+              // manipulation : on refuse la requête entière.
+              $phAbs  = implode(',', array_fill(0, count($idsAbsences),   '?'));
+              $phStag = implode(',', array_fill(0, count($idsStagiaires), '?'));
 
-              // Application optionnelle des filtres de date
-              if ($dateDebut !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateDebut)) {
-                  $requeteSQL  .= ' AND date_absence >= ?';
-                  $parametres[] = $dateDebut;
-              }
-              if ($dateFin !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFin)) {
-                  $requeteSQL  .= ' AND date_absence <= ?';
-                  $parametres[] = $dateFin;
+              $requeteSecurite = $pdo->prepare(
+                  "SELECT COUNT(*) FROM absences
+                    WHERE id_absence IN ($phAbs)
+                      AND id_stagiaire NOT IN ($phStag)"
+              );
+              $requeteSecurite->execute(array_merge(
+                  array_values($idsAbsences),
+                  array_values($idsStagiaires)
+              ));
+
+              if ((int)$requeteSecurite->fetchColumn() > 0) {
+                  error_log('[absences.php bulk_justify] Tentative de justification non autorisée.');
+                  echo json_encode(['success' => false, 'error' => 'Vérification de sécurité échouée.']);
+                  exit;
               }
 
-              $requeteJustif = $pdo->prepare($requeteSQL);
-              $requeteJustif->execute($parametres);
-              echo json_encode(['success' => true, 'updated' => $requeteJustif->rowCount()]);
+              // ── Mise à jour ciblée sur les IDs vérifiés ──────────────────────────
+              $requeteUpdate = $pdo->prepare(
+                  "UPDATE absences SET est_justifiee = 1, justificatif = ?
+                    WHERE id_absence IN ($phAbs) AND est_justifiee = 0"
+              );
+              $requeteUpdate->execute(array_merge([$justificatif], array_values($idsAbsences)));
+
+              // Bilan par stagiaire pour permettre la mise à jour DOM précise côté JS
+              $requeteBilan = $pdo->prepare(
+                  "SELECT id_stagiaire, COUNT(*) AS nb
+                     FROM absences
+                    WHERE id_absence IN ($phAbs)
+                    GROUP BY id_stagiaire"
+              );
+              $requeteBilan->execute(array_values($idsAbsences));
+              $bilanParStag = [];
+              foreach ($requeteBilan->fetchAll() as $ligneBilan) {
+                  $bilanParStag[(int)$ligneBilan['id_stagiaire']] = (int)$ligneBilan['nb'];
+              }
+
+              echo json_encode([
+                  'success'        => true,
+                  'updated'        => $requeteUpdate->rowCount(),
+                  'bilan_par_stag' => $bilanParStag,
+              ]);
           } catch (\Throwable $e) {
               error_log('[absences.php bulk_justify] ' . $e->getMessage());
               echo json_encode(['success' => false, 'error' => "Erreur lors de la justification."]);
           }
           exit;
       }
-
       echo json_encode(['success' => false, 'error' => 'Action inconnue.']);
       exit;
   }
@@ -501,6 +596,18 @@
   .page-header-abs{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;}
   .page-header-abs h1{font-size:1.6rem;font-weight:800;color:#f4f4f5;margin:0;}
   .page-header-abs p{margin:.3rem 0 0;font-size:.88rem;color:#71717a;}
+
+/* ── Modale de prévisualisation justification ────────────────────────── */
+.prev-stag-groupe{margin-bottom:.6rem;border:1px solid rgba(168,85,247,.14);border-radius:10px;overflow:hidden;}
+.prev-stag-header{display:flex;justify-content:space-between;align-items:center;padding:.6rem .9rem;background:rgba(168,85,247,.08);border-bottom:1px solid rgba(168,85,247,.12);}
+.prev-abs-liste{display:flex;flex-direction:column;gap:0;}
+.prev-abs-row{display:flex;align-items:center;gap:.75rem;padding:.5rem .9rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s;}
+.prev-abs-row:last-child{border-bottom:none;}
+.prev-abs-row:hover{background:rgba(168,85,247,.07);}
+.prev-abs-info{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;flex:1;}
+.prev-abs-date{font-weight:700;color:#e4e4e7;font-size:.85rem;}
+.prev-abs-module{font-size:.78rem;color:#71717a;background:rgba(255,255,255,.05);padding:1px 7px;border-radius:12px;}
+.prev-abs-heures{font-size:.77rem;color:#52525b;margin-left:.25rem;}
   </style>
 
   <div style="max-width:1200px;margin:0 auto;padding:1.5rem;">
@@ -747,6 +854,40 @@
       </button>
     </div>
     <?php endif; ?>
+  </div>
+
+  <!-- ─── MODALE DE PRÉVISUALISATION JUSTIFICATION EN MASSE ─────────────────── -->
+  <!-- Affiche les absences non justifiées groupées par stagiaire avant toute écriture -->
+  <div class="abs-modal-overlay" id="modal-preview-justif">
+    <div class="abs-modal-card" style="width:min(660px,96vw);max-height:90vh;">
+      <div class="abs-modal-header">
+        <h3><i class="fa-solid fa-magnifying-glass" style="color:#a855f7;margin-right:.4rem;"></i>Prévisualisation — Justification en masse</h3>
+        <button type="button" class="icon-btn-sm" onclick="fermerModal('modal-preview-justif')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Motif et compteur -->
+      <div style="padding:.9rem 1.5rem;border-bottom:1px solid rgba(168,85,247,.15);display:flex;align-items:center;gap:1rem;flex-wrap:wrap;background:rgba(168,85,247,.04);">
+        <label style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:.3rem;font-size:.76rem;font-weight:600;color:#a1a1aa;text-transform:uppercase;letter-spacing:.05em;">
+          Motif de justification *
+          <input type="text" id="prev-justif-motif" placeholder="Ex : Certificat médical, Convocation officielle…"
+            style="background:#09090b;border:1px solid rgba(168,85,247,.35);color:#e4e4e7;border-radius:8px;padding:.45rem .75rem;font-size:.9rem;width:100%;box-sizing:border-box;">
+        </label>
+        <span id="prev-justif-total" style="font-size:.85rem;font-weight:700;color:#c084fc;white-space:nowrap;"></span>
+      </div>
+
+      <!-- Corps : absences groupées par stagiaire -->
+      <div class="abs-modal-body" id="prev-justif-body" style="padding:1rem 1.25rem;"></div>
+
+      <div class="abs-modal-footer" style="justify-content:space-between;">
+        <button type="button" class="btn-abs ghost" onclick="fermerModal('modal-preview-justif')">
+          <i class="fa-solid fa-xmark"></i> Annuler
+        </button>
+        <button type="button" class="btn-abs primary" id="prev-justif-confirm" onclick="confirmerJustification()" disabled
+          style="padding:.65rem 1.75rem;font-size:.9rem;border-radius:10px;">
+          <i class="fa-solid fa-certificate"></i> Confirmer la justification
+        </button>
+      </div>
+    </div>
   </div>
 
 
@@ -1044,39 +1185,164 @@
   }
 
   /** Justifie toutes les absences non justifiées des stagiaires sélectionnés */
+  /** Phase 1 — Charge la prévisualisation des absences non justifiées, ouvre la modale */
   async function faireJustificationEnMasse() {
-    const ids     = obtenirIdsSelectionnes();
-    const justif  = document.getElementById('bulk-justif').value.trim();
+    const ids    = obtenirIdsSelectionnes();
+    const justif = document.getElementById('bulk-justif').value.trim();
 
     if (!ids.length) { afficherToast('Sélectionnez au moins un stagiaire dans la liste.', 'error'); return; }
     if (!justif)     { afficherToast('Entrez un motif de justification.', 'error'); document.getElementById('bulk-justif').focus(); return; }
 
-    const ok = await gdsConfirmer('Justifier toutes les absences non justifiées de ' + ids.length + ' stagiaire(s) ?');
-    if (!ok) return;
+    // Pré-remplir le motif dans la modale de prévisualisation
+    document.getElementById('prev-justif-motif').value = justif;
+
+    // Afficher la modale avec un spinner pendant le chargement
+    const modal = document.getElementById('modal-preview-justif');
+    const body  = document.getElementById('prev-justif-body');
+    body.innerHTML = '<div style="text-align:center;padding:2.5rem;color:#71717a;"><i class="fa-solid fa-spinner fa-spin fa-lg"></i><p style="margin-top:.75rem;">Chargement des absences…</p></div>';
+    document.getElementById('prev-justif-total').textContent = '';
+    document.getElementById('prev-justif-confirm').disabled = true;
+    modal.style.display = 'flex';
+
+    // PHASE 1 : requête GET — lecture seule, aucune écriture
+    let url = 'absences.php?action=preview_bulk_justify';
+    ids.forEach(id => { url += '&ids[]=' + id; });
+    if (SEL_DATE_FROM) url += '&date_from=' + SEL_DATE_FROM;
+    if (SEL_DATE_TO)   url += '&date_to='   + SEL_DATE_TO;
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(groupes => rendrePreviewJustif(groupes, ids))
+      .catch(e => {
+        body.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur de chargement : ' + echapperHtml(e.message) + '.</p>';
+      });
+  }
+
+  /** Génère le corps de la modale de prévisualisation groupé par stagiaire */
+  function rendrePreviewJustif(groupes, idsStagiaires) {
+    const body = document.getElementById('prev-justif-body');
+    const btnConfirm = document.getElementById('prev-justif-confirm');
+
+    if (!groupes.length) {
+      body.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-check-circle" style="color:#86efac;font-size:1.5rem;"></i><p>Aucune absence non justifiée trouvée pour cette sélection et cette période.</p></div>';
+      document.getElementById('prev-justif-total').textContent = '0 absence';
+      btnConfirm.disabled = true;
+      return;
+    }
+
+    let totalAbsences = 0;
+    let html = '';
+
+    groupes.forEach(stag => {
+      const nbAbs = stag.absences.length;
+      totalAbsences += nbAbs;
+      const groupId = 'prev-grp-' + stag.id_stagiaire;
+
+      html += '<div class="prev-stag-groupe">'
+        + '<div class="prev-stag-header">'
+        + '  <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:700;color:#e4e4e7;">'
+        + '    <input type="checkbox" class="prev-stag-toggle" data-group="' + groupId + '" checked'
+        + '     style="accent-color:#a855f7;width:15px;height:15px;" onchange="toggleGroupePrev(this)">'
+        + '    ' + echapperHtml(stag.nom) + ' ' + echapperHtml(stag.prenom)
+        + '  </label>'
+        + '  <span class="badge-abs gray" style="font-size:.7rem;">' + nbAbs + ' absence' + (nbAbs > 1 ? 's' : '') + '</span>'
+        + '</div>'
+        + '<div id="' + groupId + '" class="prev-abs-liste">';
+
+      stag.absences.forEach(abs => {
+        const dateF   = (abs.date_absence || '').split('-').reverse().join('/');
+        const heures  = (abs.heure_debut && abs.heure_fin)
+          ? abs.heure_debut.substring(0,5) + ' – ' + abs.heure_fin.substring(0,5)
+          : null;
+        const module  = abs.nom_module ? '<span class="prev-abs-module">' + echapperHtml(abs.nom_module) + '</span>' : '';
+
+        html += '<label class="prev-abs-row">'
+          + '  <input type="checkbox" class="prev-abs-cb" name="absence_ids[]" value="' + abs.id_absence + '" checked'
+          + '   data-sid="' + stag.id_stagiaire + '" data-group="' + groupId + '"'
+          + '   style="accent-color:#a855f7;width:14px;height:14px;" onchange="mettreAJourCompteurPrev()">'
+          + '  <div class="prev-abs-info">'
+          + '    <span class="prev-abs-date">' + dateF + '</span>'
+          + (module ? ' · ' + module : '')
+          + (heures ? '<span class="prev-abs-heures">' + heures + '</span>' : '')
+          + '  </div>'
+          + '</label>';
+      });
+
+      html += '</div></div>';
+    });
+
+    body.innerHTML = html;
+    mettreAJourCompteurPrev();
+  }
+
+  /** Coche/décoche toutes les absences d'un groupe stagiaire */   
+  function toggleGroupePrev(toggle) {
+    const groupId = toggle.dataset.group;
+    document.querySelectorAll('.prev-abs-cb[data-group="' + groupId + '"]').forEach(cb => {
+      cb.checked = toggle.checked;
+    });
+    mettreAJourCompteurPrev();
+  }
+
+  /** Met à jour le compteur de la modale et active/désactive le bouton Confirmer */  
+  function mettreAJourCompteurPrev() {
+    const coches = document.querySelectorAll('.prev-abs-cb:checked');
+    const total  = document.querySelectorAll('.prev-abs-cb').length;
+    const btnConfirm = document.getElementById('prev-justif-confirm');
+    const lblTotal   = document.getElementById('prev-justif-total');
+    lblTotal.textContent = coches.length + ' / ' + total + ' absence' + (total > 1 ? 's' : '');
+    btnConfirm.disabled = coches.length === 0;
+
+    // Synchroniser les toggles de groupe
+    document.querySelectorAll('.prev-stag-toggle').forEach(toggle => {
+      const groupId   = toggle.dataset.group;
+      const toutesGrp = document.querySelectorAll('.prev-abs-cb[data-group="' + groupId + '"]');
+      const cochesGrp = document.querySelectorAll('.prev-abs-cb[data-group="' + groupId + '"]:checked');
+      toggle.indeterminate = cochesGrp.length > 0 && cochesGrp.length < toutesGrp.length;
+      toggle.checked       = cochesGrp.length === toutesGrp.length;
+    });
+  }
+
+  /** Phase 2 — Soumet les IDs d'absence cochés pour justification */
+  async function confirmerJustification() {
+    const coches    = document.querySelectorAll('.prev-abs-cb:checked');
+    const justif    = document.getElementById('prev-justif-motif').value.trim();
+    const idsStagEl = document.querySelectorAll('.row-cb:checked');
+
+    if (!coches.length)  { afficherToast('Aucune absence sélectionnée.', 'error'); return; }
+    if (!justif)         { afficherToast('Le motif est obligatoire.', 'error'); document.getElementById('prev-justif-motif').focus(); return; }
+
+    const idsAbsences   = Array.from(coches).map(cb => parseInt(cb.value));
+    const idsStagiaires = Array.from(document.querySelectorAll('.row-cb:checked')).map(cb => parseInt(cb.value));
+
+    const btnConfirm = document.getElementById('prev-justif-confirm');
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Justification…';
 
     const fd = new FormData();
-    fd.append('bulk_justify', '1');
-    fd.append('csrf_token',   GDS_CSRF);
-    fd.append('justificatif', justif);
-    ids.forEach(id => fd.append('student_ids[]', id));
-    if (SEL_DATE_FROM) fd.append('date_from', SEL_DATE_FROM);
-    if (SEL_DATE_TO)   fd.append('date_to',   SEL_DATE_TO);
+    fd.append('bulk_justify',  '1');
+    fd.append('csrf_token',    GDS_CSRF);
+    fd.append('justificatif',  justif);
+    idsAbsences.forEach(id   => fd.append('absence_ids[]', id));
+    idsStagiaires.forEach(id => fd.append('student_ids[]', id));
 
     fetch('absences.php', { method: 'POST', body: fd, credentials: 'same-origin' })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
+        btnConfirm.disabled = false;
+        btnConfirm.innerHTML = '<i class="fa-solid fa-certificate"></i> Confirmer la justification';
+
         if (data.success) {
+          fermerModal('modal-preview-justif');
           afficherToast(data.updated + ' absence(s) justifiée(s).', 'success');
 
-          // Mettre à jour chaque ligne : transformer les non-justifiées en justifiées
-          ids.forEach(id => {
-            const tr = document.getElementById('row-' + id);
-            if (!tr) return;
-            const nonJ = Math.max(0, parseInt(tr.dataset.nonj) || 0);
-            // Toutes les non-justifiées passent en justifiées (approximation DOM)
-            mettreAJourLigne(id, 0, +nonJ, -nonJ, null);
+          // Mise à jour précise par stagiaire grâce au bilan retourné par le serveur
+          const bilan = data.bilan_par_stag || {};
+          Object.entries(bilan).forEach(([sid, nb]) => {
+            mettreAJourLigne(parseInt(sid), 0, +nb, -nb, null);
           });
 
+          // Réinitialiser la sélection et la barre bulk
           document.getElementById('bulk-justif').value = '';
           document.querySelectorAll('.row-cb:checked').forEach(cb => { cb.checked = false; });
           mettreAJourBarreBulk();
@@ -1084,9 +1350,12 @@
           afficherToast('Erreur : ' + data.error, 'error');
         }
       })
-      .catch(e => afficherToast('Erreur réseau (' + e.message + ').', 'error'));
+      .catch(e => {
+        btnConfirm.disabled = false;
+        btnConfirm.innerHTML = '<i class="fa-solid fa-certificate"></i> Confirmer la justification';
+        afficherToast('Erreur réseau (' + e.message + ').', 'error');
+      });
   }
-
 
   // ============================================================
   //  Modale de détail des absences d'un stagiaire
