@@ -618,6 +618,17 @@
         <h1><i class="fa-solid fa-user-clock" style="color:#a855f7;margin-right:.5rem;"></i>Gestion des Absences</h1>
         <p>Système centralisé de gestion des absences par classe</p>
       </div>
+      <!-- Bouton Feuille d'appel (accès rapide depuis l'en-tête de page) -->
+      <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;">
+        <a href="print_feuille_appel.php" target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
+                  background:rgba(168,85,247,.14);color:#c084fc;border:1px solid rgba(168,85,247,.3);text-decoration:none;transition:all .18s;"
+           onmouseover="this.style.background='rgba(168,85,247,.28)'"
+           onmouseout="this.style.background='rgba(168,85,247,.14)'"
+           title="Générer une feuille d'appel A4 pour le professeur">
+          <i class="fa-solid fa-print" style="font-size:.9rem;"></i> Feuille d'appel
+        </a>
+      </div>
     </div>
 
     <!-- Message flash (succès / erreur / avertissement) -->
@@ -1334,7 +1345,11 @@
 
         if (data.success) {
           fermerModal('modal-preview-justif');
-          afficherToast(data.updated + ' absence(s) justifiée(s).', 'success');
+          // ── URL du récapitulatif imprimable ─────────────────────────────────
+          const urlParams     = idsAbsences.map(id => 'ids[]=' + id).join('&')
+            + '&motif=' + encodeURIComponent(justif);
+          const urlImpression = 'print_bulk_justification.php?' + urlParams;
+          afficherToastAvecLien(data.updated + ' absence(s) justifiée(s).', 'Imprimer le récapitulatif', urlImpression);
 
           // Mise à jour précise par stagiaire grâce au bilan retourné par le serveur
           const bilan = data.bilan_par_stag || {};
@@ -1600,6 +1615,35 @@
       toast.style.transition = 'opacity .3s';
       setTimeout(() => toast.remove(), 300);
     }, duree);
+  }
+
+  /**
+   * Toast de succès enrichi avec un lien d'action cliquable (ouvre un nouvel onglet).
+   * Dure 7 secondes pour laisser le temps de cliquer sur le lien d'impression.
+   */
+  function afficherToastAvecLien(message, libelle, url) {
+    const toast = document.createElement('div');
+    toast.className = 'gds-toast success';
+    toast.style.cssText = 'display:flex;flex-direction:column;gap:.4rem;align-items:flex-start;min-width:230px;';
+    const spanMsg = document.createElement('span');
+    spanMsg.textContent = message;
+    const lienBtn = document.createElement('a');
+    lienBtn.href        = url;
+    lienBtn.target      = '_blank';
+    lienBtn.rel         = 'noopener';
+    lienBtn.textContent = '🖨 ' + libelle;
+    lienBtn.style.cssText = 'font-size:.79rem;font-weight:700;color:#fff;background:rgba(255,255,255,.18);'
+      + 'padding:3px 11px;border-radius:6px;text-decoration:none;border:1px solid rgba(255,255,255,.28);';
+    lienBtn.addEventListener('mouseover', () => lienBtn.style.background = 'rgba(255,255,255,.3)');
+    lienBtn.addEventListener('mouseout',  () => lienBtn.style.background = 'rgba(255,255,255,.18)');
+    toast.appendChild(spanMsg);
+    toast.appendChild(lienBtn);
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity    = '0';
+      toast.style.transition = 'opacity .4s';
+      setTimeout(() => toast.remove(), 400);
+    }, 7000);
   }
 
   /** Affiche le dialog de confirmation et retourne une Promise<boolean> */
