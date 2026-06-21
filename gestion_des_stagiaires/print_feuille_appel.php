@@ -32,9 +32,25 @@
   $idClasseSelecte   = (int)($_GET['id_classe']  ?? 0);
   $idModuleSelecte   = (int)($_GET['id_module']  ?? 0);
   $dateAppel         = trim((string)($_GET['date_appel'] ?? date('Y-m-d')));
+  $heureDebut        = trim((string)($_GET['heure_debut'] ?? ''));
+  $heureFin          = trim((string)($_GET['heure_fin']   ?? ''));
 
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateAppel)) $dateAppel = date('Y-m-d');
   $dateAppelFr = date('d/m/Y', strtotime($dateAppel));
+
+  // Validate hour format (HH:MM) — reset if malformed
+  if ($heureDebut !== '' && !preg_match('/^\d{2}:\d{2}$/', $heureDebut)) $heureDebut = '';
+  if ($heureFin   !== '' && !preg_match('/^\d{2}:\d{2}$/', $heureFin))   $heureFin   = '';
+
+  // Build the display label for the selected time slot
+  $horaireAffiche = '';
+  if ($heureDebut !== '' && $heureFin !== '') {
+      $horaireAffiche = $heureDebut . ' – ' . $heureFin;
+  } elseif ($heureDebut !== '') {
+      $horaireAffiche = 'À partir de ' . $heureDebut;
+  } elseif ($heureFin !== '') {
+      $horaireAffiche = 'Jusqu\'à ' . $heureFin;
+  }
 
   // ── Données en cascade ───────────────────────────────────────────────────
   $toutesLesAnnees = $pdo->query(
@@ -322,6 +338,33 @@
                   <input type="date" name="date_appel" value="<?= h($dateAppel) ?>" <?= ($idClasseSelecte===0)?'disabled':'' ?>>
               </label>
 
+              <?php
+              // Build list of 30-minute slots from 07:00 to 19:00
+              $creneaux = [];
+              for ($h = 7; $h <= 19; $h++) {
+                  $creneaux[] = sprintf('%02d:00', $h);
+                  if ($h < 19) $creneaux[] = sprintf('%02d:30', $h);
+              }
+              ?>
+
+              <label>Heure début
+                  <select name="heure_debut" <?= ($idClasseSelecte===0)?'disabled':'' ?>>
+                      <option value="">— Toute la journée —</option>
+                      <?php foreach ($creneaux as $c): ?>
+                      <option value="<?= h($c) ?>" <?= $heureDebut===$c?'selected':'' ?>><?= h($c) ?></option>
+                      <?php endforeach; ?>
+                  </select>
+              </label>
+
+              <label>Heure fin
+                  <select name="heure_fin" <?= ($idClasseSelecte===0)?'disabled':'' ?>>
+                      <option value="">— Toute la journée —</option>
+                      <?php foreach ($creneaux as $c): ?>
+                      <option value="<?= h($c) ?>" <?= $heureFin===$c?'selected':'' ?>><?= h($c) ?></option>
+                      <?php endforeach; ?>
+                  </select>
+              </label>
+
           </div>
           <div class="fa-btn-row">
               <button type="submit" class="fa-btn primary">
@@ -385,6 +428,9 @@
               <div><span class="label">Date :</span> <?= h($dateAppelFr) ?></div>
               <?php if ($infoModule): ?>
               <div><span class="label">Module :</span> <?= h((string)$infoModule) ?></div>
+              <?php endif; ?>
+              <?php if ($horaireAffiche !== ''): ?>
+              <div><span class="label">Horaire :</span> <?= h($horaireAffiche) ?></div>
               <?php endif; ?>
               <div><span class="label">Effectif :</span> <?= count($stagiaires) ?> stagiaire(s)</div>
           </div>
