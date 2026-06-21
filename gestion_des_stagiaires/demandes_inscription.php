@@ -330,8 +330,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(num_inscri, '-', -1) AS UNSIGNED)), 0)
                    FROM stagiaires
                   WHERE num_inscri LIKE ?
-                    AND num_inscri REGEXP '^INS-[0-9]{4}-[0-9]{5}
-
+                    AND num_inscri REGEXP '^INS-[0-9]{4}-[0-9]{5}$'"
+            );
+            $requeteMaxNumInscri->execute(['INS-' . $anneeInscription . '-%']);
+            $dernierNumero    = (int)$requeteMaxNumInscri->fetchColumn();
+            $nouveauNumInscri = 'INS-' . $anneeInscription . '-' . str_pad((string)($dernierNumero + 1), 5, '0', STR_PAD_LEFT);
             // La classe doit être explicitement choisie par la secrétaire — pas de repli automatique
             $idClasseFinale = isset($_POST['override_id_classe']) && (int)$_POST['override_id_classe'] > 0
                 ? (int)$_POST['override_id_classe']
