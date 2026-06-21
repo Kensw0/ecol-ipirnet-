@@ -50,6 +50,7 @@ $savedNiveaux    = $filled ? $jarr($d['niveaux']    ?? null) : [];
 $savedDiplomes   = $filled ? $jarr($d['diplomes']   ?? null) : [];
 $savedFormations = $filled ? $jarr($d['formations'] ?? null) : [];
 $savedSources    = $filled ? $jarr($d['sources']    ?? null) : [];
+$savedLicences   = $filled ? $jarr($d['licences']   ?? null) : [];
 
 $filiereRows = $pdo->query('SELECT id_filiere, nom_filiere FROM filieres')->fetchAll();
 $filiereById = [];
@@ -172,7 +173,7 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
         <div class="tag"><?= htmlspecialchars($SCHOOL_TAG1) ?><br><?= htmlspecialchars($SCHOOL_TAG2) ?></div>
         <div class="auth"><?= htmlspecialchars($SCHOOL_AUTH1) ?><br><?= htmlspecialchars($SCHOOL_AUTH2) ?></div>
     </div>
-    <div class="stamp-wrap"><div class="stamp"><div class="st">ACCRÉDITÉ</div><div class="ss">FORMATION<br>PROFESSIONNELLE<br>PRIVÉE</div></div></div>
+    <div class="stamp-wrap"><img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:88px;height:88px;object-fit:contain;border-radius:50%;"></div>
 </div>
 
 <div class="doc-title"><div class="doc-title-box"><div class="doc-title-txt">Fiche &nbsp; de &nbsp; Preinscription</div></div></div>
@@ -223,11 +224,12 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
 <!-- LICENCE -->
 <div class="sec"><span>➤ </span><span>Licence professionnelle :</span></div>
 <div class="cl">
-    <?php foreach(['MANAGEMENT ET RESSOURCE HUMAINE','FINANCE ET COMPTABILITE','LOGISTIQUE INTERNATIONALE','INFORMATIQUE'] as $l): ?>
-    <div class="cli"><?= chkEmpty() ?> <span><?= htmlspecialchars($l) ?> :</span></div>
+    <?php
+    \$licOptions = ['Management et Ressource Humaine', 'Finance et Comptabilité', 'Logistique Internationale', 'Informatique'];
+    foreach(\$licOptions as \$l): \$lc = \$inArr(\$savedLicences, \$l); ?>
+    <div class="cli<?= $lc ? ' bck' : '' ?>"><?= chk($lc) ?> <span><?= htmlspecialchars(strtoupper($l)) ?> :</span></div>
     <?php endforeach; ?>
 </div>
-
 <!-- FORMATION CONTINUE -->
 <div class="sec"><span>➤ </span><span>Formation continue : (Attestation)</span></div>
 <div class="c2">
