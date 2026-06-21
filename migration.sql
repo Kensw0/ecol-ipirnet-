@@ -122,3 +122,38 @@ WHERE  `type_document` = 'autre'
   AND  `genere_le` >= '2026-06-13';
 
 SELECT CONCAT('Rows updated: ', ROW_COUNT()) AS statut;
+
+
+-- ============================================================
+-- fix: add annee_scolaire to stages + deduplicate + unique key
+-- Run this ONCE on the live database
+-- ============================================================
+
+-- Step 1: Add the missing column (safe to run even if partially applied)
+ALTER TABLE `stages`
+  ADD COLUMN IF NOT EXISTS `annee_scolaire` VARCHAR(9) DEFAULT NULL
+    COMMENT 'Ex: 2024/2025' AFTER `type_stage`;
+
+-- Step 2: Back-fill annee_scolaire for existing rows using the student's class year
+UPDATE `stages` st
+  JOIN `stagiaires` s ON s.id_stagiaire = st.id_stagiaire
+  JOIN `classes`    c ON c.id_classe    = s.id_classe
+SET st.annee_scolaire = c.annee_scolaire
+WHERE st.annee_scolaire IS NULL;
+
+-- Step 3: Remove duplicate stages — keep the newest row per (student, type, year)
+DELETE FROM `stages`
+WHERE `id_stage` NOT IN (
+    SELECT max_id FROM (
+        SELECT MAX(id_stage) AS max_id
+        FROM `stages`
+        GROUP BY `id_stagiaire`, `type_stage`, `annee_scolaire`
+    ) AS dedup
+);
+
+-- Step 4: Add unique constraint so the DB enforces one stage + one PFE per student per year
+-- (Skip if already present — MariaDB will error; use IF NOT EXISTS on newer versions)
+ALTER TABLE `stages`
+  ADD UNIQUE KEY `uq_stage_per_year` (`id_stagiaire`, `type_stage`, `annee_scolaire`);
+
+SELECT CONCAT('stages.annee_scolaire ajoutée, doublons supprimés, contrainte UNIQUE posée.') AS statut;
