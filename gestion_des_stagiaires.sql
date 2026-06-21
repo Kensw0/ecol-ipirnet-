@@ -307,6 +307,7 @@ CREATE TABLE `seq_inscription` (
 CREATE TABLE `stages` (
   `id_stage` int(10) UNSIGNED NOT NULL,
   `type_stage` enum('stage_entreprise','pfe') NOT NULL DEFAULT 'stage_entreprise',
+  `annee_scolaire` varchar(9) DEFAULT NULL COMMENT 'Ex: 2024/2025',
   `sujet` varchar(512) DEFAULT NULL,
   `entreprise` varchar(255) DEFAULT NULL,
   `date_debut` date DEFAULT NULL,
@@ -318,7 +319,8 @@ CREATE TABLE `stages` (
   `date_soutenance` date DEFAULT NULL COMMENT 'CDC PFE : soutenances',
   `jury` text DEFAULT NULL COMMENT 'Membres jury / modalit?s passage',
   `id_stagiaire` int(10) UNSIGNED NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  UNIQUE KEY `uq_stage_per_year` (`id_stagiaire`,`type_stage`,`annee_scolaire`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
