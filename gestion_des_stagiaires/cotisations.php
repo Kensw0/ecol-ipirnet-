@@ -75,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upd = $stUpd->fetch() ?: null;
             echo json_encode(['success' => true, 'msg' => 'Paiement enregistré.', 'row' => $upd, 'tarif' => $tarif]);
         } catch (\Throwable $e) {
-            echo json_encode(['success' => false, 'error' => 'Erreur enregistrement : ' . $e->getMessage()]);
+            error_log('[cotisations.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
