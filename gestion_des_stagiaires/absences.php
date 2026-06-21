@@ -121,7 +121,7 @@
               ]);
           } catch (\Throwable $e) {
               error_log('[absences.php save_absence] ' . $e->getMessage());
-              echo json_encode(['success' => false, 'error' => 'Erreur lors de l'enregistrement.']);
+              echo json_encode(['success' => false, 'error' => "Erreur lors de l'enregistrement."]);
           }
           exit;
       }
@@ -135,7 +135,7 @@
 
           $idAbsence = (int)($_POST['id_absence'] ?? 0);
           if ($idAbsence <= 0) {
-              echo json_encode(['success' => false, 'error' => 'ID d'absence invalide.']);
+              echo json_encode(['success' => false, 'error' => "ID d'absence invalide."]);
               exit;
           }
 
@@ -191,7 +191,7 @@
           } catch (\Throwable $e) {
               $pdo->rollBack();
               error_log('[absences.php bulk_mark_absent] ' . $e->getMessage());
-              echo json_encode(['success' => false, 'error' => 'Erreur lors de l'enregistrement en masse.']);
+              echo json_encode(['success' => false, 'error' => "Erreur lors de l'enregistrement en masse."]);
           }
           exit;
       }
@@ -234,7 +234,7 @@
               echo json_encode(['success' => true, 'updated' => $requeteJustif->rowCount()]);
           } catch (\Throwable $e) {
               error_log('[absences.php bulk_justify] ' . $e->getMessage());
-              echo json_encode(['success' => false, 'error' => 'Erreur lors de la justification.']);
+              echo json_encode(['success' => false, 'error' => "Erreur lors de la justification."]);
           }
           exit;
       }
