@@ -22,7 +22,7 @@
   $SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
   $SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
   $SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
-  $SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13';
+  $SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
   $SCHOOL_LEGAL       = 'Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293';
 
   // ── Paramètres de filtre ─────────────────────────────────────────────────
@@ -364,25 +364,8 @@
   <!-- ── Document A4 ─────────────────────────────────────────────────────── -->
   <div class="cs-doc">
 
-      <!-- En-tête officiel -->
-      <table class="cs-head">
-          <tr>
-              <td class="cs-head-left">
-                  <img src="assets/img/logo.png" alt="" class="cs-head-logo">
-              </td>
-              <td class="cs-head-mid">
-                  <div class="cs-org"><?= h($SCHOOL_ORG) ?></div>
-                  <div class="cs-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
-                  <div class="cs-tag"><?= h($SCHOOL_TAGLINE_2) ?></div>
-                  <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
-                  <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
-              </td>
-              <td class="cs-head-right">
-                  <img src="assets/img/stamp_accredite.jpg" alt="Accrédité"
-                       style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
-              </td>
-          </tr>
-      </table>
+      <!-- En-tête officiel (partagé entre toutes les pages d'impression) -->
+      <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
       <!-- Titre -->
       <div class="cs-title-wrap">
@@ -474,11 +457,8 @@
 
       <?php endif; ?>
 
-      <!-- Pied de page -->
-      <div class="cs-footer">
-          <?= h($SCHOOL_ADDRESS) ?><br>
-          <?= h($SCHOOL_LEGAL) ?>
-      </div>
+      <!-- Pied de page (partagé entre toutes les pages d'impression) -->
+      <?php require __DIR__ . '/includes/print_footer.php'; ?>
 
   </div>
 
