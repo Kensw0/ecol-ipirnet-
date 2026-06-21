@@ -358,8 +358,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $cinChkNew->execute([$cin]);
                 $cinOwnerNew = $cinChkNew->fetch();
                 if ($cinOwnerNew) {
-                    flash_set('⚠️ Ce CIN appartient déjà à ' . trim((string)$cinOwnerNew['prenom'] . ' ' . (string)$cinOwnerNew['nom']) . ' (N° ' . (string)$cinOwnerNew['num_inscri'] . '). Vous avez été redirigé vers sa fiche.', 'warning');
-                    redirect('stagiaires.php?id=' . (int)$cinOwnerNew['id_stagiaire'] . '&highlight=1');
+                    $nomDupCin = trim((string)$cinOwnerNew['prenom'] . ' ' . (string)$cinOwnerNew['nom']);
+                    $numDupCin = (string)$cinOwnerNew['num_inscri'];
+                    $idDupCin  = (int)$cinOwnerNew['id_stagiaire'];
+                    $msgDupCin = '⚠️ Ce CIN appartient déjà à ' . $nomDupCin . ' (N° ' . $numDupCin . '). Redirection vers sa fiche.';
+                    flash_set($msgDupCin, 'warning');
+                    // Le formulaire ADD soumet en AJAX — on retourne JSON avec URL de redirection
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'redirect' => 'stagiaires.php?id=' . $idDupCin . '&highlight=1', 'msg' => $msgDupCin]);
+                    exit;
                 }
             }
             // ── Vérification doublon email avant insertion ─────────────────────────────
@@ -2644,6 +2651,12 @@ function gdsAjaxForm(form, submitter) {
         .then(r => r.json())
         .then(data => {
             if (submitBtn && submitBtn.disabled !== undefined) submitBtn.disabled = false;
+            // Redirection serveur (ex : doublon CIN → fiche du stagiaire existant)
+            if (data.redirect) {
+                if (data.msg) gdsToast(data.msg, 'warning');
+                setTimeout(() => { window.location.href = data.redirect; }, data.msg ? 700 : 0);
+                return;
+            }
             gdsToast(data.msg || (data.success ? 'Succès.' : 'Erreur.'), data.success ? 'success' : 'error');
             if (data.success) {
                 if (fd.has('quick_delete_absence') && fd.get('quick_delete_absence') === '1') {
