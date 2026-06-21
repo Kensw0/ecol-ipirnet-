@@ -1727,10 +1727,30 @@ if (isset($_GET['id'])) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($hubDocHistory as $dh): ?>
+                            <?php
+                            $docTypeLabels = [
+                                'certificat_scolarite'  => 'Certificat de Scolarité',
+                                'billet_excuse'         => 'Billet d\'Excuse',
+                                'etat_mensualites'      => 'État des Cotisations',
+                                'fiche_inscription'     => 'Fiche d\'Inscription',
+                                'fiche_preinscription'  => 'Fiche de Préinscription',
+                                'recu_paiement'         => 'Reçu de Paiement',
+                                'releve_notes'          => 'Relevé de Notes',
+                                'bulletin'              => 'Bulletin',
+                                'attestation_reussite'  => 'Attestation de Réussite',
+                                'convention_stage'      => 'Convention de Stage',
+                                'liste_stagiaires'      => 'Liste des Stagiaires',
+                                'etat_paiement'         => 'État des Paiements',
+                                'etat_paiements_annuel' => 'État des Paiements Annuels',
+                                'rapport_individuel'    => 'Rapport Individuel',
+                                'autre'                 => 'Autre',
+                            ];
+                            foreach($hubDocHistory as $dh):
+                                $dtLabel = $docTypeLabels[$dh['type_document']] ?? ucwords(str_replace('_', ' ', $dh['type_document']));
+                            ?>
                             <tr>
                                 <td style="color:#71717a; font-size:0.85rem;"><?= date('d/m/Y H:i', strtotime($dh['genere_le'])) ?></td>
-                                <td style="font-weight:600; color:#e4e4e7;"><?= h($dh['type_document']) ?></td>
+                                <td style="font-weight:600; color:#e4e4e7;"><?= h($dtLabel) ?></td>
                                 <td style="color:#71717a;"><?= h($dh['reference'] ?? '—') ?></td>
                             </tr>
                             <?php endforeach; ?>
