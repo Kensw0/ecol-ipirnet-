@@ -136,7 +136,8 @@ if (isset($_POST['quick_save_stage'])) {
             }
             echo json_encode(['success' => true, 'msg' => $msg]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => 'Erreur: ' . $e->getMessage()]);
+            error_log('[stages.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'msg' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
     } else {
         echo json_encode(['success' => false, 'msg' => 'Données invalides.']);
