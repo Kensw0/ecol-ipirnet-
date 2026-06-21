@@ -223,21 +223,24 @@
           .fa-seance-bloc .label { font-weight: 700; }
 
           /* ── Tableau d'appel ─────────────────────────────────── */
-          .fa-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10.5pt; }
+          .fa-table {
+              width: 100%; border-collapse: collapse;
+              border: 2px solid #000; margin-top: 8px; font-size: 10.5pt;
+          }
           .fa-table th {
-              background: #e8e8e8; border: 1.5px solid #444;
-              padding: 6px 8px; text-align: center; font-weight: 700; font-size: 10pt;
+              background: #e8e8e8; border: 1px solid #000;
+              padding: 6px 8px; text-align: center; font-weight: bold; font-size: 10pt;
               letter-spacing: .04em;
+              -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           .fa-table td {
-              border: 1px solid #aaa; padding: 5px 8px;
+              border: 1px solid #000; padding: 5px 8px;
               vertical-align: middle; line-height: 1.4;
           }
-          .fa-table .col-n    { width: 6%;  text-align: center; color: #555; }
+          .fa-table .col-n    { width: 6%;  text-align: center; }
           .fa-table .col-nom  { width: 50%; font-weight: 600; }
-          .fa-table .col-cb   { width: 12%; text-align: center; font-size: 14pt; letter-spacing: .1em; color: #222; }
+          .fa-table .col-cb   { width: 12%; text-align: center; font-size: 14pt; letter-spacing: .1em; }
           .fa-table .col-obs  { width: 32%; }
-          .fa-table tbody tr:nth-child(even) td { background: #f9f9f9; }
           /* Hauteur minimale pour que le prof puisse écrire */
           .fa-table tbody td { height: 22px; }
 
@@ -412,13 +415,6 @@
               <tr><td class="col-n"><?= count($stagiaires)+2 ?></td><td class="col-nom">&nbsp;</td><td class="col-cb">&#9633;</td><td class="col-obs">&nbsp;</td></tr>
           </tbody>
       </table>
-
-      <!-- Résumé comptage (à remplir à la main) -->
-      <div style="margin:12px 4px 0;display:flex;gap:2rem;font-size:10pt;">
-          <span>Présents : _____ </span>
-          <span>Absents : _____ </span>
-          <span>Taux de présence : _____%</span>
-      </div>
 
       <!-- Zone de signatures -->
       <table class="cs-sign">
