@@ -14,24 +14,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nextPost = gds_safe_next((string) ($_POST['next'] ?? $next));
 
     $role = null; $displayName = null;
+    $unLower = strtolower($un);
 
-    if ($un === '' || strtolower($un) === 'directeur') {
-        // Directeur: backward-compatible single password check
+    if ($un === '' || $unLower === 'directeur' || $unLower === 'admin') {
+        // Directeur — username: admin, password: admin123
         if (hash_equals(gds_admin_password(), $pw)) {
             $role        = 'directeur';
             $displayName = 'Directeur';
         }
     } else {
-        // Secretary: look up in users table
+        // Secrétaire — try users table first, then hardcoded fallback
+        $matched = false;
         try {
             $st = $pdo->prepare("SELECT password_hash, role FROM users WHERE username = ? AND role = 'secretaire'");
             $st->execute([$un]);
             $row = $st->fetch();
             if ($row && password_verify($pw, (string)$row['password_hash'])) {
+                $matched     = true;
                 $role        = 'secretaire';
                 $displayName = $un;
             }
         } catch (\PDOException $e) { /* users table may not exist yet */ }
+
+        // Hardcoded fallback: secretaire / secretaire
+        if (!$matched && $unLower === 'secretaire' && hash_equals(gds_secretaire_password(), $pw)) {
+            $role        = 'secretaire';
+            $displayName = 'Secrétaire';
+        }
     }
 
     if ($role !== null) {
@@ -466,9 +475,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="hidden" name="next" value="<?= h($next) ?>">
                 
                 <div class="form-group">
-                    <label for="username"><i class="fa-solid fa-user" style="font-size:0.8rem; color:#71717a;"></i> Nom d'utilisateur <span style="color:#52525b; font-size:0.78rem;">(laisser vide pour le Directeur)</span></label>
+                    <label for="username"><i class="fa-solid fa-user" style="font-size:0.8rem; color:#71717a;"></i> Nom d'utilisateur</label>
                     <div class="input-wrapper">
-                        <input id="username" name="username" type="text" autocomplete="username" placeholder="Ex: secretaire1" style="letter-spacing:normal;">
+                        <input id="username" name="username" type="text" autocomplete="username" placeholder="admin  ou  secretaire" style="letter-spacing:normal;">
                     </div>
                 </div>
                 <div class="form-group">
