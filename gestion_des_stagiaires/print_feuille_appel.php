@@ -31,32 +31,21 @@
   $niveauSelectionne = trim((string)($_GET['niveau']     ?? ''));
   $idClasseSelecte   = (int)($_GET['id_classe']  ?? 0);
   $idModuleSelecte   = (int)($_GET['id_module']  ?? 0);
-  $dateAppel         = trim((string)($_GET['date_appel'] ?? date('Y-m-d')));
-  $creneauSelectionne = trim((string)($_GET['creneau'] ?? ''));
+  $dateAppel  = trim((string)($_GET['date_appel']  ?? date('Y-m-d')));
+  $heureDebut = trim((string)($_GET['heure_debut'] ?? ''));
+  $heureFin   = trim((string)($_GET['heure_fin']   ?? ''));
 
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateAppel)) $dateAppel = date('Y-m-d');
   $dateAppelFr = date('d/m/Y', strtotime($dateAppel));
 
-  // Parse créneau "HH:MM|HH:MM" → separate debut / fin
-  $heureDebut = '';
-  $heureFin   = '';
-  if ($creneauSelectionne !== '' && substr_count($creneauSelectionne, '|') === 1) {
-      [$heureDebut, $heureFin] = explode('|', $creneauSelectionne, 2);
-      if (!preg_match('/^\d{2}:\d{2}$/', $heureDebut)) $heureDebut = '';
-      if (!preg_match('/^\d{2}:\d{2}$/', $heureFin))   $heureFin   = '';
-  }
+  // Sanitise — keep only valid HH:MM values
+  if (!preg_match('/^\d{2}:\d{2}$/', $heureDebut)) $heureDebut = '';
+  if (!preg_match('/^\d{2}:\d{2}$/', $heureFin))   $heureFin   = '';
 
   // Display label shown in the session info block on the printed page
   $horaireAffiche = ($heureDebut !== '' && $heureFin !== '')
       ? $heureDebut . ' – ' . $heureFin
       : '';
-
-  // Predefined school session slots (value: "HH:MM|HH:MM", label: "HH:MM – HH:MM")
-  $creneauxDisponibles = [
-      '07:30|09:30', '08:00|10:00', '09:30|11:30', '10:00|12:00',
-      '12:00|14:00', '13:00|15:00', '14:00|16:00',
-      '15:30|17:30', '16:00|18:00', '17:30|19:30',
-  ];
 
   // ── Données en cascade ───────────────────────────────────────────────────
   $toutesLesAnnees = $pdo->query(
@@ -344,16 +333,16 @@
                   <input type="date" name="date_appel" value="<?= h($dateAppel) ?>" <?= ($idClasseSelecte===0)?'disabled':'' ?>>
               </label>
 
-              <label>Créneau horaire
-                  <select name="creneau" <?= ($idClasseSelecte===0)?'disabled':'' ?>>
-                      <option value="">— Toute la journée —</option>
-                      <?php foreach ($creneauxDisponibles as $slot):
-                          [$deb, $fin] = explode('|', $slot);
-                          $label = $deb . ' – ' . $fin;
-                      ?>
-                      <option value="<?= h($slot) ?>" <?= $creneauSelectionne===$slot?'selected':'' ?>><?= h($label) ?></option>
-                      <?php endforeach; ?>
-                  </select>
+              <label>Heure début
+                  <input type="time" name="heure_debut"
+                         value="<?= h($heureDebut) ?>"
+                         <?= ($idClasseSelecte===0)?'disabled':'' ?>>
+              </label>
+
+              <label>Heure fin
+                  <input type="time" name="heure_fin"
+                         value="<?= h($heureFin) ?>"
+                         <?= ($idClasseSelecte===0)?'disabled':'' ?>>
               </label>
 
           </div>
