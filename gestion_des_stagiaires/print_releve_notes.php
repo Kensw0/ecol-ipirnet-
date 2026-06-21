@@ -2,11 +2,14 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$SCHOOL_ORG          = 'Groupe IPIRNET';
-$SCHOOL_TAGLINE_1    = "Institut Privé d'Informatique, Réseau et Nouvelles Etudes de Télécommunication";
-$SCHOOL_TAGLINE_2    = '';
-$SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N°: 03/02/2003   Du : 19/02/2003";
-$SCHOOL_AUTH_LINE_2  = "Accrédité par l'Etat sous N°: 21/DFP/F0301/199 du 21/11/2021";
+// ── Constantes établissement (source unique de vérité pour toutes les pages d'impression) ──
+$SCHOOL_ORG         = 'GROUPE IPIRNET';
+$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique Réseau et Nouvelles";
+$SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
+$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
+$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
+$SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
+$SCHOOL_LEGAL       = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
 
 $id   = (int) ($_GET['id'] ?? 0);
 $mode = $_GET['mode'] ?? 'combined'; // 'controle', 'examen', 'combined'
@@ -109,13 +112,17 @@ $totalCols += 2; // Moyenne UF + Observations
 
         .doc-wrapper { max-width: 820px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
 
-        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .header-table td { vertical-align: top; text-align: center; }
-        .school-name { font-weight: bold; font-size: 20px; margin-bottom: 5px; }
-        .school-desc { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-        .school-auth { font-size: 12px; margin-bottom: 2px; }
-        .logo-img { max-width: 90px; }
-        .accredite-img { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #000; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; }
+        /* ===== En-tête 3 colonnes (identique aux autres pages d'impression) ===== */
+        .cs-head { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .cs-head td { border: 1px solid #111; padding: 8px 10px; vertical-align: middle; text-align: center; }
+        .cs-head .cs-head-left, .cs-head .cs-head-right { width: 18%; }
+        .cs-head-logo { max-width: 90px; max-height: 90px; display: inline-block; }
+        .cs-head-mid .cs-org { font-weight: 700; font-size: 1.6rem; letter-spacing: 0.03em; }
+        .cs-head-mid .cs-tag { font-style: italic; font-size: .95rem; margin-top: 2px; }
+        .cs-head-mid .cs-auth { font-size: .8rem; margin-top: 4px; }
+
+        /* ===== Pied de page ===== */
+        .cs-footer { border-top: 1px solid #111; padding-top: 6px; margin-top: 18px; text-align: center; font-size: .82rem; line-height: 1.45; }
 
         .eval-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 15px; text-decoration: underline; margin-bottom: 20px; line-height: 1.5; }
 
@@ -162,24 +169,8 @@ $totalCols += 2; // Moyenne UF + Observations
 
 <div class="doc-wrapper">
 
-    <table class="header-table">
-        <tr>
-            <td style="width: 20%; text-align:left;">
-                <img src="assets/img/logo.png" alt="Logo IPIRNET" class="logo-img" onerror="this.style.display='none'">
-            </td>
-            <td style="width: 60%;">
-                <div class="school-name"><?= $SCHOOL_ORG ?></div>
-                <div class="school-desc"><?= $SCHOOL_TAGLINE_1 ?></div>
-                <div class="school-auth"><?= $SCHOOL_AUTH_LINE_1 ?></div>
-                <div class="school-auth"><?= $SCHOOL_AUTH_LINE_2 ?></div>
-            </td>
-            <td style="width: 20%; text-align:right;">
-                <div align="right">
-                    <img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:80px;height:80px;object-fit:contain;border-radius:50%;">
-                </div>
-            </td>
-        </tr>
-    </table>
+    <!-- ===== En-tête officiel (partagé entre toutes les pages d'impression) ===== -->
+    <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
     <div class="eval-title">
         SYSTEME D'EVALUATION EN <?= h(strtoupper($niveau)) ?> DE FORMATION<br>
@@ -278,6 +269,9 @@ $totalCols += 2; // Moyenne UF + Observations
             </td>
         </tr>
     </table>
+
+    <!-- ===== Pied de page ===== -->
+    <?php require __DIR__ . '/includes/print_footer.php'; ?>
 
 </div>
 
