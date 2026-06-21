@@ -37,7 +37,7 @@
 
   if (empty($idsAbsences)) {
       http_response_code(400);
-      exit('Aucun identifiant d'absence fourni.');
+      exit("Aucun identifiant d'absence fourni.");
   }
 
   // ── Requête sécurisée — uniquement les absences justifiées ───────────────
