@@ -10,14 +10,39 @@ $SCHOOL_AUTH_LINE_1  = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/200
 $SCHOOL_AUTH_LINE_2  = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
 $SCHOOL_CITY         = 'Berrechid';
 
-// Deux modes :
-//   ?id=<id_absence>          — billet pour une absence spécifique (mode historique)
-//   ?id_stagiaire=<sid>&auto=1 — liste toutes les absences justifiées du stagiaire sur une page
-$idAbsence   = (int)($_GET['id']            ?? 0);
-$idStagiaire = (int)($_GET['id_stagiaire']  ?? 0);
+// Trois modes :
+//   ?id=<id_absence>                  — billet pour une seule absence (mode historique, justifiée requise)
+//   ?id_stagiaire=<sid>&auto=1        — toutes les absences justifiées du stagiaire (hub)
+//   ?absence_ids[]=X&absence_ids[]=Y  — absences spécifiques choisies dans la modale (pas de check justification)
+$idAbsence       = (int)($_GET['id']           ?? 0);
+$idStagiaire     = (int)($_GET['id_stagiaire'] ?? 0);
+$absenceIdsRaw   = isset($_GET['absence_ids']) ? (array)$_GET['absence_ids'] : [];
+$absenceIds      = array_values(array_filter(array_map('intval', $absenceIdsRaw)));
 
-if ($idAbsence > 0) {
-    // Mode classique : une seule absence
+if (!empty($absenceIds)) {
+    // Mode sélection depuis la modale billets
+    $ph  = implode(',', array_fill(0, count($absenceIds), '?'));
+    $stA = $pdo->prepare(
+        "SELECT a.*, s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere,
+                m.nom_module
+           FROM absences a
+           JOIN stagiaires s ON s.id_stagiaire = a.id_stagiaire
+           JOIN classes c    ON c.id_classe    = s.id_classe
+           JOIN filieres f   ON f.id_filiere   = c.id_filiere
+           LEFT JOIN modules m ON m.id_module  = a.id_module
+          WHERE a.id_absence IN ($ph)
+          ORDER BY a.date_absence, a.heure_debut"
+    );
+    $stA->execute($absenceIds);
+    $absences = $stA->fetchAll();
+    if (empty($absences)) { http_response_code(404); exit('Absences introuvables.'); }
+    $stagiaire    = $absences[0];
+    $modeMultiple = true;
+    $a            = $absences[0];
+    log_document_gen($pdo, 'billet_excuse', (int)$a['id_stagiaire'], 'ABS-MODAL-' . implode(',', $absenceIds));
+
+} elseif ($idAbsence > 0) {
+    // Mode classique : une seule absence (doit être justifiée)
     $st = $pdo->prepare(
         'SELECT a.*, s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere
            FROM absences a
@@ -36,9 +61,10 @@ if ($idAbsence > 0) {
     log_document_gen($pdo, 'billet_excuse', (int)$a['id_stagiaire'], 'ABS-' . $idAbsence);
     $modeMultiple = false;
     $absences     = [$a];
-    $stagiaire    = $a; // nom, prenom, num_inscri, etc.
+    $stagiaire    = $a;
+
 } elseif ($idStagiaire > 0) {
-    // Mode multi : toutes les absences justifiées du stagiaire
+    // Mode hub : toutes les absences justifiées du stagiaire
     $stS = $pdo->prepare(
         'SELECT s.nom, s.prenom, s.num_inscri, c.nom_classe, c.annee_scolaire, f.nom_filiere
            FROM stagiaires s
@@ -61,13 +87,14 @@ if ($idAbsence > 0) {
     if (empty($absences)) { http_response_code(404); exit('Aucune absence justifiée pour ce stagiaire.'); }
     log_document_gen($pdo, 'billet_excuse', $idStagiaire, 'STAG-' . $idStagiaire);
     $modeMultiple = true;
-    $a = $absences[0]; // pour la compatibilité des variables ci-dessous
+    $a = $absences[0];
+
 } else {
     http_response_code(400);
     exit('Paramètre manquant.');
 }
 
-$id = $idAbsence; // compatibilité pour la suite
+$id = $idAbsence;
 
 // Numbering like the cert: "01/25-26".
 $seq = (int) $pdo->query("SELECT COUNT(*) FROM documents_generes WHERE type_document='billet_excuse'")->fetchColumn();

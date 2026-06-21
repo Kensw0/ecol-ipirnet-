@@ -158,6 +158,28 @@
               $lignesBillets = array_values(array_filter($lignesBillets, fn($l) => (int)$l['nb_non_justifiees'] > 0));
           }
 
+          // Attach unjustified absences for each student
+          if (!empty($lignesBillets)) {
+              $sids = array_column($lignesBillets, 'id_stagiaire');
+              $ph   = implode(',', array_fill(0, count($sids), '?'));
+              $stmtAbs = $pdo->prepare(
+                  "SELECT a.id_absence, a.id_stagiaire, a.date_absence, a.heure_debut, a.heure_fin, m.nom_module
+                     FROM absences a
+                     LEFT JOIN modules m ON m.id_module = a.id_module
+                    WHERE a.id_stagiaire IN ($ph) AND a.est_justifiee = 0
+                    ORDER BY a.date_absence DESC, a.heure_debut"
+              );
+              $stmtAbs->execute(array_values($sids));
+              $absParStagiaire = [];
+              foreach ($stmtAbs->fetchAll() as $absRow) {
+                  $absParStagiaire[(int)$absRow['id_stagiaire']][] = $absRow;
+              }
+              foreach ($lignesBillets as &$stag) {
+                  $stag['absences'] = $absParStagiaire[(int)$stag['id_stagiaire']] ?? [];
+              }
+              unset($stag);
+          }
+
           echo json_encode($lignesBillets);
       } catch (\Throwable $e) {
           echo json_encode(['error' => $e->getMessage()]);
@@ -1744,56 +1766,141 @@ function _chargerListeBilletsNow() {
     });
 }
 
+// ── Render two-level list: student → their unjustified absences ──
 function rendreListeBillets(lignes) {
   const liste = document.getElementById('billets-liste');
-  if (!lignes.length) {
-    liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-users-slash"></i><p style="margin-top:.5rem;">Aucun stagiaire trouvé.</p></div>';
+
+  // Only show students that have at least one unjustified absence
+  const avecAbs = lignes.filter(s => s.absences && s.absences.length > 0);
+
+  if (!avecAbs.length) {
+    liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-users-slash"></i><p style="margin-top:.5rem;">Aucun stagiaire avec des absences non justifiées.</p></div>';
     majCompteurBillets();
     return;
   }
+
   let html = '';
-  lignes.forEach(s => {
-    const nbNonJ  = parseInt(s.nb_non_justifiees) || 0;
-    const badge   = nbNonJ > 0
-      ? '<span style="font-size:.72rem;font-weight:700;color:#fca5a5;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.22);padding:1px 8px;border-radius:12px;">' + nbNonJ + ' non just.</span>'
-      : '<span style="font-size:.72rem;color:#3f3f46;">0 non just.</span>';
-    html += '<label style="display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .12s;" '
-      + 'onmouseover="this.style.background=\'rgba(34,197,94,.06)\'" onmouseout="this.style.background=\'\'">'
-      + '<input type="checkbox" class="billet-cb" value="' + s.id_stagiaire + '" onchange="majCompteurBillets()"'
-      + ' style="accent-color:#22c55e;width:15px;height:15px;flex-shrink:0;">'
+  avecAbs.forEach(s => {
+    const sid    = s.id_stagiaire;
+    const nbAbs  = s.absences.length;
+
+    // Student header row
+    html += '<div class="billet-stag-block" data-sid="' + sid + '">'
+      + '<div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;background:rgba(34,197,94,.05);border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;" '
+      + 'onclick="toggleBilletBlock(' + sid + ')">'
+      + '<input type="checkbox" class="billet-stag-cb" data-sid="' + sid + '"'
+      + ' checked style="accent-color:#22c55e;width:15px;height:15px;flex-shrink:0;"'
+      + ' onclick="event.stopPropagation();onStagCbChange(' + sid + ')">'
       + '<div style="flex:1;">'
       + '<span style="font-weight:700;color:#e4e4e7;font-size:.88rem;">' + echapperHtml(s.nom) + ' ' + echapperHtml(s.prenom) + '</span>'
       + '<span style="font-size:.77rem;color:#71717a;font-family:monospace;margin-left:.5rem;">' + echapperHtml(s.num_inscri || '') + '</span>'
-      + (s.cin ? '<span style="font-size:.75rem;color:#52525b;margin-left:.4rem;">· ' + echapperHtml(s.cin) + '</span>' : '')
       + '</div>'
-      + badge
-      + '</label>';
+      + '<span style="font-size:.72rem;font-weight:700;color:#fca5a5;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.22);padding:1px 8px;border-radius:12px;flex-shrink:0;">'
+      + nbAbs + ' absence' + (nbAbs > 1 ? 's' : '') + '</span>'
+      + '<i class="fa-solid fa-chevron-down billet-chevron" id="billet-chev-' + sid + '" style="font-size:.7rem;color:#71717a;transition:transform .2s;flex-shrink:0;"></i>'
+      + '</div>'
+      // Absence list (expanded by default)
+      + '<div class="billet-abs-list" id="billet-abs-' + sid + '">';
+
+    s.absences.forEach(abs => {
+      const dateFr = abs.date_absence
+        ? abs.date_absence.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1')
+        : '—';
+      const hor = abs.heure_debut
+        ? abs.heure_debut.substring(0, 5) + ' – ' + (abs.heure_fin || '').substring(0, 5)
+        : 'Journée';
+      const mod = abs.nom_module || '—';
+
+      html += '<label style="display:flex;align-items:center;gap:.65rem;padding:.45rem .9rem .45rem 2.6rem;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;"'
+        + ' onmouseover="this.style.background=\'rgba(255,255,255,.03)\'" onmouseout="this.style.background=\'\'">'
+        + '<input type="checkbox" class="billet-abs-cb" data-sid="' + sid + '" value="' + abs.id_absence + '"'
+        + ' checked style="accent-color:#22c55e;width:13px;height:13px;flex-shrink:0;" onchange="onAbsCbChange(' + sid + ')">'
+        + '<span style="font-size:.8rem;color:#d4d4d8;min-width:72px;flex-shrink:0;">' + echapperHtml(dateFr) + '</span>'
+        + '<span style="font-size:.78rem;color:#a1a1aa;min-width:90px;flex-shrink:0;">' + echapperHtml(hor) + '</span>'
+        + '<span style="font-size:.78rem;color:#71717a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + echapperHtml(mod) + '</span>'
+        + '</label>';
+    });
+
+    html += '</div></div>'; // close billet-abs-list + billet-stag-block
   });
+
   liste.innerHTML = html;
   majCompteurBillets();
 }
 
-function majCompteurBillets() {
-  const n    = document.querySelectorAll('.billet-cb:checked').length;
-  const span = document.getElementById('billets-count-sel');
-  const btn  = document.getElementById('billets-print-btn');
-  if (span) span.textContent = n + ' sélectionné(s)';
-  if (btn)  btn.disabled = n === 0;
+// Toggle expand/collapse of a student's absences
+function toggleBilletBlock(sid) {
+  const list = document.getElementById('billet-abs-' + sid);
+  const chev = document.getElementById('billet-chev-' + sid);
+  if (!list) return;
+  const collapsed = list.style.display === 'none';
+  list.style.display = collapsed ? '' : 'none';
+  if (chev) chev.style.transform = collapsed ? '' : 'rotate(-90deg)';
 }
 
-function billetsSelectAll(etat) {
-  document.querySelectorAll('.billet-cb').forEach(cb => { cb.checked = etat; });
+// When a student checkbox changes → check/uncheck all their absences
+function onStagCbChange(sid) {
+  const stCb   = document.querySelector('.billet-stag-cb[data-sid="' + sid + '"]');
+  const absCbs = document.querySelectorAll('.billet-abs-cb[data-sid="' + sid + '"]');
+  absCbs.forEach(cb => { cb.checked = stCb.checked; });
   majCompteurBillets();
 }
 
-function imprimerBilletsSelectionnes() {
-  const ids = Array.from(document.querySelectorAll('.billet-cb:checked')).map(cb => parseInt(cb.value));
-  if (!ids.length) { afficherToast('Sélectionnez au moins un stagiaire.', 'error'); return; }
-  ids.forEach(id => {
-    window.open('print_billet_excuse.php?id_stagiaire=' + id + '&auto=1', '_blank');
+// When an absence checkbox changes → update parent student checkbox state
+function onAbsCbChange(sid) {
+  const absCbs = Array.from(document.querySelectorAll('.billet-abs-cb[data-sid="' + sid + '"]'));
+  const stCb   = document.querySelector('.billet-stag-cb[data-sid="' + sid + '"]');
+  if (!stCb) return;
+  const allChecked  = absCbs.every(cb => cb.checked);
+  const noneChecked = absCbs.every(cb => !cb.checked);
+  stCb.checked       = allChecked;
+  stCb.indeterminate = !allChecked && !noneChecked;
+  majCompteurBillets();
+}
+
+// Count selected absences (not students)
+function majCompteurBillets() {
+  const n    = document.querySelectorAll('.billet-abs-cb:checked').length;
+  const span = document.getElementById('billets-count-sel');
+  const btn  = document.getElementById('billets-print-btn');
+  if (span) span.textContent = n + ' absence' + (n !== 1 ? 's' : '') + ' sélectionnée' + (n !== 1 ? 's' : '');
+  if (btn)  btn.disabled = n === 0;
+}
+
+// Select/deselect all absences
+function billetsSelectAll(etat) {
+  document.querySelectorAll('.billet-abs-cb').forEach(cb => { cb.checked = etat; });
+  document.querySelectorAll('.billet-stag-cb').forEach(cb => {
+    cb.checked       = etat;
+    cb.indeterminate = false;
   });
+  majCompteurBillets();
+}
+
+// Print: open one tab per student with their selected absence_ids[], with staggered delays
+function imprimerBilletsSelectionnes() {
+  // Group selected absence IDs by student
+  const parStagiaire = {};
+  document.querySelectorAll('.billet-abs-cb:checked').forEach(cb => {
+    const sid = cb.dataset.sid;
+    if (!parStagiaire[sid]) parStagiaire[sid] = [];
+    parStagiaire[sid].push(cb.value);
+  });
+
+  const entries = Object.entries(parStagiaire);
+  if (!entries.length) { afficherToast('Sélectionnez au moins une absence.', 'error'); return; }
+
   fermerModal('modal-billets');
-  afficherToast(ids.length + ' billet(s) ouvert(s) dans de nouveaux onglets.', 'success');
+
+  // Open tabs with 250ms delay between each to avoid browser popup blocker
+  entries.forEach(([sid, absIds], i) => {
+    setTimeout(() => {
+      const params = absIds.map(id => 'absence_ids%5B%5D=' + encodeURIComponent(id)).join('&');
+      window.open('print_billet_excuse.php?' + params + '&auto=1', '_blank');
+    }, i * 300);
+  });
+
+  afficherToast(entries.length + ' billet(s) envoyé(s) vers de nouveaux onglets.', 'success');
 }
 
 var _gdsConfirmCallback = null;
