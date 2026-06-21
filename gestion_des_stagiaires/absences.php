@@ -118,76 +118,6 @@
       exit;
   }
 
-  // ── SECTION 1c : Liste des stagiaires avec absences non justifiées (pour modale billets) ──
-  if (isset($_GET['action']) && $_GET['action'] === 'get_stagiaires_non_justifies') {
-      header('Content-Type: application/json');
-
-      try {
-          $idClasseBillets  = (int)($_GET['id_classe'] ?? 0);
-          $rechercheBillets = trim((string)($_GET['q'] ?? ''));
-          $modeRecent       = (int)($_GET['recent'] ?? 0);
-
-          $clausesBillets = [];
-          $paramsBillets  = [];
-
-          if ($idClasseBillets > 0) {
-              $clausesBillets[] = 's.id_classe = ?';
-              $paramsBillets[]  = $idClasseBillets;
-          }
-
-          if ($rechercheBillets !== '') {
-              $clausesBillets[] = '(UPPER(s.nom) LIKE ? OR UPPER(s.prenom) LIKE ? OR s.num_inscri LIKE ? OR s.cin LIKE ?)';
-              $like = '%' . strtoupper($rechercheBillets) . '%';
-              $paramsBillets = array_merge($paramsBillets, [$like, $like, '%'.$rechercheBillets.'%', '%'.$rechercheBillets.'%']);
-          }
-
-          $whereBillets = $clausesBillets ? 'WHERE ' . implode(' AND ', $clausesBillets) : '';
-
-          $sqlBillets = "SELECT s.id_stagiaire, s.num_inscri, UPPER(s.nom) AS nom, s.prenom,
-                                COALESCE(s.cin, '') AS cin,
-                                (SELECT COUNT(*) FROM absences a WHERE a.id_stagiaire = s.id_stagiaire AND a.est_justifiee = 0) AS nb_non_justifiees
-                           FROM stagiaires s
-                           $whereBillets
-                          ORDER BY s.nom, s.prenom";
-
-          $stmtBillets = $pdo->prepare($sqlBillets);
-          $stmtBillets->execute($paramsBillets);
-          $lignesBillets = $stmtBillets->fetchAll();
-
-          if ($modeRecent) {
-              $lignesBillets = array_values(array_filter($lignesBillets, fn($l) => (int)$l['nb_non_justifiees'] > 0));
-          }
-
-          // Attach unjustified absences for each student
-          if (!empty($lignesBillets)) {
-              $sids = array_column($lignesBillets, 'id_stagiaire');
-              $ph   = implode(',', array_fill(0, count($sids), '?'));
-              $stmtAbs = $pdo->prepare(
-                  "SELECT a.id_absence, a.id_stagiaire, a.date_absence, a.heure_debut, a.heure_fin, m.nom_module
-                     FROM absences a
-                     LEFT JOIN modules m ON m.id_module = a.id_module
-                    WHERE a.id_stagiaire IN ($ph) AND a.est_justifiee = 0
-                    ORDER BY a.date_absence DESC, a.heure_debut"
-              );
-              $stmtAbs->execute(array_values($sids));
-              $absParStagiaire = [];
-              foreach ($stmtAbs->fetchAll() as $absRow) {
-                  $absParStagiaire[(int)$absRow['id_stagiaire']][] = $absRow;
-              }
-              foreach ($lignesBillets as &$stag) {
-                  $stag['absences'] = $absParStagiaire[(int)$stag['id_stagiaire']] ?? [];
-              }
-              unset($stag);
-          }
-
-          echo json_encode($lignesBillets);
-      } catch (\Throwable $e) {
-          echo json_encode(['error' => $e->getMessage()]);
-      }
-      exit;
-  }
-
-
   // ============================================================
   //  SECTION 2 : Gestionnaires POST (toutes les réponses sont JSON)
   // ============================================================
@@ -689,14 +619,6 @@
          title="Générer une feuille d'appel A4 pour le professeur">
         <i class="fa-solid fa-print" style="font-size:.9rem;"></i> Feuille d'appel
       </a>
-      <button type="button" onclick="ouvrirModalBillets()"
-         style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
-                background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.3);cursor:pointer;transition:all .18s;"
-         onmouseover="this.style.background='rgba(34,197,94,.22)'"
-         onmouseout="this.style.background='rgba(34,197,94,.12)'"
-         title="Imprimer des billets d'excuse pour plusieurs stagiaires">
-        <i class="fa-solid fa-ticket" style="font-size:.9rem;"></i> Imprimer les billets
-      </button>
       <a href="print_releve_absences.php<?= $idClasseSelecte > 0 ? '?id_classe='.$idClasseSelecte.'&annee='.urlencode($anneeSelectionnee) : '' ?>" target="_blank"
          style="display:inline-flex;align-items:center;gap:6px;padding:.52rem 1rem;border-radius:9px;font-size:.82rem;font-weight:600;
                 background:rgba(251,191,36,.1);color:#fde047;border:1px solid rgba(251,191,36,.3);text-decoration:none;transition:all .18s;"
@@ -754,6 +676,12 @@
 
         <label>Date
           <input type="date" name="date_filter" value="<?= h($dateFiltreUnique) ?>" <?= $idClasseSelecte === 0 ? 'disabled' : '' ?>>
+        </label>
+
+        <label>Rechercher (Nom / CIN)
+          <input type="text" id="search-nom-cin" placeholder="ex: Benali, D123…"
+            style="background:#09090b;border:1px solid rgba(255,255,255,.12);color:#e4e4e7;border-radius:8px;padding:.5rem .75rem;font-size:.9rem;width:100%;"
+            oninput="filtrerStagiaires(this.value)" autocomplete="off">
         </label>
 
         <label style="justify-content:flex-end;">
@@ -889,7 +817,8 @@
             data-sid="<?= (int)$stag['id_stagiaire'] ?>"
             data-total="<?= $totalAbsStag ?>"
             data-just="<?= $nbJustifiees ?>"
-            data-nonj="<?= $nbNonJustifiees ?>">
+            data-nonj="<?= $nbNonJustifiees ?>"
+            data-search="<?= h(strtoupper($stag['nom']) . ' ' . strtoupper($stag['prenom']) . ' ' . ($stag['cin'] ?? '') . ' ' . ($stag['num_inscri'] ?? '')) ?>">
           <td class="cb-col">
             <input type="checkbox" class="row-cb" value="<?= (int)$stag['id_stagiaire'] ?>">
           </td>
@@ -947,52 +876,6 @@
 </div><!-- /container principal -->
 
 
-<!-- ─── MODALE IMPRIMER LES BILLETS D'EXCUSE ──────────────────────────── -->
-<div class="abs-modal-overlay" id="modal-billets" style="z-index:10000;">
-  <div class="abs-modal-card" style="width:min(640px,95vw);">
-    <div class="abs-modal-header">
-      <h3><i class="fa-solid fa-ticket" style="color:#22c55e;margin-right:.4rem;"></i>Imprimer les billets d'excuse</h3>
-      <button type="button" class="icon-btn-sm" onclick="fermerModal('modal-billets')"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="abs-modal-body" style="padding:1rem 1.25rem;">
-
-      <!-- Barre de recherche & filtres billets -->
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.85rem;">
-        <input type="text" id="billets-search" placeholder="Rechercher par nom, CIN, code…"
-          style="flex:1;min-width:200px;background:#09090b;border:1px solid rgba(255,255,255,.12);color:#e4e4e7;border-radius:8px;padding:.45rem .75rem;font-size:.88rem;"
-          oninput="chargerListeBillets()">
-        <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#a1a1aa;cursor:pointer;user-select:none;">
-          <input type="checkbox" id="billets-recent" style="accent-color:#22c55e;width:14px;height:14px;" onchange="chargerListeBillets()">
-          Absences non just. seulement
-        </label>
-      </div>
-
-      <!-- Actions sélection -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;font-size:.8rem;color:#71717a;">
-        <div style="display:flex;gap:.5rem;">
-          <button type="button" onclick="billetsSelectAll(true)"  style="background:transparent;border:1px solid rgba(255,255,255,.1);color:#a1a1aa;border-radius:6px;padding:2px 9px;font-size:.77rem;cursor:pointer;">Tout sélectionner</button>
-          <button type="button" onclick="billetsSelectAll(false)" style="background:transparent;border:1px solid rgba(255,255,255,.1);color:#a1a1aa;border-radius:6px;padding:2px 9px;font-size:.77rem;cursor:pointer;">Tout désélectionner</button>
-        </div>
-        <span id="billets-count-sel" style="font-weight:700;color:#86efac;">0 sélectionné(s)</span>
-      </div>
-
-      <!-- Liste des stagiaires -->
-      <div id="billets-liste" style="max-height:340px;overflow-y:auto;border:1px solid rgba(255,255,255,.07);border-radius:10px;">
-        <div style="text-align:center;padding:2rem;color:#52525b;">
-          <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
-          <p style="margin-top:.5rem;">Chargement…</p>
-        </div>
-      </div>
-    </div>
-    <div class="abs-modal-footer">
-      <button type="button" class="btn-abs ghost" onclick="fermerModal('modal-billets')">Annuler</button>
-      <button type="button" class="btn-abs primary" id="billets-print-btn" onclick="imprimerBilletsSelectionnes()" disabled
-        style="padding:.65rem 1.75rem;font-size:.9rem;border-radius:10px;background:linear-gradient(135deg,#16a34a,#22c55e);">
-        <i class="fa-solid fa-print"></i> Imprimer
-      </button>
-    </div>
-  </div>
-</div>
 
 
 <!-- ─── DRAWER JUSTIFICATION EN MASSE ─────────────────────────────────── -->
@@ -1720,187 +1603,19 @@ function afficherToast(message, type) {
 }
 
 // ============================================================
-//  Modale — Imprimer les billets d'excuse
+//  Filtre Nom / CIN (temps réel sur le tableau)
 // ============================================================
 
-var _billetsDebounce = null;
-
-function ouvrirModalBillets() {
-  document.getElementById('billets-search').value = '';
-  document.getElementById('billets-recent').checked = false;
-  document.getElementById('modal-billets').style.display = 'flex';
-  chargerListeBillets();
+function filtrerStagiaires(q) {
+  const needle = q.trim().toUpperCase();
+  const rows   = document.querySelectorAll('tr[data-search]');
+  rows.forEach(tr => {
+    tr.style.display = (!needle || tr.dataset.search.toUpperCase().includes(needle)) ? '' : 'none';
+  });
 }
 
 function chargerListeBillets() {
-  clearTimeout(_billetsDebounce);
-  _billetsDebounce = setTimeout(_chargerListeBilletsNow, 250);
-}
-
-function _chargerListeBilletsNow() {
-  const q      = document.getElementById('billets-search').value.trim();
-  const recent = document.getElementById('billets-recent').checked ? 1 : 0;
-  const liste  = document.getElementById('billets-liste');
-
-  liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-spinner fa-spin fa-lg"></i></div>';
-
-  let url = 'absences.php?action=get_stagiaires_non_justifies&recent=' + recent;
-  if (SEL_CLASSE_ID > 0) url += '&id_classe=' + SEL_CLASSE_ID;
-  if (q) url += '&q=' + encodeURIComponent(q);
-
-  fetch(url, { credentials: 'same-origin' })
-    .then(r => {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(data => {
-      if (!Array.isArray(data)) {
-        const msg = data && data.error ? data.error : 'Réponse inattendue du serveur.';
-        liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur : ' + echapperHtml(msg) + '</p>';
-        return;
-      }
-      rendreListeBillets(data);
-    })
-    .catch(err => {
-      liste.innerHTML = '<p style="color:#fca5a5;padding:1rem;">Erreur de chargement : ' + echapperHtml(err.message) + '</p>';
-    });
-}
-
-// ── Render two-level list: student → their unjustified absences ──
-function rendreListeBillets(lignes) {
-  const liste = document.getElementById('billets-liste');
-
-  // Only show students that have at least one unjustified absence
-  const avecAbs = lignes.filter(s => s.absences && s.absences.length > 0);
-
-  if (!avecAbs.length) {
-    liste.innerHTML = '<div style="text-align:center;padding:2rem;color:#52525b;"><i class="fa-solid fa-users-slash"></i><p style="margin-top:.5rem;">Aucun stagiaire avec des absences non justifiées.</p></div>';
-    majCompteurBillets();
-    return;
-  }
-
-  let html = '';
-  avecAbs.forEach(s => {
-    const sid    = s.id_stagiaire;
-    const nbAbs  = s.absences.length;
-
-    // Student header row
-    html += '<div class="billet-stag-block" data-sid="' + sid + '">'
-      + '<div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;background:rgba(34,197,94,.05);border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;" '
-      + 'onclick="toggleBilletBlock(' + sid + ')">'
-      + '<input type="checkbox" class="billet-stag-cb" data-sid="' + sid + '"'
-      + ' checked style="accent-color:#22c55e;width:15px;height:15px;flex-shrink:0;"'
-      + ' onclick="event.stopPropagation();onStagCbChange(' + sid + ')">'
-      + '<div style="flex:1;">'
-      + '<span style="font-weight:700;color:#e4e4e7;font-size:.88rem;">' + echapperHtml(s.nom) + ' ' + echapperHtml(s.prenom) + '</span>'
-      + '<span style="font-size:.77rem;color:#71717a;font-family:monospace;margin-left:.5rem;">' + echapperHtml(s.num_inscri || '') + '</span>'
-      + '</div>'
-      + '<span style="font-size:.72rem;font-weight:700;color:#fca5a5;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.22);padding:1px 8px;border-radius:12px;flex-shrink:0;">'
-      + nbAbs + ' absence' + (nbAbs > 1 ? 's' : '') + '</span>'
-      + '<i class="fa-solid fa-chevron-down billet-chevron" id="billet-chev-' + sid + '" style="font-size:.7rem;color:#71717a;transition:transform .2s;flex-shrink:0;"></i>'
-      + '</div>'
-      // Absence list (expanded by default)
-      + '<div class="billet-abs-list" id="billet-abs-' + sid + '">';
-
-    s.absences.forEach(abs => {
-      const dateFr = abs.date_absence
-        ? abs.date_absence.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1')
-        : '—';
-      const hor = abs.heure_debut
-        ? abs.heure_debut.substring(0, 5) + ' – ' + (abs.heure_fin || '').substring(0, 5)
-        : 'Journée';
-      const mod = abs.nom_module || '—';
-
-      html += '<label style="display:flex;align-items:center;gap:.65rem;padding:.45rem .9rem .45rem 2.6rem;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;"'
-        + ' onmouseover="this.style.background=\'rgba(255,255,255,.03)\'" onmouseout="this.style.background=\'\'">'
-        + '<input type="checkbox" class="billet-abs-cb" data-sid="' + sid + '" value="' + abs.id_absence + '"'
-        + ' checked style="accent-color:#22c55e;width:13px;height:13px;flex-shrink:0;" onchange="onAbsCbChange(' + sid + ')">'
-        + '<span style="font-size:.8rem;color:#d4d4d8;min-width:72px;flex-shrink:0;">' + echapperHtml(dateFr) + '</span>'
-        + '<span style="font-size:.78rem;color:#a1a1aa;min-width:90px;flex-shrink:0;">' + echapperHtml(hor) + '</span>'
-        + '<span style="font-size:.78rem;color:#71717a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + echapperHtml(mod) + '</span>'
-        + '</label>';
-    });
-
-    html += '</div></div>'; // close billet-abs-list + billet-stag-block
-  });
-
-  liste.innerHTML = html;
-  majCompteurBillets();
-}
-
-// Toggle expand/collapse of a student's absences
-function toggleBilletBlock(sid) {
-  const list = document.getElementById('billet-abs-' + sid);
-  const chev = document.getElementById('billet-chev-' + sid);
-  if (!list) return;
-  const collapsed = list.style.display === 'none';
-  list.style.display = collapsed ? '' : 'none';
-  if (chev) chev.style.transform = collapsed ? '' : 'rotate(-90deg)';
-}
-
-// When a student checkbox changes → check/uncheck all their absences
-function onStagCbChange(sid) {
-  const stCb   = document.querySelector('.billet-stag-cb[data-sid="' + sid + '"]');
-  const absCbs = document.querySelectorAll('.billet-abs-cb[data-sid="' + sid + '"]');
-  absCbs.forEach(cb => { cb.checked = stCb.checked; });
-  majCompteurBillets();
-}
-
-// When an absence checkbox changes → update parent student checkbox state
-function onAbsCbChange(sid) {
-  const absCbs = Array.from(document.querySelectorAll('.billet-abs-cb[data-sid="' + sid + '"]'));
-  const stCb   = document.querySelector('.billet-stag-cb[data-sid="' + sid + '"]');
-  if (!stCb) return;
-  const allChecked  = absCbs.every(cb => cb.checked);
-  const noneChecked = absCbs.every(cb => !cb.checked);
-  stCb.checked       = allChecked;
-  stCb.indeterminate = !allChecked && !noneChecked;
-  majCompteurBillets();
-}
-
-// Count selected absences (not students)
-function majCompteurBillets() {
-  const n    = document.querySelectorAll('.billet-abs-cb:checked').length;
-  const span = document.getElementById('billets-count-sel');
-  const btn  = document.getElementById('billets-print-btn');
-  if (span) span.textContent = n + ' absence' + (n !== 1 ? 's' : '') + ' sélectionnée' + (n !== 1 ? 's' : '');
-  if (btn)  btn.disabled = n === 0;
-}
-
-// Select/deselect all absences
-function billetsSelectAll(etat) {
-  document.querySelectorAll('.billet-abs-cb').forEach(cb => { cb.checked = etat; });
-  document.querySelectorAll('.billet-stag-cb').forEach(cb => {
-    cb.checked       = etat;
-    cb.indeterminate = false;
-  });
-  majCompteurBillets();
-}
-
-// Print: open one tab per student with their selected absence_ids[], with staggered delays
-function imprimerBilletsSelectionnes() {
-  // Group selected absence IDs by student
-  const parStagiaire = {};
-  document.querySelectorAll('.billet-abs-cb:checked').forEach(cb => {
-    const sid = cb.dataset.sid;
-    if (!parStagiaire[sid]) parStagiaire[sid] = [];
-    parStagiaire[sid].push(cb.value);
-  });
-
-  const entries = Object.entries(parStagiaire);
-  if (!entries.length) { afficherToast('Sélectionnez au moins une absence.', 'error'); return; }
-
-  fermerModal('modal-billets');
-
-  // Open tabs with 250ms delay between each to avoid browser popup blocker
-  entries.forEach(([sid, absIds], i) => {
-    setTimeout(() => {
-      const params = absIds.map(id => 'absence_ids%5B%5D=' + encodeURIComponent(id)).join('&');
-      window.open('print_billet_excuse.php?' + params + '&auto=1', '_blank');
-    }, i * 300);
-  });
-
-  afficherToast(entries.length + ' billet(s) envoyé(s) vers de nouveaux onglets.', 'success');
+  // no-op — kept so any stale reference doesn't crash
 }
 
 var _gdsConfirmCallback = null;
