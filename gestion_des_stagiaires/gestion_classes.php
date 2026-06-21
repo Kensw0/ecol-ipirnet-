@@ -9,8 +9,9 @@
  *   - Naviguer vers la liste des stagiaires d'une classe
  *
  * Actions POST (réponse JSON) :
- *   • add_classe  — création d'une nouvelle classe
- *   • edit_classe — mise à jour du nom et de la capacité d'une classe
+ *   • add_classe     — création d'une nouvelle classe
+ *   • edit_classe    — mise à jour du nom et de la capacité d'une classe
+ *   • delete_classe  — suppression d'une classe (bloquée si des stagiaires y sont inscrits)
  *
  * Tables : classes, filieres, stagiaires
  */
@@ -112,6 +113,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'nom_classe' => $nomClasse,
                 'capacite'   => $capacite,
             ]);
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // ── Suppression d'une classe ──────────────────────────────────────────────
+    if (isset($_POST['delete_classe'])) {
+        $idClasse = (int)($_POST['id_classe'] ?? 0);
+
+        if ($idClasse <= 0) {
+            echo json_encode(['success' => false, 'error' => 'Identifiant invalide.']);
+            exit;
+        }
+
+        // Bloquer la suppression si des stagiaires sont encore inscrits dans cette classe
+        $reqEffectif = $pdo->prepare('SELECT COUNT(*) FROM stagiaires WHERE id_classe = ?');
+        $reqEffectif->execute([$idClasse]);
+        $nbStagiaires = (int)$reqEffectif->fetchColumn();
+
+        if ($nbStagiaires > 0) {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'Impossible de supprimer : ' . $nbStagiaires . ' stagiaire(s) sont inscrits dans cette classe. Désaffectez-les d\'abord.',
+            ]);
+            exit;
+        }
+
+        try {
+            $pdo->prepare('DELETE FROM classes WHERE id_classe = ?')->execute([$idClasse]);
+            echo json_encode(['success' => true, 'msg' => 'Classe supprimée.']);
         } catch (\Throwable $e) {
             echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
         }
@@ -220,6 +252,8 @@ require __DIR__ . '/includes/header.php';
 .gc-btn-edit:hover { background:rgba(168,85,247,0.25); }
 .gc-btn-voir { background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.25); color:#a5b4fc; border-radius:7px; padding:0.35rem 0.8rem; font-size:0.78rem; font-weight:600; cursor:pointer; transition:background .15s; text-decoration:none; display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap; }
 .gc-btn-voir:hover { background:rgba(99,102,241,0.22); }
+.gc-btn-del { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.28); color:#fca5a5; border-radius:7px; padding:0.35rem 0.8rem; font-size:0.78rem; font-weight:600; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.gc-btn-del:hover { background:rgba(239,68,68,0.22); }
 
 /* ── Modales (ajout / modification) ── */
 .gc-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9000; align-items:center; justify-content:center; padding:1rem; }
@@ -419,6 +453,14 @@ require __DIR__ . '/includes/header.php';
                            class="gc-btn-voir">
                             <i class="fa-solid fa-users"></i> Étudiants
                         </a>
+                        <button class="gc-btn-del"
+                            onclick="ouvrirModaleSupprimer(
+                                <?= (int)$classe['id_classe'] ?>,
+                                <?= htmlspecialchars(json_encode($classe['nom_classe']), ENT_QUOTES) ?>,
+                                <?= $effectif ?>
+                            )">
+                            <i class="fa-solid fa-trash"></i> Supprimer
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -517,13 +559,45 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- ── MODALE : Confirmation de suppression ───────────────────────────────────── -->
+<div id="gc-del-modal" class="gc-modal">
+    <div class="gc-modal-box" style="max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="margin:0;font-size:1rem;color:#ef4444;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Supprimer la classe
+            </h3>
+            <button type="button" onclick="fermerModale('gc-del-modal')" style="background:none;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <!-- Avertissement affiché si la classe a des stagiaires -->
+        <div id="gc-del-warning" style="display:none;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:8px;padding:0.65rem 0.9rem;margin-bottom:1rem;font-size:0.83rem;color:#fb923c;">
+            <i class="fa-solid fa-circle-exclamation" style="margin-right:0.35rem;"></i>
+            <span id="gc-del-warning-text"></span>
+        </div>
+        <p id="gc-del-msg" style="margin:0 0 1.25rem;font-size:0.9rem;color:#a1a1aa;line-height:1.55;"></p>
+        <div id="gc-del-err" class="gc-err-box"></div>
+        <div style="display:flex;gap:0.65rem;">
+            <button type="button" onclick="fermerModale('gc-del-modal')"
+                    style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a1a1aa;font-weight:600;font-size:0.88rem;cursor:pointer;">
+                Annuler
+            </button>
+            <button type="button" id="gc-del-confirm-btn" onclick="soumettreSupprimer()"
+                    style="flex:1;padding:0.65rem;border-radius:8px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#fca5a5;font-weight:700;font-size:0.88rem;cursor:pointer;">
+                <i class="fa-solid fa-trash" style="margin-right:0.35rem;"></i> Confirmer la suppression
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Notification toast (succès / erreur) -->
 <div id="gc-toast" class="gc-toast"></div>
 
 <script>
 // ── Variables globales ─────────────────────────────────────────────────────────
-var idClasseEnEdition = 0;
-var jetonCsrf         = <?= json_encode(csrf_token()) ?>;
+var idClasseEnEdition  = 0;
+var idClasseASupprimer = 0;
+var jetonCsrf          = <?= json_encode(csrf_token()) ?>;
 
 // ── Soumission recherche avec délai (évite un rechargement par frappe) ────────
 (function () {
@@ -563,7 +637,7 @@ function fermerModale(idModale) {
 }
 
 // Fermeture par clic sur le fond de la modale ou par touche Échap
-['gc-edit-modal', 'gc-add-modal'].forEach(function (idModale) {
+['gc-edit-modal', 'gc-add-modal', 'gc-del-modal'].forEach(function (idModale) {
     document.getElementById(idModale).addEventListener('click', function (e) {
         if (e.target === this) this.style.display = 'none';
     });
@@ -572,6 +646,7 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         fermerModale('gc-edit-modal');
         fermerModale('gc-add-modal');
+        fermerModale('gc-del-modal');
     }
 });
 
@@ -776,6 +851,86 @@ function soumettreAjout() {
                     // Mettre à jour le compteur affiché dans la barre de filtres
                     var compteurEl = document.getElementById('gc-count-visible');
                     if (compteurEl) compteurEl.textContent = parseInt(compteurEl.textContent, 10) + 1;
+                }
+            } else {
+                boiteErreur.textContent = resultat.error || 'Erreur inconnue.';
+                boiteErreur.style.display = 'block';
+            }
+        })
+        .catch(function () {
+            boiteErreur.textContent = 'Erreur réseau.';
+            boiteErreur.style.display = 'block';
+        });
+}
+
+// ============================================================
+//  Modale : Suppression d'une classe
+// ============================================================
+
+/**
+ * Ouvre la modale de confirmation de suppression.
+ * Affiche un avertissement orange si la classe a des stagiaires inscrits
+ * (dans ce cas le bouton de confirmation reste désactivé côté serveur).
+ * @param {number} idClasse  - Identifiant de la classe à supprimer.
+ * @param {string} nomClasse - Nom affiché dans le message de confirmation.
+ * @param {number} effectif  - Nombre de stagiaires actuellement inscrits.
+ */
+function ouvrirModaleSupprimer(idClasse, nomClasse, effectif) {
+    idClasseASupprimer = idClasse;
+    document.getElementById('gc-del-err').style.display = 'none';
+    document.getElementById('gc-del-msg').innerHTML =
+        'Vous êtes sur le point de supprimer définitivement la classe <strong style="color:#fff;">'
+        + escHtml(nomClasse) + '</strong>. Cette action est irréversible.';
+
+    // Afficher l'avertissement si des stagiaires sont présents
+    var zoneAvertissement = document.getElementById('gc-del-warning');
+    var texteAvertissement = document.getElementById('gc-del-warning-text');
+    if (effectif > 0) {
+        texteAvertissement.textContent =
+            effectif + ' stagiaire(s) sont inscrits dans cette classe. '
+            + 'Désaffectez-les d\'abord avant de pouvoir supprimer.';
+        zoneAvertissement.style.display = 'block';
+    } else {
+        zoneAvertissement.style.display = 'none';
+    }
+
+    document.getElementById('gc-del-modal').style.display = 'flex';
+}
+
+/**
+ * Soumet la suppression en AJAX et retire la ligne du tableau si réussi.
+ * Le serveur bloque la suppression si des stagiaires sont encore dans la classe.
+ */
+function soumettreSupprimer() {
+    var boiteErreur = document.getElementById('gc-del-err');
+    boiteErreur.style.display = 'none';
+
+    var donneesFormulaire = new FormData();
+    donneesFormulaire.append('delete_classe', '1');
+    donneesFormulaire.append('csrf_token',    jetonCsrf);
+    donneesFormulaire.append('id_classe',     idClasseASupprimer);
+
+    fetch('gestion_classes.php', { method: 'POST', body: donneesFormulaire })
+        .then(function (reponse) { return reponse.json(); })
+        .then(function (resultat) {
+            if (resultat.success) {
+                fermerModale('gc-del-modal');
+                afficherToast(resultat.msg, true);
+                // Retrait de la ligne du tableau sans rechargement
+                var rangee = document.querySelector('.gc-row[data-id="' + idClasseASupprimer + '"]');
+                if (rangee) {
+                    rangee.style.transition = 'opacity .3s, transform .3s';
+                    rangee.style.opacity    = '0';
+                    rangee.style.transform  = 'translateX(20px)';
+                    setTimeout(function () {
+                        rangee.remove();
+                        // Décrémenter le compteur visible
+                        var compteurEl = document.getElementById('gc-count-visible');
+                        if (compteurEl) {
+                            var ancien = parseInt(compteurEl.textContent, 10);
+                            if (!isNaN(ancien) && ancien > 0) compteurEl.textContent = ancien - 1;
+                        }
+                    }, 300);
                 }
             } else {
                 boiteErreur.textContent = resultat.error || 'Erreur inconnue.';
