@@ -2,12 +2,14 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
-$SCHOOL_ORG   = 'Groupe IPIRNET';
-$SCHOOL_TAG1  = "Institut Privé d'Informatique, Réseau et Nouvelles";
-$SCHOOL_TAG2  = 'Etudes de Télécommunication';
-$SCHOOL_AUTH1 = "Autorisé par l'Etat sous N°   : 3/03/2/2003     Du : 19/02/2003";
-$SCHOOL_AUTH2 = "Décision de l'accréditation N°    21/ DFP /F0301/ 199    du 29/11/2021";
-$SCHOOL_ADDR  = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13';
+// ── Constantes établissement (source unique de vérité pour toutes les pages d'impression) ──
+$SCHOOL_ORG         = 'GROUPE IPIRNET';
+$SCHOOL_TAGLINE_1   = "Institut Privé d'Informatique Réseau et Nouvelles";
+$SCHOOL_TAGLINE_2   = 'Etude de Télécommunication';
+$SCHOOL_AUTH_LINE_1 = "Autorisé par l'Etat sous N: 3/03/2/2003   Du: 19/02/2003";
+$SCHOOL_AUTH_LINE_2 = "Accrédité par l'Etat sous N° 21/ DFP/ F0301/199   du 29/11/2021";
+$SCHOOL_ADDRESS     = 'Bd Hassan II, Lot ESSAFI, Imm N° 1, Berrechid.  Tel : 0522.32.72.13  //  mobile 06 27 61 21 79';
+$SCHOOL_LEGAL       = "Email : ipirnet.fp@gmail.com,  R.C : 6693,  Patente N° : 40724575,  IF : 14374293";
 
 $auto   = isset($_GET['auto']) && $_GET['auto'] === '1';
 $filled = false;
@@ -167,13 +169,13 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
 <?php endif; ?>
 
 <div class="lh">
-    <div class="lh-logo"><img src="assets/img/logo.png" alt="" onerror="this.style.display='none'"></div>
+    <div class="lh-logo"><img src="assets/img/logo.png" alt="Logo <?= h($SCHOOL_ORG) ?>" onerror="this.style.display='none'"></div>
     <div class="lh-mid">
-        <div class="org"><?= htmlspecialchars($SCHOOL_ORG) ?></div>
-        <div class="tag"><?= htmlspecialchars($SCHOOL_TAG1) ?><br><?= htmlspecialchars($SCHOOL_TAG2) ?></div>
-        <div class="auth"><?= htmlspecialchars($SCHOOL_AUTH1) ?><br><?= htmlspecialchars($SCHOOL_AUTH2) ?></div>
+        <div class="org"><?= h($SCHOOL_ORG) ?></div>
+        <div class="tag"><?= h($SCHOOL_TAGLINE_1) ?><br><?= h($SCHOOL_TAGLINE_2) ?></div>
+        <div class="auth"><?= h($SCHOOL_AUTH_LINE_1) ?><br><?= h($SCHOOL_AUTH_LINE_2) ?></div>
     </div>
-    <div class="stamp-wrap"><img src="assets/img/stamp_accredite.jpg" alt="Accrédité" style="width:88px;height:88px;object-fit:contain;border-radius:50%;"></div>
+    <div class="stamp-wrap"><img src="assets/img/stamp_accredite.jpg" alt="Accrédité par l'État" style="width:88px;height:88px;object-fit:contain;border-radius:50%;"></div>
 </div>
 
 <div class="doc-title"><div class="doc-title-box"><div class="doc-title-txt">Fiche &nbsp; de &nbsp; Preinscription</div></div></div>
@@ -253,7 +255,10 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
 <div class="xl"></div>
 
 <div class="merci">Merci de nous rendre visite.</div>
-<div class="footer-doc"><?= htmlspecialchars($SCHOOL_ADDR) ?></div>
+<div class="footer-doc">
+    <?= h($SCHOOL_ADDRESS) ?><br>
+    <?= h($SCHOOL_LEGAL) ?>
+</div>
 </div>
 
 <?php if($auto): ?><script>window.addEventListener('load',function(){setTimeout(function(){var t=document.title;document.title=' ';window.print();document.title=t;},400);});</script><?php endif; ?>
