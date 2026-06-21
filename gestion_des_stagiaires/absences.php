@@ -833,6 +833,25 @@
   </div><!-- /container principal -->
 
 
+  <!-- ─── BANDEAU RÉIMPRESSION (persistant via localStorage) ─────────────── -->
+  <div id="gds-reprint-banner"
+       style="display:none;position:fixed;top:1rem;left:50%;transform:translateX(-50%);
+              z-index:9999;background:#18181b;border:1px solid rgba(34,197,94,.4);
+              border-radius:10px;padding:.55rem 1rem;align-items:center;gap:.75rem;
+              font-size:.82rem;color:#86efac;box-shadow:0 4px 18px rgba(0,0,0,.5);
+              white-space:nowrap;">
+    <span>🖨 Dernière justification :</span>
+    <a id="gds-reprint-link" href="#" target="_blank" rel="noopener"
+       style="color:#fff;font-weight:700;text-decoration:none;background:rgba(255,255,255,.15);
+              padding:2px 12px;border-radius:5px;border:1px solid rgba(255,255,255,.25);">
+      Réimprimer le récapitulatif
+    </a>
+    <button onclick="gdsClearReprint()"
+            style="background:transparent;border:none;color:#71717a;cursor:pointer;
+                   font-size:.95rem;line-height:1;padding:0 2px;"
+            title="Effacer">✕</button>
+  </div>
+
   <!-- ─── BARRE D'ACTIONS EN MASSE ────────────────────────────────────────── -->
   <div class="bulk-bar" id="bulk-bar">
     <span class="bulk-count" id="bulk-count">0 sélectionné(s)</span>
@@ -1350,6 +1369,9 @@
             + '&motif=' + encodeURIComponent(justif);
           const urlImpression = 'print_bulk_justification.php?' + urlParams;
           afficherToastAvecLien(data.updated + ' absence(s) justifiée(s).', 'Imprimer le récapitulatif', urlImpression);
+          // Sauvegarder pour pouvoir réimprimer après rechargement de la page
+          try { localStorage.setItem('gds_last_bulk_print', urlImpression); } catch(e) {}
+          afficherBandeauReprint(urlImpression);
 
           // Mise à jour précise par stagiaire grâce au bilan retourné par le serveur
           const bilan = data.bilan_par_stag || {};
@@ -1645,6 +1667,30 @@
       setTimeout(() => toast.remove(), 400);
     }, 7000);
   }
+
+  /** Affiche le bandeau de réimpression persistant en haut de page */
+  function afficherBandeauReprint(url) {
+    const banner = document.getElementById('gds-reprint-banner');
+    const lien   = document.getElementById('gds-reprint-link');
+    if (!banner || !lien) return;
+    lien.href = url;
+    banner.style.display = 'flex';
+  }
+
+  /** Supprime la dernière URL sauvegardée et masque le bandeau */
+  function gdsClearReprint() {
+    try { localStorage.removeItem('gds_last_bulk_print'); } catch(e) {}
+    const banner = document.getElementById('gds-reprint-banner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  // Restaurer le bandeau au chargement de la page si une URL est sauvegardée
+  document.addEventListener('DOMContentLoaded', function() {
+    try {
+      const saved = localStorage.getItem('gds_last_bulk_print');
+      if (saved) afficherBandeauReprint(saved);
+    } catch(e) {}
+  });
 
   /** Affiche le dialog de confirmation et retourne une Promise<boolean> */
   var _gdsConfirmCallback = null;
