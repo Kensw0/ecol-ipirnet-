@@ -171,6 +171,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── ACCEPT ── */
     if (isset($_POST['accepter_id'])) {
+        if (!gds_is_directeur()) {
+            flash_set('Accès réservé au directeur.', 'danger');
+            redirect('demandes_inscription.php');
+        }
         $idDem = (int)$_POST['accepter_id'];
         $pdo->beginTransaction();
         try {
@@ -277,6 +281,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── REFUSE ── */
     if (isset($_POST['refuser_id'])) {
+        if (!gds_is_directeur()) {
+            flash_set('Accès réservé au directeur.', 'danger');
+            redirect('demandes_inscription.php');
+        }
         $idDem = (int)$_POST['refuser_id'];
         $u = $pdo->prepare('UPDATE pre_inscription SET statut = ?, date_decision = NOW() WHERE id_demande = ? AND statut = ?');
         $u->execute(['abandonne', $idDem, 'en_attente']);
@@ -286,6 +294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── BULK REFUSE ── */
     if (isset($_POST['bulk_refuser'])) {
+        if (!gds_is_directeur()) {
+            flash_set('Accès réservé au directeur.', 'danger');
+            redirect('demandes_inscription.php');
+        }
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? []))));
         if (!empty($ids)) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
@@ -306,6 +318,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /* ── BULK PREFLIGHT (AJAX) ── */
     if (isset($_POST['bulk_preflight'])) {
         header('Content-Type: application/json');
+        if (!gds_is_directeur()) {
+            echo json_encode(['success' => false, 'msg' => 'Accès réservé au directeur.']);
+            exit;
+        }
         // Ensure capacite column exists (soft-cap support)
         try { $pdo->exec("ALTER TABLE classes ADD COLUMN IF NOT EXISTS capacite INT UNSIGNED NOT NULL DEFAULT 30"); } catch (\Throwable $ignored) {}
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? []))));
@@ -382,6 +398,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ── BULK ACCEPT (auto-assign by filière) ── */
     if (isset($_POST['bulk_accepter'])) {
+        if (!gds_is_directeur()) {
+            flash_set('Accès réservé au directeur.', 'danger');
+            redirect('demandes_inscription.php');
+        }
         $groupsRaw = trim((string)($_POST['bulk_groups'] ?? ''));
         $groups = [];
         try { $groups = json_decode($groupsRaw, true) ?: []; } catch (\Throwable $e) {}
