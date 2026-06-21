@@ -225,8 +225,8 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
 <div class="sec"><span>➤ </span><span>Licence professionnelle :</span></div>
 <div class="cl">
     <?php
-    \$licOptions = ['Management et Ressource Humaine', 'Finance et Comptabilité', 'Logistique Internationale', 'Informatique'];
-    foreach(\$licOptions as \$l): \$lc = \$inArr(\$savedLicences, \$l); ?>
+    $licOptions = ['Management et Ressource Humaine', 'Finance et Comptabilité', 'Logistique Internationale', 'Informatique'];
+    foreach($licOptions as $l): $lc = $inArr($savedLicences, $l); ?>
     <div class="cli<?= $lc ? ' bck' : '' ?>"><?= chk($lc) ?> <span><?= htmlspecialchars(strtoupper($l)) ?> :</span></div>
     <?php endforeach; ?>
 </div>
