@@ -271,6 +271,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     redirect('stagiaires.php?id=' . $id);
                 }
             }
+            // ── Vérification doublon email avant mise à jour ──────────────────────────────
+            if ($emNull !== null) {
+                $emailChk = $pdo->prepare('SELECT id_stagiaire, nom, prenom, num_inscri FROM stagiaires WHERE email = ? AND id_stagiaire != ?');
+                $emailChk->execute([$emNull, $id]);
+                $emailOwner = $emailChk->fetch();
+                if ($emailOwner) {
+                    flash_set('⚠️ Cet email est déjà utilisé par ' . trim((string)$emailOwner['prenom'] . ' ' . (string)$emailOwner['nom']) . ' (N° ' . (string)$emailOwner['num_inscri'] . '). Veuillez corriger l\'email.', 'error');
+                    redirect('stagiaires.php?id=' . $id . '&edit=1');
+                }
+            }
             $sql = 'UPDATE stagiaires SET num_inscri=?, cin=?, nom=?, prenom=?, date_naissance=?, adresse=?, email=?, telephone=?, telephone_parent=?, nom_tuteur=?, photo=?, date_inscription=?, id_classe=?';
             $params = [$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $photo === '' ? null : $photo, $di, $cid];
             if ($remiseMensuelle !== null) {
@@ -320,12 +330,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (\PDOException $e) { /* table may not exist yet — silently skip */ }
             // ── END AUDIT TRAIL ───────────────────────────────────────────────────
 
-            $pdo->prepare($sql)->execute($params);
+            // Exécution avec protection contre les doublons au niveau base de données
+            try {
+                $pdo->prepare($sql)->execute($params);
+            } catch (\PDOException $e) {
+                if (str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate entry')) {
+                    if (str_contains(strtolower($e->getMessage()), 'cin')) {
+                        flash_set('⚠️ Ce CIN est déjà utilisé par un autre stagiaire.', 'error');
+                    } elseif (str_contains(strtolower($e->getMessage()), 'email')) {
+                        flash_set('⚠️ Cet email est déjà utilisé par un autre stagiaire.', 'error');
+                    } else {
+                        flash_set('⚠️ Une valeur unique (CIN ou email) est déjà utilisée. Veuillez corriger.', 'error');
+                    }
+                } else {
+                    flash_set('⚠️ Erreur lors de la mise à jour. Veuillez réessayer.', 'error');
+                }
+                redirect('stagiaires.php?id=' . $id . '&edit=1');
+            }
             flash_set('Stagiaire mis à jour.', 'success');
             // PRG: redirect back to the student hub, preserving the year filter
             $_stAnnee = $pdo->prepare("SELECT c.annee_scolaire FROM stagiaires s JOIN classes c ON c.id_classe=s.id_classe WHERE s.id_stagiaire=? LIMIT 1"); $_stAnnee->execute([$id]); $_savedAnnee = (string)($_stAnnee->fetchColumn() ?: '');
             redirect('stagiaires.php?id=' . $id . ($_savedAnnee !== '' ? '&a=' . urlencode($_savedAnnee) : ''));
         } else {
+            // ── Vérification doublon CIN avant insertion ───────────────────────────────
+            if ($cin !== '') {
+                $cinChkNew = $pdo->prepare('SELECT id_stagiaire, nom, prenom, num_inscri FROM stagiaires WHERE cin = ?');
+                $cinChkNew->execute([$cin]);
+                $cinOwnerNew = $cinChkNew->fetch();
+                if ($cinOwnerNew) {
+                    flash_set('⚠️ Ce CIN est déjà utilisé par ' . trim((string)$cinOwnerNew['prenom'] . ' ' . (string)$cinOwnerNew['nom']) . ' (N° ' . (string)$cinOwnerNew['num_inscri'] . '). Veuillez corriger le CIN.', 'error');
+                    redirect('stagiaires.php?new=1');
+                }
+            }
+            // ── Vérification doublon email avant insertion ─────────────────────────────
+            if ($emNull !== null) {
+                $emailChkNew = $pdo->prepare('SELECT id_stagiaire, nom, prenom, num_inscri FROM stagiaires WHERE email = ?');
+                $emailChkNew->execute([$emNull]);
+                $emailOwnerNew = $emailChkNew->fetch();
+                if ($emailOwnerNew) {
+                    flash_set('⚠️ Cet email est déjà utilisé par ' . trim((string)$emailOwnerNew['prenom'] . ' ' . (string)$emailOwnerNew['nom']) . ' (N° ' . (string)$emailOwnerNew['num_inscri'] . '). Veuillez corriger l\'email.', 'error');
+                    redirect('stagiaires.php?new=1');
+                }
+            }
             if ($mat === '') {
                 $year = date('Y', strtotime($di));
                 $st = $pdo->prepare("SELECT COUNT(*) FROM stagiaires WHERE num_inscri LIKE ?");
@@ -334,8 +380,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mat = 'INS-' . $year . '-' . str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
             }
             $hash = $pwHash ?? password_hash('changeme', PASSWORD_DEFAULT);
-            $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, remise_mensuelle) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid, $remiseMensuelle ?? 0.0]);
+            // Insertion avec protection contre les doublons base de données (filet de sécurité)
+            try {
+                $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, remise_mensuelle) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid, $remiseMensuelle ?? 0.0]);
+            } catch (\PDOException $e) {
+                if (str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate entry')) {
+                    if (str_contains(strtolower($e->getMessage()), 'cin')) {
+                        flash_set('⚠️ Ce CIN est déjà utilisé. Veuillez vérifier et corriger.', 'error');
+                    } elseif (str_contains(strtolower($e->getMessage()), 'email')) {
+                        flash_set('⚠️ Cet email est déjà utilisé. Veuillez vérifier et corriger.', 'error');
+                    } else {
+                        flash_set('⚠️ Une valeur unique (CIN ou email) est déjà utilisée. Veuillez corriger.', 'error');
+                    }
+                } else {
+                    flash_set('⚠️ Erreur lors de la création du stagiaire. Veuillez réessayer.', 'error');
+                }
+                redirect('stagiaires.php?new=1');
+            }
             $_newId = (int)$pdo->lastInsertId();
             flash_set('Stagiaire créé avec succès (N° Inscription: ' . $mat . ').', 'success');
             // PRG: redirect to the new student's hub page — no year filter so smart default applies
