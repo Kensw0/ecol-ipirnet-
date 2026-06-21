@@ -23,9 +23,8 @@ function gds_safe_next(string $raw): string
 }
 
 /**
- * Single shared admin password (school demo).
- * Set env GDS_ADMIN_PASSWORD in production; never commit a real secret.
- * If unset, login is disabled — no fallback default password.
+ * Directeur password. Override via GDS_ADMIN_PASSWORD env var in production.
+ * Default: admin123 (username: admin)
  */
 function gds_admin_password(): string
 {
@@ -34,6 +33,19 @@ function gds_admin_password(): string
         return $p;
     }
     return 'admin123';
+}
+
+/**
+ * Secrétaire fallback password. Override via GDS_SECRETAIRE_PASSWORD env var in production.
+ * Default: secretaire (username: secretaire)
+ */
+function gds_secretaire_password(): string
+{
+    $p = getenv('GDS_SECRETAIRE_PASSWORD');
+    if ($p !== false && $p !== '') {
+        return $p;
+    }
+    return 'secretaire';
 }
 
 function gds_admin_logged_in(): bool
