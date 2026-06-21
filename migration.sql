@@ -95,3 +95,30 @@ JOIN `modules` m ON m.`id_module` = mn.`id_module`
 GROUP BY mn.`id_stagiaire`, mn.`id_module`, m.`nom_module`, m.`coefficient`, m.`nb_controles`;
 
 SELECT 'Migration terminée avec succès.' AS statut;
+
+
+-- ============================================================
+-- feat: add etat_paiements_annuel to documents_generes ENUM
+-- Run this on the live database after deploying the PHP changes
+-- ============================================================
+
+-- Step 1: Expand the ENUM to include the new document type
+ALTER TABLE `documents_generes`
+MODIFY COLUMN `type_document`
+  enum('certificat_scolarite','billet_excuse','etat_mensualites','releve_notes','bulletin',
+       'attestation_reussite','convention_stage','fiche_inscription','recu_paiement',
+       'fiche_preinscription','liste_stagiaires','etat_paiement','rapport_individuel',
+       'etat_paiements_annuel','autre')
+  NOT NULL DEFAULT 'autre';
+
+-- Step 2: Fix existing rows that were mislogged as 'autre' because the ENUM
+--         didn't accept 'etat_paiements_annuel' yet. These rows have a reference
+--         matching a student num_inscri, logged after the feature was introduced.
+--         Review before running — adjust the date cutoff if needed.
+UPDATE `documents_generes`
+SET    `type_document` = 'etat_paiements_annuel'
+WHERE  `type_document` = 'autre'
+  AND  `reference` IN (SELECT `num_inscri` FROM `stagiaires`)
+  AND  `genere_le` >= '2026-06-13';
+
+SELECT CONCAT('Rows updated: ', ROW_COUNT()) AS statut;
