@@ -319,24 +319,8 @@ $fmtDt = static function (?string $d): string {
         <a href="cotisations.php">Cotisations</a>
     </div>
 
-    <!-- ══ Letterhead ════════════════════════════════════════════════════════ -->
-    <table class="cs-head">
-        <tr>
-            <td class="cs-head-left">
-                <img src="assets/img/logo.png" alt="" class="cs-head-logo">
-            </td>
-            <td class="cs-head-mid">
-                <div class="cs-org"><?= h($SCHOOL_ORG) ?></div>
-                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_1) ?></div>
-                <div class="cs-tag"><?= h($SCHOOL_TAGLINE_2) ?></div>
-                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_1) ?></div>
-                <div class="cs-auth"><?= h($SCHOOL_AUTH_LINE_2) ?></div>
-            </td>
-            <td class="cs-head-right">
-                <div class="cs-stamp">ACCRÉDITÉ</div>
-            </td>
-        </tr>
-    </table>
+    <!-- ══ En-tête officiel (partagé entre toutes les pages d'impression) ══ -->
+    <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
     <!-- ══ Title oval ════════════════════════════════════════════════════════ -->
     <div class="cs-title-wrap">
@@ -464,11 +448,8 @@ $fmtDt = static function (?string $d): string {
         </tr>
     </table>
 
-    <!-- ══ Footer ════════════════════════════════════════════════════════════ -->
-    <div class="cs-footer">
-        <?= h($SCHOOL_ADDRESS) ?><br>
-        <?= h($SCHOOL_LEGAL) ?>
-    </div>
+    <!-- ══ Pied de page ═════════════════════════════════════════════════════ -->
+    <?php require __DIR__ . '/includes/print_footer.php'; ?>
 </div>
 
 <?php if ($auto): ?>
