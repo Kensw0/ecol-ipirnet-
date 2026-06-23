@@ -249,10 +249,10 @@
               vertical-align: middle; line-height: 1.4;
           }
           .fa-table .col-n     { width: 6%;  text-align: center; }
-          .fa-table .col-nom   { width: 44%; font-weight: 600; }
+          .fa-table .col-nom   { width: 60%; font-weight: 600; }
           .fa-table .col-heure { width: 16%; text-align: center; font-size: 9.5pt; }
-          .fa-table .col-cb    { width: 10%; text-align: center; font-size: 14pt; letter-spacing: .1em; }
-          .fa-table .col-obs   { width: 24%; }
+          .fa-table .col-abs   { width: 17%; text-align: center; }
+          .fa-table .col-pre   { width: 17%; text-align: center; }
           /* Hauteur minimale pour que le prof puisse écrire */
           .fa-table tbody td { height: 22px; }
 
@@ -406,11 +406,8 @@
               <tr>
                   <th class="col-n">N°</th>
                   <th class="col-nom" style="text-align:left;">Nom &amp; Prénom</th>
-                  <?php if ($horaireAffiche !== ''): ?>
-                  <th class="col-heure">Heure</th>
-                  <?php endif; ?>
-                  <th class="col-cb">[ ]</th>
-                  <th class="col-obs" style="text-align:left;">Observations</th>
+                  <th class="col-abs">Absent</th>
+                  <th class="col-pre">Présent</th>
               </tr>
           </thead>
           <tbody>
@@ -418,11 +415,8 @@
               <tr>
                   <td class="col-n"><?= $idx + 1 ?></td>
                   <td class="col-nom"><?= h(strtoupper($stag['nom']) . ' ' . $stag['prenom']) ?></td>
-                  <?php if ($horaireAffiche !== ''): ?>
-                  <td class="col-heure"><?= h($horaireAffiche) ?></td>
-                  <?php endif; ?>
-                  <td class="col-cb">&#9633;</td>
-                  <td class="col-obs">&nbsp;</td>
+                  <td class="col-abs">&#9633;</td>
+                  <td class="col-pre">&#9633;</td>
               </tr>
               <?php endforeach; ?>
 
@@ -431,11 +425,8 @@
               <tr>
                   <td class="col-n"><?= count($stagiaires) + $extra ?></td>
                   <td class="col-nom">&nbsp;</td>
-                  <?php if ($horaireAffiche !== ''): ?>
-                  <td class="col-heure">&nbsp;</td>
-                  <?php endif; ?>
-                  <td class="col-cb">&#9633;</td>
-                  <td class="col-obs">&nbsp;</td>
+                  <td class="col-abs">&#9633;</td>
+                  <td class="col-pre">&#9633;</td>
               </tr>
               <?php endfor; ?>
           </tbody>
