@@ -659,6 +659,14 @@
                   </button>
                   <?php endif; ?>
 
+                  <!-- Fiche vierge : tableau de contrôle sans données -->
+                  <a href="print_tableau_notes_controle.php?vierge=1"
+                     target="_blank"
+                     class="btn-save-notes"
+                     style="text-decoration:none;background:rgba(255,255,255,0.05);color:#a1a1aa;border-color:rgba(255,255,255,0.15);">
+                      <i class="fa-solid fa-file-lines"></i> Fiche vierge
+                  </a>
+
                   <!-- Enregistrement AJAX -->
                   <button type="submit" class="btn-save-notes" id="btn-enregistrer">
                       <i class="fa-solid fa-floppy-disk"></i> Enregistrer
