@@ -236,7 +236,7 @@
           /* ── Tableau d'appel ─────────────────────────────────── */
           .fa-table {
               width: 100%; border-collapse: collapse;
-              border: 2px solid #000; margin-top: 8px; font-size: 10.5pt;
+              margin-top: 8px; font-size: 10.5pt;
           }
           .fa-table th {
               background: #e8e8e8; border: 1px solid #000;
@@ -401,7 +401,6 @@
       </div>
 
       <!-- Tableau d'appel -->
-      <form autocomplete="off" style="display:block;margin:0;padding:0;">
       <table class="fa-table">
           <thead>
               <tr>
@@ -432,7 +431,6 @@
               <?php endfor; ?>
           </tbody>
       </table>
-      </form>
 
       <!-- Zone de signatures -->
       <table class="cs-sign">
