@@ -1649,7 +1649,7 @@ function applyTraiterFilters() {
         var matchYear   = !activeYearTraiter || rowYear === '' || rowYear === activeYearTraiter;
         row.style.display = (matchSearch && matchYear) ? '' : 'none';
     });
-    refreshGroupHeaders();
+    if (typeof refreshGroupHeaders === 'function') refreshGroupHeaders();
 }
 
 function applyHistFilters() {
