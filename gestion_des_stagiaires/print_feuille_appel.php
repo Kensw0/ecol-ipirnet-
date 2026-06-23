@@ -401,6 +401,7 @@
       </div>
 
       <!-- Tableau d'appel -->
+      <form autocomplete="off" style="display:block;margin:0;padding:0;">
       <table class="fa-table">
           <thead>
               <tr>
@@ -431,6 +432,7 @@
               <?php endfor; ?>
           </tbody>
       </table>
+      </form>
 
       <!-- Zone de signatures -->
       <table class="cs-sign">
