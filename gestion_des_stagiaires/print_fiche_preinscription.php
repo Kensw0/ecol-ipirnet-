@@ -64,18 +64,14 @@ $dipOptions = [
     'TGI'  => 'Technicien en Gestion Informatisée (3AS ou plus)',
 ];
 
-// Primary: use the selected filière (id_filiere) — the single source of truth since the select redesign
-// Fallback: also include anything saved in the legacy diplomes JSON array (for old records)
+// Source unique de vérité : la filière choisie via id_filiere.
+// L'ancienne boucle "fallback" traitait les valeurs JSON de diplomes[] comme des
+// identifiants de filière (int), ce qui causait l'ajout de filières erronées quand
+// ces valeurs commençaient par un chiffre (ex. "1ère Bac" → (int) = 1).
 $checkedDipCodes = [];
 if ($filled) {
-    // Always mark the chosen filière
     $mainCode = $filiereById[(int)($d['id_filiere'] ?? 0)] ?? null;
     if ($mainCode) $checkedDipCodes[] = $mainCode;
-    // Also honour legacy diplomes array (pre-select-redesign records)
-    foreach ($savedDiplomes as $fid) {
-        $code = $filiereById[(int)$fid] ?? null;
-        if ($code && !in_array($code, $checkedDipCodes, true)) $checkedDipCodes[] = $code;
-    }
 }
 
 function chkEmpty(): string {
