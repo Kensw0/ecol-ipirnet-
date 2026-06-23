@@ -455,18 +455,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $resultats = [];
         foreach ($groupes as $groupe) {
             $nbDemandes = count($groupe['ids']);
-            // Récupère TOUTES les classes de cette filière (toutes années/niveaux) pour que l'utilisateur puisse choisir
+            // Récupère uniquement les classes de cette filière pour l'année scolaire visée dans la pré-inscription
             $requeteClasses = $pdo->prepare(
                 "SELECT c.id_classe, c.nom_classe, c.annee_scolaire, c.niveau, COALESCE(c.capacite, 30) AS capacite,
                         COUNT(s.id_stagiaire) AS effectif
                  FROM classes c LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
-                 WHERE c.id_filiere = ?
-                 GROUP BY c.id_classe ORDER BY c.annee_scolaire DESC, c.niveau ASC"
+                 WHERE c.id_filiere = ? AND c.annee_scolaire = ?
+                 GROUP BY c.id_classe ORDER BY c.niveau ASC"
             );
-            $requeteClasses->execute([$groupe['id_filiere']]);
-            $toutesClasses = $requeteClasses->fetchAll();
+            $requeteClasses->execute([$groupe['id_filiere'], $groupe['annee']]);
+            $classesAnnee = $requeteClasses->fetchAll();
 
-            if (empty($toutesClasses)) {
+            if (empty($classesAnnee)) {
                 $resultats[] = [
                     'id_filiere'  => $groupe['id_filiere'],
                     'nom_filiere' => $groupe['nom_filiere'],
@@ -482,13 +482,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'classes'     => [],
                 ];
             } else {
-                // Construit la liste complète des classes avec leur statut de capacité
+                // Construit la liste des classes pour l'année visée avec leur statut de capacité
                 $classesDispos = [];
-                $classeDefaut  = null;
-                foreach ($toutesClasses as $cls) {
+                foreach ($classesAnnee as $cls) {
                     $eff = (int)$cls['effectif'];
                     $cap = (int)$cls['capacite'];
-                    $entry = [
+                    $classesDispos[] = [
                         'id_classe'      => (int)$cls['id_classe'],
                         'nom_classe'     => $cls['nom_classe'],
                         'annee_scolaire' => $cls['annee_scolaire'],
@@ -497,12 +496,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'capacite'       => $cap,
                         'status'         => ($eff + $nbDemandes) <= $cap ? 'ok' : 'full',
                     ];
-                    $classesDispos[] = $entry;
-                    // Préférence : classe correspondant à l'année visée, sinon première
-                    if ($classeDefaut === null || $cls['annee_scolaire'] === $groupe['annee']) {
-                        $classeDefaut = $entry;
-                    }
                 }
+                $classeDefaut = $classesDispos[0];
                 $resultats[] = [
                     'id_filiere'  => $groupe['id_filiere'],
                     'nom_filiere' => $groupe['nom_filiere'],
@@ -1001,8 +996,16 @@ function getAvatarInitials($nom, $prenom) {
                 <?php endif; ?>
             </h2>
         </div>
-        <div style="font-size:0.78rem;color:rgba(249,115,22,0.7);display:flex;align-items:center;gap:0.4rem;">
-            <i class="fa-solid fa-circle-notch fa-spin"></i> Actualisation auto...
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <button type="button" id="pi-group-toggle"
+                onclick="toggleGroupByFiliere()"
+                style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.3rem 0.85rem;border-radius:20px;border:1px solid rgba(168,85,247,0.3);background:transparent;color:#a855f7;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.18s;"
+                onmouseover="this.style.background='rgba(168,85,247,0.12)'" onmouseout="this.style.background='transparent'">
+                <i class="fa-solid fa-layer-group"></i> Grouper par filière
+            </button>
+            <span style="font-size:0.78rem;color:rgba(249,115,22,0.7);display:flex;align-items:center;gap:0.4rem;">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Actualisation auto...
+            </span>
         </div>
     </div>
     <!-- Bulk action bar — appears when rows are checked -->
@@ -1038,7 +1041,7 @@ function getAvatarInitials($nom, $prenom) {
             <input type="text" id="traiter-search" placeholder="Rechercher par nom ou CIN..." style="width:100%;background:#111;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#fff;padding:0.55rem 0.8rem 0.55rem 2.3rem;font-size:0.85rem;box-sizing:border-box;">
         </div>
     </div>
-    <div style="padding:0 1.25rem 1.25rem;">
+    <div id="pi-rows-container" style="padding:0 1.25rem 1.25rem;">
         <?php foreach ($attente as $r): ?>
         <?php
             $did      = (int)$r['id_demande'];
@@ -1646,6 +1649,7 @@ function applyTraiterFilters() {
         var matchYear   = !activeYearTraiter || rowYear === '' || rowYear === activeYearTraiter;
         row.style.display = (matchSearch && matchYear) ? '' : 'none';
     });
+    refreshGroupHeaders();
 }
 
 function applyHistFilters() {
@@ -2003,6 +2007,97 @@ function bulkRefuse() {
             form.submit();
         }
     );
+}
+
+// ── Group-by-filière toggle ───────────────────────────────────────────────────
+var _groupByFiliere = false;
+
+function toggleGroupByFiliere() {
+    _groupByFiliere = !_groupByFiliere;
+    var btn = document.getElementById('pi-group-toggle');
+    if (btn) {
+        btn.innerHTML = _groupByFiliere
+            ? '<i class="fa-solid fa-list"></i> Vue liste'
+            : '<i class="fa-solid fa-layer-group"></i> Grouper par filière';
+        btn.style.background = _groupByFiliere ? 'rgba(168,85,247,0.18)' : 'transparent';
+        btn.style.borderColor = _groupByFiliere ? '#a855f7' : 'rgba(168,85,247,0.3)';
+        btn.onmouseover = function(){ this.style.background = _groupByFiliere ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.12)'; };
+        btn.onmouseout  = function(){ this.style.background = _groupByFiliere ? 'rgba(168,85,247,0.18)' : 'transparent'; };
+    }
+    renderPiList();
+}
+
+function renderPiList() {
+    var container = document.getElementById('pi-rows-container');
+    if (!container) return;
+
+    // Collect all real pi-rows (not group headers we inserted)
+    var allRows = Array.from(container.querySelectorAll('.pi-row[id^="pi-row-"]'));
+
+    // Remove any previously inserted group headers
+    container.querySelectorAll('.pi-filiere-header').forEach(function(h) { h.remove(); });
+
+    if (!_groupByFiliere) {
+        // Flat list — restore original order (just ensure all rows are back as siblings)
+        allRows.forEach(function(row) { container.appendChild(row); });
+        return;
+    }
+
+    // Group by filière — collect filière ordering from rows
+    var groups = {};
+    var filiereOrder = [];
+    allRows.forEach(function(row) {
+        var filiere = row.dataset.filiere || '—';
+        var filiereId = row.dataset.id_filiere || '0';
+        var key = filiereId + '||' + filiere;
+        if (!groups[key]) {
+            groups[key] = { filiere: filiere, rows: [] };
+            filiereOrder.push(key);
+        }
+        groups[key].rows.push(row);
+    });
+
+    // Clear container, then re-insert in grouped order
+    container.innerHTML = '';
+    filiereOrder.forEach(function(key) {
+        var g = groups[key];
+        var visible = g.rows.filter(function(r) { return r.style.display !== 'none'; });
+        var total   = g.rows.length;
+        var visibleN = visible.length;
+
+        // Filière header
+        var header = document.createElement('div');
+        header.className = 'pi-filiere-header';
+        header.style.cssText = 'display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.25rem 0.35rem;margin-top:0.6rem;border-bottom:1px solid rgba(168,85,247,0.18);';
+        header.innerHTML = '<i class="fa-solid fa-folder-open" style="color:#a855f7;font-size:0.85rem;"></i>'
+            + '<span style="font-weight:700;font-size:0.88rem;color:#d8b4fe;">' + htmlEsc(g.filiere) + '</span>'
+            + '<span id="pi-fh-count-' + key.replace(/\W/g,'_') + '" style="background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.25);border-radius:12px;font-size:0.7rem;font-weight:700;padding:0.1rem 0.5rem;">' + visibleN + ' / ' + total + '</span>';
+        container.appendChild(header);
+
+        g.rows.forEach(function(row) { container.appendChild(row); });
+    });
+}
+
+// Re-apply group view after year-filter or search changes visibility
+function refreshGroupHeaders() {
+    if (!_groupByFiliere) return;
+    var container = document.getElementById('pi-rows-container');
+    if (!container) return;
+    container.querySelectorAll('.pi-filiere-header').forEach(function(h) {
+        var key = null;
+        // Find next sibling rows to count visible
+        var countEl = h.querySelector('[id^="pi-fh-count-"]');
+        var visible = 0, total = 0;
+        var next = h.nextElementSibling;
+        while (next && next.classList.contains('pi-row')) {
+            total++;
+            if (next.style.display !== 'none') visible++;
+            next = next.nextElementSibling;
+        }
+        if (countEl) countEl.textContent = visible + ' / ' + total;
+        // Hide header if all rows in group are hidden
+        h.style.display = (total === 0 || visible === 0) ? 'none' : 'flex';
+    });
 }
 
 var _bulkPreflight = [];
