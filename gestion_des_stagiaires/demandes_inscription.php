@@ -454,18 +454,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $resultats = [];
         foreach ($groupes as $groupe) {
-            // Cherche la première classe disponible pour cette filière et cette année
-            $requeteClasse = $pdo->prepare(
-                "SELECT c.id_classe, c.nom_classe, c.niveau, COALESCE(c.capacite, 30) AS capacite,
+            $nbDemandes = count($groupe['ids']);
+            // Récupère TOUTES les classes de cette filière (toutes années/niveaux) pour que l'utilisateur puisse choisir
+            $requeteClasses = $pdo->prepare(
+                "SELECT c.id_classe, c.nom_classe, c.annee_scolaire, c.niveau, COALESCE(c.capacite, 30) AS capacite,
                         COUNT(s.id_stagiaire) AS effectif
                  FROM classes c LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
-                 WHERE c.id_filiere = ? AND c.annee_scolaire = ?
-                 GROUP BY c.id_classe ORDER BY c.niveau ASC LIMIT 1"
+                 WHERE c.id_filiere = ?
+                 GROUP BY c.id_classe ORDER BY c.annee_scolaire DESC, c.niveau ASC"
             );
-            $requeteClasse->execute([$groupe['id_filiere'], $groupe['annee']]);
-            $classe    = $requeteClasse->fetch();
-            $nbDemandes = count($groupe['ids']);
-            if (!$classe) {
+            $requeteClasses->execute([$groupe['id_filiere']]);
+            $toutesClasses = $requeteClasses->fetchAll();
+
+            if (empty($toutesClasses)) {
                 $resultats[] = [
                     'id_filiere'  => $groupe['id_filiere'],
                     'nom_filiere' => $groupe['nom_filiere'],
@@ -478,22 +479,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'capacite'    => 30,
                     'status'      => 'no_class',
                     'ids'         => $groupe['ids'],
+                    'classes'     => [],
                 ];
             } else {
-                $effectifActuel = (int)$classe['effectif'];
-                $capaciteMax    = (int)$classe['capacite'];
+                // Construit la liste complète des classes avec leur statut de capacité
+                $classesDispos = [];
+                $classeDefaut  = null;
+                foreach ($toutesClasses as $cls) {
+                    $eff = (int)$cls['effectif'];
+                    $cap = (int)$cls['capacite'];
+                    $entry = [
+                        'id_classe'      => (int)$cls['id_classe'],
+                        'nom_classe'     => $cls['nom_classe'],
+                        'annee_scolaire' => $cls['annee_scolaire'],
+                        'niveau'         => $cls['niveau'],
+                        'effectif'       => $eff,
+                        'capacite'       => $cap,
+                        'status'         => ($eff + $nbDemandes) <= $cap ? 'ok' : 'full',
+                    ];
+                    $classesDispos[] = $entry;
+                    // Préférence : classe correspondant à l'année visée, sinon première
+                    if ($classeDefaut === null || $cls['annee_scolaire'] === $groupe['annee']) {
+                        $classeDefaut = $entry;
+                    }
+                }
                 $resultats[] = [
                     'id_filiere'  => $groupe['id_filiere'],
                     'nom_filiere' => $groupe['nom_filiere'],
                     'annee'       => $groupe['annee'],
-                    'id_classe'   => (int)$classe['id_classe'],
-                    'nom_classe'  => $classe['nom_classe'],
-                    'niveau'      => $classe['niveau'],
+                    'id_classe'   => $classeDefaut['id_classe'],
+                    'nom_classe'  => $classeDefaut['nom_classe'],
+                    'niveau'      => $classeDefaut['niveau'],
                     'count'       => $nbDemandes,
-                    'effectif'    => $effectifActuel,
-                    'capacite'    => $capaciteMax,
-                    'status'      => ($effectifActuel + $nbDemandes) <= $capaciteMax ? 'ok' : 'full',
+                    'effectif'    => $classeDefaut['effectif'],
+                    'capacite'    => $classeDefaut['capacite'],
+                    'status'      => $classeDefaut['status'],
                     'ids'         => $groupe['ids'],
+                    'classes'     => $classesDispos,
                 ];
             }
         }
@@ -521,7 +543,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok   = 0; $skip = 0;
         $pdo->beginTransaction();
         try {
-            foreach ($groups as $group) {
+            foreach ($groupes as $group) {
                 $classeId = (int)($group['id_classe'] ?? 0);
                 $override = !empty($group['override']);
                 $ids      = array_values(array_filter(array_map('intval', (array)($group['ids'] ?? []))));
@@ -2034,61 +2056,73 @@ function renderBulkGroups(groups) {
         return;
     }
 
-    var html = '<div style="display:flex;flex-direction:column;gap:0.65rem;">';
+    var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
 
     groups.forEach(function(g, idx) {
         var isNoClass = g.status === 'no_class';
-        var isFull    = g.status === 'full';
 
-        var borderColor = isNoClass ? 'rgba(251,146,60,0.4)' : (isFull ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.3)');
-        var bgColor     = isNoClass ? 'rgba(251,146,60,0.06)' : (isFull ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.05)');
-
-        var badge = isNoClass
-            ? '<span style="background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">Aucune classe</span>'
-            : (isFull
-                ? '<span style="background:rgba(239,68,68,0.13);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">Classe pleine</span>'
-                : '<span style="background:rgba(16,185,129,0.13);color:#10b981;border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:0.7rem;font-weight:700;padding:0.15rem 0.5rem;white-space:nowrap;">&#10003; Places dispo</span>');
-
-        var capacityBar = '';
-        if (!isNoClass) {
-            var after   = g.effectif + g.count;
-            var capPct  = g.capacite > 0 ? Math.min(100, Math.round((after / g.capacite) * 100)) : 100;
-            var barCol  = capPct >= 100 ? '#ef4444' : (capPct >= 80 ? '#fb923c' : '#10b981');
-            capacityBar = '<div style="margin-top:0.55rem;">'
-                + '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#a1a1aa;margin-bottom:0.22rem;">'
-                + '<span>Après inscription</span>'
-                + '<span style="font-weight:700;color:' + barCol + ';">' + after + ' / ' + g.capacite + '</span>'
-                + '</div>'
-                + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
-                + '<div style="height:100%;width:' + capPct + '%;background:' + barCol + ';border-radius:3px;"></div>'
-                + '</div></div>';
-        }
-
-        var overrideHtml = isFull
-            ? '<label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.6rem;font-size:0.82rem;color:#f87171;cursor:pointer;">'
-              + '<input type="checkbox" id="override-' + idx + '" style="accent-color:#ef4444;cursor:pointer;width:15px;height:15px;">'
-              + 'Inscrire quand même (dépasser la capacité)</label>'
-            : '';
+        var borderColor = isNoClass ? 'rgba(251,146,60,0.4)' : 'rgba(168,85,247,0.25)';
+        var bgColor     = isNoClass ? 'rgba(251,146,60,0.06)' : 'rgba(168,85,247,0.04)';
 
         var skipNote = isNoClass
-            ? '<div style="margin-top:0.5rem;font-size:0.78rem;color:#fb923c;"><i class="fa-solid fa-triangle-exclamation"></i> Ces candidats seront ignorés — aucune classe trouvée pour cette filière / année.</div>'
+            ? '<div style="margin-top:0.5rem;font-size:0.78rem;color:#fb923c;"><i class="fa-solid fa-triangle-exclamation"></i> Ces candidats seront ignorés — aucune classe trouvée pour cette filière.</div>'
             : '';
 
+        var classSelectHtml = '';
+        if (!isNoClass && g.classes && g.classes.length > 0) {
+            var opts = '';
+            g.classes.forEach(function(cls) {
+                var label = cls.nom_classe + ' (' + (cls.annee_scolaire || '—') + ') · ' + (cls.niveau || '—') + ' — ' + cls.effectif + '/' + cls.capacite + ' places';
+                var selected = cls.id_classe === g.id_classe ? ' selected' : '';
+                opts += '<option value="' + cls.id_classe + '" data-effectif="' + cls.effectif + '" data-capacite="' + cls.capacite + '" data-status="' + cls.status + '"' + selected + '>' + htmlEsc(label) + '</option>';
+            });
+            classSelectHtml = '<div style="margin-top:0.6rem;">'
+                + '<label style="font-size:0.78rem;color:#a1a1aa;display:block;margin-bottom:0.3rem;">Classe cible</label>'
+                + '<select id="bulk-cls-' + idx + '" onchange="onBulkClassChange(' + idx + ',' + g.count + ')"'
+                + ' style="width:100%;background:#1e1e3a;border:1px solid rgba(168,85,247,0.35);border-radius:7px;color:#e2e8f0;font-size:0.85rem;padding:0.45rem 0.6rem;cursor:pointer;outline:none;">'
+                + opts
+                + '</select>'
+                + '</div>';
+        }
+
+        var capacityBarHtml = '';
+        if (!isNoClass) {
+            var after  = g.effectif + g.count;
+            var cap    = g.capacite;
+            var capPct = cap > 0 ? Math.min(100, Math.round((after / cap) * 100)) : 100;
+            var barCol = capPct >= 100 ? '#ef4444' : (capPct >= 80 ? '#fb923c' : '#10b981');
+            capacityBarHtml = '<div id="bulk-capbar-' + idx + '" style="margin-top:0.55rem;">'
+                + '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#a1a1aa;margin-bottom:0.22rem;">'
+                + '<span>Après inscription</span>'
+                + '<span id="bulk-caplabel-' + idx + '" style="font-weight:700;color:' + barCol + ';">' + after + ' / ' + cap + '</span>'
+                + '</div>'
+                + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+                + '<div id="bulk-capfill-' + idx + '" style="height:100%;width:' + capPct + '%;background:' + barCol + ';border-radius:3px;transition:width 0.25s,background 0.25s;"></div>'
+                + '</div>'
+                + '<div id="bulk-capstatus-' + idx + '" style="margin-top:0.35rem;"></div>'
+                + '</div>';
+        }
+
+        var overrideHtml = (!isNoClass && g.status === 'full')
+            ? '<label id="bulk-override-wrap-' + idx + '" style="display:flex;align-items:center;gap:0.5rem;margin-top:0.55rem;font-size:0.82rem;color:#f87171;cursor:pointer;">'
+              + '<input type="checkbox" id="override-' + idx + '" style="accent-color:#ef4444;cursor:pointer;width:15px;height:15px;">'
+              + 'Inscrire quand même (dépasser la capacité)</label>'
+            : '<span id="bulk-override-wrap-' + idx + '"></span>';
+
         html += '<div style="border:1px solid ' + borderColor + ';background:' + bgColor + ';border-radius:10px;padding:0.9rem 1rem;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.75rem;flex-wrap:wrap;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;">'
             + '<div style="min-width:0;">'
-            + '<div style="font-weight:700;font-size:0.92rem;color:#fff;margin-bottom:0.2rem;">'
-            + htmlEsc(g.nom_filiere) + ' <span style="color:#71717a;font-weight:400;">·</span> ' + htmlEsc(g.annee || '—')
+            + '<div style="font-weight:700;font-size:0.93rem;color:#fff;margin-bottom:0.15rem;">'
+            + htmlEsc(g.nom_filiere)
             + '</div>'
-            + '<div style="font-size:0.8rem;color:#a1a1aa;">'
-            + (isNoClass
-                ? '<span style="color:#fb923c;"><i class="fa-solid fa-circle-xmark"></i> Classe non trouvée pour cette filière/année</span>'
-                : '<i class="fa-solid fa-chalkboard-user" style="color:#a855f7;"></i> ' + htmlEsc(g.nom_classe) + ' · ' + htmlEsc(g.niveau))
-            + '</div></div>'
-            + '<div style="display:flex;align-items:center;gap:0.45rem;flex-shrink:0;">'
+            + '<div style="font-size:0.78rem;color:#a1a1aa;">Année visée : ' + htmlEsc(g.annee || '—') + '</div>'
+            + '</div>'
             + '<span style="background:rgba(168,85,247,0.12);color:#d8b4fe;border:1px solid rgba(168,85,247,0.25);border-radius:6px;font-size:0.74rem;font-weight:700;padding:0.15rem 0.55rem;white-space:nowrap;">' + g.count + ' candidat(s)</span>'
-            + badge + '</div></div>'
-            + capacityBar + overrideHtml + skipNote
+            + '</div>'
+            + classSelectHtml
+            + capacityBarHtml
+            + overrideHtml
+            + skipNote
             + '</div>';
     });
 
@@ -2099,6 +2133,34 @@ function renderBulkGroups(groups) {
     document.getElementById('pi-bulk-modal-body').style.display = 'block';
 }
 
+function onBulkClassChange(idx, count) {
+    var sel = document.getElementById('bulk-cls-' + idx);
+    if (!sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    var eff    = parseInt(opt.getAttribute('data-effectif')) || 0;
+    var cap    = parseInt(opt.getAttribute('data-capacite')) || 30;
+    var status = opt.getAttribute('data-status') || 'ok';
+    var after  = eff + count;
+    var capPct = cap > 0 ? Math.min(100, Math.round((after / cap) * 100)) : 100;
+    var barCol = capPct >= 100 ? '#ef4444' : (capPct >= 80 ? '#fb923c' : '#10b981');
+
+    var labelEl = document.getElementById('bulk-caplabel-' + idx);
+    var fillEl  = document.getElementById('bulk-capfill-'  + idx);
+    if (labelEl) { labelEl.textContent = after + ' / ' + cap; labelEl.style.color = barCol; }
+    if (fillEl)  { fillEl.style.width = capPct + '%'; fillEl.style.background = barCol; }
+
+    var wrapEl = document.getElementById('bulk-override-wrap-' + idx);
+    if (wrapEl) {
+        if (status === 'full') {
+            wrapEl.innerHTML = '<label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.55rem;font-size:0.82rem;color:#f87171;cursor:pointer;">'
+                + '<input type="checkbox" id="override-' + idx + '" style="accent-color:#ef4444;cursor:pointer;width:15px;height:15px;">'
+                + 'Inscrire quand même (dépasser la capacité)</label>';
+        } else {
+            wrapEl.innerHTML = '';
+        }
+    }
+}
+
 function submitBulkAccept() {
     if (!_bulkPreflight || _bulkPreflight.length === 0) return;
 
@@ -2106,12 +2168,27 @@ function submitBulkAccept() {
     var hasActionable = false;
 
     _bulkPreflight.forEach(function(g, idx) {
-        if (g.status === 'no_class') return; // auto-skip
+        if (g.status === 'no_class') return; // auto-skip, no class exists for this filière
+
+        // Read the class chosen in the dropdown (may differ from preflight default)
+        var sel = document.getElementById('bulk-cls-' + idx);
+        var classeId = sel ? parseInt(sel.value) : g.id_classe;
+        if (!classeId || classeId <= 0) return;
+
+        // Determine status for the chosen class
+        var chosenStatus = g.status;
+        if (sel) {
+            var opt = sel.options[sel.selectedIndex];
+            chosenStatus = opt ? (opt.getAttribute('data-status') || 'ok') : g.status;
+        }
+
         var override = false;
         var cb = document.getElementById('override-' + idx);
         if (cb) override = cb.checked;
-        if (!override && g.status === 'full') return; // full, no override — skip
-        groups.push({ id_classe: g.id_classe, override: override, ids: g.ids });
+
+        if (!override && chosenStatus === 'full') return; // full and no override — skip
+
+        groups.push({ id_classe: classeId, override: override, ids: g.ids });
         hasActionable = true;
     });
 
