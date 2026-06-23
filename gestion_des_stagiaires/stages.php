@@ -488,38 +488,6 @@
 
       <?php if ($idClasseSelecte > 0 && $infoClasse): ?>
 
-          <?php
-          // Comptages pour les cartes récapitulatives
-          $nbStagiaires        = count($stagiaires);
-          $nbDossiersComplets  = count(array_filter($stagiaires, fn($stag) => $stag['status'] === 'complet'));
-          $nbDossiersIncomplets = $nbStagiaires - $nbDossiersComplets;
-          ?>
-
-          <!-- ── Cartes de statistiques ── -->
-          <div class="summary-grid">
-              <div class="summary-card">
-                  <div class="summary-icon" style="background:rgba(59,130,246,0.1); color:#3b82f6;"><i class="fa-solid fa-users"></i></div>
-                  <div class="summary-info">
-                      <h3>Effectif Classe</h3>
-                      <div><?= $nbStagiaires ?></div>
-                  </div>
-              </div>
-              <div class="summary-card" style="border-bottom: 3px solid #10b981;">
-                  <div class="summary-icon" style="background:rgba(16,185,129,0.1); color:#10b981;"><i class="fa-solid fa-check-double"></i></div>
-                  <div class="summary-info">
-                      <h3>Dossiers Complets</h3>
-                      <div><?= $nbDossiersComplets ?></div>
-                  </div>
-              </div>
-              <div class="summary-card" style="border-bottom: 3px solid #ef4444;">
-                  <div class="summary-icon" style="background:rgba(239,68,68,0.1); color:#ef4444;"><i class="fa-solid fa-clock-rotate-left"></i></div>
-                  <div class="summary-info">
-                      <h3>Dossiers Incomplets</h3>
-                      <div><?= $nbDossiersIncomplets ?></div>
-                  </div>
-              </div>
-          </div>
-
           <!-- ── Tableau des stagiaires avec leurs stages ── -->
           <div class="card" style="background:transparent; border:none; padding:0;">
               <table class="stage-table">
