@@ -18,7 +18,7 @@ $modeVierge = !empty($_GET['vierge']);   // fiche vierge — aucune donnée char
 
 // ── Class info ────────────────────────────────────────────────────────────
 $classeInfo = null;
-if (!$modeVierge && $idClasse > 0) {
+if ($idClasse > 0) {
     $st = $pdo->prepare(
         "SELECT c.nom_classe, c.annee_scolaire, c.niveau, f.nom_filiere
          FROM classes c JOIN filieres f ON f.id_filiere = c.id_filiere
@@ -31,7 +31,7 @@ if (!$modeVierge && $idClasse > 0) {
 // ── Module info + nb_controles ────────────────────────────────────────────
 $moduleName   = '';
 $nb_controles = 1;
-if (!$modeVierge && $idModule > 0) {
+if ($idModule > 0) {
     $st = $pdo->prepare("SELECT nom_module, nb_controles FROM modules WHERE id_module = ?");
     $st->execute([$idModule]);
     $mod = $st->fetch();
@@ -46,7 +46,7 @@ $controleType = "controle_$controleNo";
 
 // ── Stagiaires + note for the requested controle ──────────────────────────
 $stagiaires = [];
-if (!$modeVierge && $idClasse > 0) {
+if ($idClasse > 0) {
     $sql = 'SELECT s.id_stagiaire, s.num_inscri, s.nom, s.prenom, ev.note'
          . ' FROM stagiaires s'
          . ' LEFT JOIN module_notes ev'
@@ -193,20 +193,11 @@ if (!$modeVierge && $idClasse > 0) {
             </tr>
         </thead>
         <tbody>
-        <?php if ($modeVierge): ?>
-            <?php for ($i = 0; $i < 30; $i++): ?>
-            <tr>
-                <td class="code-col">&nbsp;</td>
-                <td class="name-col">&nbsp;</td>
-                <td class="note-col">&nbsp;</td>
-                <td class="obs-col">&nbsp;</td>
-            </tr>
-            <?php endfor; ?>
-        <?php elseif (empty($stagiaires)): ?>
+        <?php if (empty($stagiaires)): ?>
             <tr><td colspan="4" style="text-align:center;font-style:italic;padding:14px;">Aucun stagiaire.</td></tr>
         <?php else: ?>
             <?php foreach ($stagiaires as $s):
-                $note = $s['note'] !== null ? number_format((float)$s['note'], 2) : '';
+                $note = (!$modeVierge && $s['note'] !== null) ? number_format((float)$s['note'], 2) : '';
             ?>
             <tr>
                 <td class="code-col"><?= h((string)($s['num_inscri'] ?? '')) ?></td>
