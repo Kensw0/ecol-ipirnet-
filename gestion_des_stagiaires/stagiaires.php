@@ -911,9 +911,9 @@ if (isset($_GET['id'])) {
                             <img id="avatar-preview" src="<?= h((string) ($edit['photo'] ?? '')) ?>" style="display:<?= empty($edit['photo']) ? 'none' : 'block' ?>;">
                             <div id="avatar-initials" class="avatar-initials" style="display:<?= empty($edit['photo']) ? 'flex' : 'none' ?>;"><i class="fa-solid fa-user"></i></div>
                         </div>
-                        <label>Nom * <input class="gds-validate" type="text" name="nom" required value="<?= h((string) ($edit['nom'] ?? '')) ?>"></label>
-                        <label>Prénom * <input class="gds-validate" type="text" name="prenom" required value="<?= h((string) ($edit['prenom'] ?? '')) ?>"></label>
-                        <label>N° Inscription <input type="text" name="num_inscri" placeholder="Auto si vide" value="<?= h((string) ($edit['num_inscri'] ?? '')) ?>"></label>
+                        <label>Nom * <input class="gds-validate" type="text" name="nom" maxlength="100" required value="<?= h((string) ($edit['nom'] ?? '')) ?>"></label>
+                        <label>Prénom * <input class="gds-validate" type="text" name="prenom" maxlength="100" required value="<?= h((string) ($edit['prenom'] ?? '')) ?>"></label>
+                        <label>N° Inscription <input type="text" name="num_inscri" maxlength="32" placeholder="Auto si vide" value="<?= h((string) ($edit['num_inscri'] ?? '')) ?>"></label>
                         <label>CIN * <input class="gds-validate" type="text" name="cin" maxlength="8" placeholder="WA123456" required value="<?= h((string) ($edit['cin'] ?? '')) ?>"></label>
                         <label>Photo URL <input type="text" name="photo" id="form-photo" value="<?= h((string) ($edit['photo'] ?? '')) ?>"></label>
                         <label>Date naissance <span style="color:#ef4444;">*</span> <input type="date" name="date_naissance" required value="<?= h((string) ($edit['date_naissance'] ?? '')) ?>"></label>
@@ -922,11 +922,11 @@ if (isset($_GET['id'])) {
                     <div style="display:flex; flex-direction:column; gap:1.5rem;">
                         <fieldset class="modal-fieldset">
                             <legend><i class="fa-solid fa-address-book"></i> Contact</legend>
-                            <label>Email <input class="gds-validate" type="email" name="email" value="<?= h((string) ($edit['email'] ?? '')) ?>"></label>
-                            <label>Téléphone <input class="gds-validate" type="tel" name="telephone" value="<?= h((string) ($edit['telephone'] ?? '')) ?>"></label>
-                            <label>Tél. Parent / Tuteur <input class="gds-validate" type="tel" name="telephone_parent" placeholder="Ex: 0600000000" value="<?= h((string) ($edit['telephone_parent'] ?? '')) ?>"></label>
+                            <label>Email <input class="gds-validate" type="email" name="email" maxlength="255" value="<?= h((string) ($edit['email'] ?? '')) ?>"></label>
+                            <label>Téléphone <input class="gds-validate" type="tel" name="telephone" maxlength="15" value="<?= h((string) ($edit['telephone'] ?? '')) ?>"></label>
+                            <label>Tél. Parent / Tuteur <input class="gds-validate" type="tel" name="telephone_parent" maxlength="15" placeholder="Ex: 0600000000" value="<?= h((string) ($edit['telephone_parent'] ?? '')) ?>"></label>
                             <label>Nom Tuteur / Père <input class="gds-validate" type="text" name="nom_tuteur" placeholder="Ex: Mohamed Alami" value="<?= h((string) ($edit['nom_tuteur'] ?? '')) ?>"></label>
-                            <label style="grid-column: span 2;">Adresse <input type="text" name="adresse" value="<?= h((string) ($edit['adresse'] ?? '')) ?>"></label>
+                            <label style="grid-column: span 2;">Adresse <input type="text" name="adresse" maxlength="512" value="<?= h((string) ($edit['adresse'] ?? '')) ?>"></label>
                         </fieldset>
 
                         <fieldset class="modal-fieldset">

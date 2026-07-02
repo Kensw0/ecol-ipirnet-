@@ -344,7 +344,7 @@
           <div style="display:flex;flex-direction:column;gap:1rem;">
               <div>
                   <label style="font-size:.78rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Nom du module *</label>
-                  <input type="text" id="add-nom-module" placeholder="ex: Techniques de Réseaux"
+                  <input type="text" id="add-nom-module" maxlength="255" placeholder="ex: Techniques de Réseaux"
                          style="width:100%;background:#0f0f1a;color:#e4e4e7;border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.5rem .85rem;font-size:.9rem;outline:none;box-sizing:border-box;">
               </div>
               <div>

@@ -612,10 +612,10 @@
                           </select>
                       </label>
                       <label style="grid-column: span 2;">Sujet / Mission
-                          <input type="text" name="sujet" id="stage-sujet" placeholder="Ex: Développement d'une application web">
+                          <input type="text" name="sujet" id="stage-sujet" maxlength="512" placeholder="Ex: Développement d'une application web">
                       </label>
                       <label style="grid-column: span 2;">Entreprise / Organisme
-                          <input type="text" name="entreprise" id="stage-entreprise" placeholder="Ex: IPIRNET SARL">
+                          <input type="text" name="entreprise" id="stage-entreprise" maxlength="255" placeholder="Ex: IPIRNET SARL">
                       </label>
                   </fieldset>
                   <fieldset class="modal-fieldset">

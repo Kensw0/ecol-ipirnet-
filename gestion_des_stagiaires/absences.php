@@ -854,7 +854,7 @@
     <div class="justify-drawer-motif">
       <label style="flex:1;min-width:200px;">
         Motif de justification *
-        <input type="text" id="prev-justif-motif" placeholder="Ex : Certificat médical, Convocation officielle…">
+        <input type="text" id="prev-justif-motif" maxlength="1024" placeholder="Ex : Certificat médical, Convocation officielle…">
       </label>
       <span id="prev-justif-total" style="font-size:.82rem;font-weight:700;color:#c084fc;white-space:nowrap;"></span>
     </div>
@@ -912,7 +912,7 @@
         </label>
         <div class="abs-form-full">
           <label>Justificatif / Motif
-            <input type="text" id="add-justif" placeholder="Ex: Certificat médical, Absence autorisée…">
+            <input type="text" id="add-justif" maxlength="1024" placeholder="Ex: Certificat médical, Absence autorisée…">
           </label>
         </div>
         <?php if (gds_is_directeur()): ?>

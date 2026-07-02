@@ -1301,11 +1301,11 @@ function getAvatarInitials($nom, $prenom) {
             <div class="pi-form-grid" style="margin-bottom:1.25rem;">
                 <div class="pi-form-group">
                     <label>Nom *</label>
-                    <input class="gds-validate" type="text" name="nom" required placeholder="Ex: Bergam">
+                    <input class="gds-validate" type="text" name="nom" maxlength="100" required placeholder="Ex: Bergam">
                 </div>
                 <div class="pi-form-group">
                     <label>Prénom *</label>
-                    <input class="gds-validate" type="text" name="prenom" required placeholder="Ex: El Mehdi">
+                    <input class="gds-validate" type="text" name="prenom" maxlength="100" required placeholder="Ex: El Mehdi">
                 </div>
                 <div class="pi-form-group">
                     <label>CIN <span style="color:#ef4444;">*</span></label>
@@ -1317,23 +1317,23 @@ function getAvatarInitials($nom, $prenom) {
                 </div>
                 <div class="pi-form-group">
                     <label>Téléphone</label>
-                    <input class="gds-validate" type="text" name="telephone" placeholder="0612345678">
+                    <input class="gds-validate" type="text" name="telephone" maxlength="15" placeholder="0612345678">
                 </div>
                 <div class="pi-form-group">
                     <label>Tél. Parent</label>
-                    <input class="gds-validate" type="text" name="telephone_parent" placeholder="0612345678">
+                    <input class="gds-validate" type="text" name="telephone_parent" maxlength="15" placeholder="0612345678">
                 </div>
                 <div class="pi-form-group full">
                     <label>Email</label>
-                    <input class="gds-validate" type="email" name="email" placeholder="exemple@gmail.com">
+                    <input class="gds-validate" type="email" name="email" maxlength="255" placeholder="exemple@gmail.com">
                 </div>
                 <div class="pi-form-group full">
                     <label>Adresse</label>
-                    <input class="gds-validate" type="text" name="adresse" placeholder="Rue, quartier, ville">
+                    <input class="gds-validate" type="text" name="adresse" maxlength="512" placeholder="Rue, quartier, ville">
                 </div>
                 <div class="pi-form-group full">
                     <label>Nom du tuteur / père</label>
-                    <input class="gds-validate" type="text" name="nom_tuteur" placeholder="Nom complet du tuteur">
+                    <input class="gds-validate" type="text" name="nom_tuteur" maxlength="255" placeholder="Nom complet du tuteur">
                 </div>
             </div>
 
@@ -1439,7 +1439,7 @@ function getAvatarInitials($nom, $prenom) {
             </div>
             <div class="pi-form-group full" style="margin-bottom:1.25rem;">
                 <label>Autre formation</label>
-                <input type="text" name="autre_formation" placeholder="Préciser si autre...">
+                <input type="text" name="autre_formation" maxlength="255" placeholder="Préciser si autre...">
             </div>
 
                         <div style="margin-bottom:0.25rem;"></div>
@@ -1459,7 +1459,7 @@ function getAvatarInitials($nom, $prenom) {
             </div>
             <div class="pi-form-group full" style="margin-bottom:1.5rem;">
                 <label>Autre</label>
-                <input type="text" name="source_autre" placeholder="Préciser...">
+                <input type="text" name="source_autre" maxlength="255" placeholder="Préciser...">
             </div>
 
             <!-- ── Buttons ── -->
