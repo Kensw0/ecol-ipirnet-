@@ -141,9 +141,9 @@ log_msg("   ✓ " . count($modules) . " modules\n");
 
 // ── Insert users (secrétaires) ─────────────────────────────────────────────
 log_msg("👤 Insertion des utilisateurs...");
-$pdo->prepare('INSERT INTO users (id_user,username,password_hash,role) VALUES (?,?,?,?)')
+$pdo->prepare('INSERT INTO users (id,username,password_hash,role) VALUES (?,?,?,?)')
     ->execute([1, 'secretaire1', $PASS_HASH, 'secretaire']);
-$pdo->prepare('INSERT INTO users (id_user,username,password_hash,role) VALUES (?,?,?,?)')
+$pdo->prepare('INSERT INTO users (id,username,password_hash,role) VALUES (?,?,?,?)')
     ->execute([2, 'secretaire2', $PASS_HASH, 'secretaire']);
 log_msg("   ✓ 2 secrétaires (mot de passe: changeme)\n");
 
