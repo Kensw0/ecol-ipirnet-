@@ -354,7 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // ── Création du stagiaire et mise à jour du statut de la demande ────────
             $requeteInsertion = $pdo->prepare(
-                'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, sexe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $requeteInsertion->execute([
                 $nouveauNumInscri,
@@ -363,10 +363,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $demande['email'] ?: null, $demande['telephone'] ?: null,
                 $demande['telephone_parent'] ?: null, $demande['nom_tuteur'] ?: null,
                 $motDePasseHash, null, $dateInscription, $idClasseFinale,
+                in_array($demande['sexe'] ?? '', ['M', 'F']) ? $demande['sexe'] : 'M',
             ]);
             $idNouveauStagiaire = (int)$pdo->lastInsertId();
-            $pdo->prepare('UPDATE pre_inscription SET statut = ?, date_decision = NOW(), id_stagiaire_cree = ? WHERE id_demande = ?')
-                ->execute(['converti', $idNouveauStagiaire, $idDemande]);
+            $pdo->prepare('UPDATE pre_inscription SET statut = ?, date_decision = NOW() WHERE id_demande = ?')
+                ->execute(['converti', $idDemande]);
             $pdo->commit();
             flash_set('Pré-inscription acceptée — stagiaire créé (' . $nouveauNumInscri . ').');
         } catch (Throwable $e) {
@@ -580,18 +581,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $maxNum = (int)$stGen->fetchColumn();
                     $newNum = 'INS-' . $year . '-' . str_pad((string)($maxNum + 1), 5, '0', STR_PAD_LEFT);
                     $pdo->prepare(
-                        'INSERT INTO stagiaires (num_inscri,cin,nom,prenom,date_naissance,adresse,email,telephone,telephone_parent,nom_tuteur,mot_de_passe,photo,date_inscription,id_classe)
-                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                        'INSERT INTO stagiaires (num_inscri,cin,nom,prenom,date_naissance,adresse,email,telephone,telephone_parent,nom_tuteur,mot_de_passe,photo,date_inscription,id_classe,sexe)
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                     )->execute([
                         $newNum, $cin_val ?: null, $d['nom'], $d['prenom'],
                         $d['date_naissance'] ?: null, $d['adresse'] ?: null,
                         $em ?: null, $d['telephone'] ?: null,
                         $d['telephone_parent'] ?: null, $d['nom_tuteur'] ?: null,
                         $hash, null, $di, $classeId,
+                        in_array($d['sexe'] ?? '', ['M', 'F']) ? $d['sexe'] : 'M',
                     ]);
                     $newId = (int)$pdo->lastInsertId();
-                    $pdo->prepare('UPDATE pre_inscription SET statut=?,date_decision=NOW(),id_stagiaire_cree=? WHERE id_demande=?')
-                        ->execute(['converti', $newId, $idDem]);
+                    $pdo->prepare('UPDATE pre_inscription SET statut=?,date_decision=NOW() WHERE id_demande=?')
+                        ->execute(['converti', $idDem]);
                     $ok++; $eff++;
                 }
             }

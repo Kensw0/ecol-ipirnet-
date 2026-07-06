@@ -208,7 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $emNull = $em === '' ? null : $em;
         $tel = trim((string) ($_POST['telephone'] ?? ''));
         $telp = trim((string) ($_POST['telephone_parent'] ?? ''));
-        $tuteur = trim((string) ($_POST['nom_tuteur'] ?? ''));
+        $tuteur  = trim((string) ($_POST['nom_tuteur'] ?? ''));
+        $sexeNew = in_array($_POST['sexe'] ?? '', ['M', 'F']) ? (string)$_POST['sexe'] : 'M';
         $pw = (string) ($_POST['mot_de_passe'] ?? '');
         $photo = trim((string) ($_POST['photo'] ?? ''));
         $di = (string) ($_POST['date_inscription'] ?? '');
@@ -281,8 +282,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     redirect('stagiaires.php?id=' . $id . '&edit=1');
                 }
             }
-            $sql = 'UPDATE stagiaires SET num_inscri=?, cin=?, nom=?, prenom=?, date_naissance=?, adresse=?, email=?, telephone=?, telephone_parent=?, nom_tuteur=?, photo=?, date_inscription=?, id_classe=?';
-            $params = [$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $photo === '' ? null : $photo, $di, $cid];
+            $sql = 'UPDATE stagiaires SET num_inscri=?, cin=?, nom=?, prenom=?, date_naissance=?, adresse=?, email=?, telephone=?, telephone_parent=?, nom_tuteur=?, sexe=?, photo=?, date_inscription=?, id_classe=?';
+            $params = [$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $sexeNew, $photo === '' ? null : $photo, $di, $cid];
             if ($remiseMensuelle !== null) {
                 $sql .= ', remise_mensuelle=?';
                 $params[] = $remiseMensuelle;
@@ -389,8 +390,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = $pwHash ?? password_hash('changeme', PASSWORD_DEFAULT);
             // Insertion avec protection contre les doublons base de données (filet de sécurité)
             try {
-                $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, remise_mensuelle) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                    ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid, $remiseMensuelle ?? 0.0]);
+                $pdo->prepare('INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, remise_mensuelle, sexe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$mat, $cin === '' ? null : $cin, $nom, $prenom, $dn, $adr === '' ? null : $adr, $emNull, $tel === '' ? null : $tel, $telp === '' ? null : $telp, $tuteur === '' ? null : $tuteur, $hash, $photo === '' ? null : $photo, $di, $cid, $remiseMensuelle ?? 0.0, $sexeNew]);
             } catch (\PDOException $e) {
                 if (str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate entry')) {
                     if (str_contains(strtolower($e->getMessage()), 'cin')) {
@@ -917,6 +918,13 @@ if (isset($_GET['id'])) {
                         <label>CIN * <input class="gds-validate" type="text" name="cin" maxlength="8" placeholder="WA123456" required value="<?= h((string) ($edit['cin'] ?? '')) ?>"></label>
                         <label>Photo URL <input type="text" name="photo" id="form-photo" value="<?= h((string) ($edit['photo'] ?? '')) ?>"></label>
                         <label>Date naissance <span style="color:#ef4444;">*</span> <input type="date" name="date_naissance" required value="<?= h((string) ($edit['date_naissance'] ?? '')) ?>"></label>
+                        <label>Sexe <span style="color:#ef4444;">*</span>
+                            <select name="sexe" required>
+                                <option value="">— Sélectionner —</option>
+                                <option value="M" <?= (isset($edit['sexe']) && $edit['sexe'] === 'M') ? 'selected' : '' ?>>Masculin</option>
+                                <option value="F" <?= (isset($edit['sexe']) && $edit['sexe'] === 'F') ? 'selected' : '' ?>>Féminin</option>
+                            </select>
+                        </label>
                     </fieldset>
 
                     <div style="display:flex; flex-direction:column; gap:1.5rem;">

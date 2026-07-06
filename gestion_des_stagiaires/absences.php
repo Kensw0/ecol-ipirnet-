@@ -140,10 +140,14 @@
           $heureFin       = trim((string)($_POST['heure_fin']    ?? '')) ?: null;
           $justificatif   = trim((string)($_POST['justificatif'] ?? '')) ?: null;
           $estJustifiee   = (isset($_POST['est_justifiee']) && gds_is_directeur()) ? 1 : 0;
-          $idModule       = (int)($_POST['id_module'] ?? 0) ?: null;
+          $idModule       = (int)($_POST['id_module'] ?? 0);
 
           if ($idStagiaire <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateAbsence)) {
               echo json_encode(['success' => false, 'error' => 'Données invalides.']);
+              exit;
+          }
+          if ($idModule <= 0) {
+              echo json_encode(['success' => false, 'error' => 'Le module est obligatoire.']);
               exit;
           }
 
@@ -212,10 +216,14 @@
           $idsStagiaires = array_filter(array_map('intval', (array)($_POST['student_ids'] ?? [])));
           $heureDebut    = trim((string)($_POST['heure_debut'] ?? '')) ?: null;
           $heureFin      = trim((string)($_POST['heure_fin']   ?? '')) ?: null;
-          $idModule      = (int)($_POST['id_module'] ?? 0) ?: null;
+          $idModule      = (int)($_POST['id_module'] ?? 0);
 
           if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateBulk) || empty($idsStagiaires)) {
               echo json_encode(['success' => false, 'error' => 'Date ou sélection invalide.']);
+              exit;
+          }
+          if ($idModule <= 0) {
+              echo json_encode(['success' => false, 'error' => 'Veuillez sélectionner un module avant de marquer les absences.']);
               exit;
           }
 
@@ -898,7 +906,7 @@
         </label>
         <label>Module *
           <select id="add-module" required>
-            <option value="0">— Sélectionner un module —</option>
+            <option value="">— Sélectionner un module —</option>
             <?php foreach ($tousLesModules as $module): ?>
               <option value="<?= (int)$module['id_module'] ?>"><?= h(gds_module_label((string)$module['nom_module'])) ?></option>
             <?php endforeach; ?>
