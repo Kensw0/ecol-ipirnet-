@@ -322,7 +322,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     redirect('demandes_inscription.php');
                 }
             }
-            $motDePasseHash  = password_hash('changeme', PASSWORD_DEFAULT); // Mot de passe provisoire
             $dateInscription = date('Y-m-d');                                // Date du jour = date d'inscription
             $anneeInscription = date('Y', strtotime($dateInscription));
             // Calcul du prochain numéro d'inscription séquentiel pour l'année en cours
@@ -354,7 +353,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // ── Création du stagiaire et mise à jour du statut de la demande ────────
             $requeteInsertion = $pdo->prepare(
-                'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, mot_de_passe, photo, date_inscription, id_classe, sexe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, photo, date_inscription, id_classe, sexe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $requeteInsertion->execute([
                 $nouveauNumInscri,
@@ -362,7 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $demande['date_naissance'] ?: null, $demande['adresse'] ?: null,
                 $demande['email'] ?: null, $demande['telephone'] ?: null,
                 $demande['telephone_parent'] ?: null, $demande['nom_tuteur'] ?: null,
-                $motDePasseHash, null, $dateInscription, $idClasseFinale,
+                null, $dateInscription, $idClasseFinale,
                 in_array($demande['sexe'] ?? '', ['M', 'F']) ? $demande['sexe'] : 'M',
             ]);
             $idNouveauStagiaire = (int)$pdo->lastInsertId();
@@ -535,7 +534,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $di   = date('Y-m-d');
         $year = date('Y');
-        $hash = password_hash('changeme', PASSWORD_DEFAULT);
         $ok   = 0; $skip = 0;
         $pdo->beginTransaction();
         try {
@@ -581,14 +579,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $maxNum = (int)$stGen->fetchColumn();
                     $newNum = 'INS-' . $year . '-' . str_pad((string)($maxNum + 1), 5, '0', STR_PAD_LEFT);
                     $pdo->prepare(
-                        'INSERT INTO stagiaires (num_inscri,cin,nom,prenom,date_naissance,adresse,email,telephone,telephone_parent,nom_tuteur,mot_de_passe,photo,date_inscription,id_classe,sexe)
-                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                        'INSERT INTO stagiaires (num_inscri,cin,nom,prenom,date_naissance,adresse,email,telephone,telephone_parent,nom_tuteur,photo,date_inscription,id_classe,sexe)
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                     )->execute([
                         $newNum, $cin_val ?: null, $d['nom'], $d['prenom'],
                         $d['date_naissance'] ?: null, $d['adresse'] ?: null,
                         $em ?: null, $d['telephone'] ?: null,
                         $d['telephone_parent'] ?: null, $d['nom_tuteur'] ?: null,
-                        $hash, null, $di, $classeId,
+                        null, $di, $classeId,
                         in_array($d['sexe'] ?? '', ['M', 'F']) ? $d['sexe'] : 'M',
                     ]);
                     $newId = (int)$pdo->lastInsertId();

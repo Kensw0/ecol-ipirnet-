@@ -63,3 +63,12 @@ ALTER TABLE absences
     ADD CONSTRAINT fk_absences_module
         FOREIGN KEY (id_module) REFERENCES modules(id_module)
         ON DELETE RESTRICT ON UPDATE CASCADE;
+
+
+-- ────────────────────────────────────────────────────────────
+--  CHANGEMENT 4 : Supprimer mot_de_passe de stagiaires
+--  Cette colonne n'a aucune fonction dans le site web.
+-- ────────────────────────────────────────────────────────────
+
+ALTER TABLE stagiaires
+    DROP COLUMN mot_de_passe;
