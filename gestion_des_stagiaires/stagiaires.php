@@ -1066,7 +1066,7 @@ if (isset($_GET['id'])) {
         form.reset();
         document.getElementById('form-id-stagiaire').value = s.id_stagiaire;
 
-        const fields = ['nom', 'prenom', 'num_inscri', 'cin', 'photo', 'date_naissance', 'email', 'telephone', 'telephone_parent', 'nom_tuteur', 'adresse', 'date_inscription'];
+        const fields = ['nom', 'prenom', 'num_inscri', 'cin', 'photo', 'date_naissance', 'sexe', 'email', 'telephone', 'telephone_parent', 'nom_tuteur', 'adresse', 'date_inscription'];
         fields.forEach(f => {
             const el = form.querySelector('[name="' + f + '"]');
             if (el) el.value = s[f] || '';
