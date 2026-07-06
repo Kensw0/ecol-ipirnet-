@@ -737,7 +737,7 @@ $navClasse  = (int) ($_GET['c'] ?? 0);
 $navSearch  = (string) ($_GET['s'] ?? '');
 $navSort    = (string) ($_GET['o'] ?? 'nom');
 
-$sqlNav = "SELECT v.*, s.date_naissance, s.adresse, s.photo, s.email, s.telephone, s.date_inscription, s.cin, c.niveau 
+$sqlNav = "SELECT v.*, s.date_naissance, s.adresse, s.photo, s.email, s.telephone, s.date_inscription, s.cin, s.sexe, c.niveau 
            FROM v_stagiaires_detail v 
            LEFT JOIN stagiaires s ON s.id_stagiaire = v.id_stagiaire
            LEFT JOIN classes c ON c.id_classe = v.id_classe";
@@ -785,7 +785,7 @@ if (isset($_GET['id'])) {
     
     // FETCH SELECTED STUDENT (Independent of Nav Filters)
     $stSel = $pdo->prepare("SELECT v.*, s.date_naissance, s.adresse, s.photo, s.email, s.telephone, s.date_inscription, s.cin,
-                                   COALESCE(s.remise_mensuelle, 0) as remise_mensuelle
+                                   COALESCE(s.remise_mensuelle, 0) as remise_mensuelle, s.sexe
                             FROM v_stagiaires_detail v 
                             LEFT JOIN stagiaires s ON s.id_stagiaire = v.id_stagiaire
                             WHERE v.id_stagiaire = ?");
