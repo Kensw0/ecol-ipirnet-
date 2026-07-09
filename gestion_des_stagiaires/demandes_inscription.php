@@ -675,16 +675,9 @@ $pi_years = $pdo->query(
       ORDER BY annee_scolaire_visee DESC"
 )->fetchAll(\PDO::FETCH_COLUMN);
 
-// Available years for the form — union of classes AND pre_inscription years
-// so that any year stored in pre_inscription always has a matching <option>
+// Available years for the form — sourced from classes table only (admin-defined years)
 $years_available = $pdo->query(
-    "SELECT annee FROM (
-        SELECT DISTINCT annee_scolaire      AS annee FROM classes
-        UNION
-        SELECT DISTINCT annee_scolaire_visee AS annee FROM pre_inscription
-         WHERE annee_scolaire_visee IS NOT NULL AND annee_scolaire_visee != ''
-     ) t
-     ORDER BY annee DESC"
+    "SELECT DISTINCT annee_scolaire AS annee FROM classes ORDER BY annee_scolaire DESC"
 )->fetchAll(\PDO::FETCH_COLUMN);
 $default_year = !empty($years_available) ? $years_available[0] : '';
 
