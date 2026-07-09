@@ -1,4 +1,4 @@
--- phpMyAdmin SQL Dump
+the -- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
@@ -3823,29 +3823,29 @@ CREATE TABLE `modules` (
 
 INSERT INTO `modules` (`id_module`, `nom_module`, `masse_horaire`, `semestre`, `id_filiere`, `coefficient`, `nb_controles`) VALUES
 (2, 'Algorithmique et Programmation', 120, 1, 2, 5, 2),
-(3, 'Bases de données', 90, 0, 2, 1, 1),
+(3, 'Bases de données', 90, 1, 2, 1, 1),
 (4, 'Développement Web', 100, 2, 2, 1, 1),
-(19, 'Métier et Formation', NULL, NULL, 2, 1, 1),
-(20, 'L\'entreprise et son environnement', NULL, NULL, 2, 1, 1),
-(21, 'Notion de mathématique appliquée', NULL, NULL, 2, 1, 1),
-(22, 'Gestion du temps', NULL, NULL, 2, 1, 1),
-(23, 'Veille technologique', NULL, NULL, 2, 1, 1),
-(24, 'Logiciel d\'application', NULL, NULL, 2, 1, 1),
-(25, 'Programmation événementielle', NULL, NULL, 2, 5, 1),
-(26, 'Technique de programmation structurée', NULL, NULL, 2, 5, 1),
-(27, 'Langage de programmation structurée', NULL, NULL, 2, 5, 1),
-(28, 'Programmation orientée objet', NULL, NULL, 2, 5, 1),
-(29, 'Concept et modélisation d\'un système d\'information', NULL, NULL, 2, 1, 1),
-(30, 'Installation d\'un poste informatique', NULL, NULL, 2, 1, 1),
-(31, 'Communication en Anglais', NULL, NULL, 2, 1, 1),
-(32, 'Assistant technique à la clientèle', NULL, NULL, 2, 1, 1),
-(33, 'Comptabilité générale', NULL, NULL, 4, 1, 1),
-(34, 'Concept de base', NULL, NULL, 4, 1, 1),
-(35, 'Traitement de salaire', NULL, NULL, 4, 1, 1),
-(36, 'Charge de personnel', NULL, NULL, 4, 1, 1),
-(37, 'Marketing', NULL, NULL, 4, 1, 1),
-(38, 'Entreprise', NULL, NULL, 4, 1, 1),
-(39, 'Statistique', NULL, NULL, 4, 1, 1),
+(19, 'Métier et Formation', 30, 1, 2, 1, 1),
+(20, 'L\'entreprise et son environnement', 30, 1, 2, 1, 1),
+(21, 'Notion de mathématique appliquée', 60, 1, 2, 1, 1),
+(22, 'Gestion du temps', 30, 1, 2, 1, 1),
+(23, 'Veille technologique', 30, 2, 2, 1, 1),
+(24, 'Logiciel d\'application', 45, 2, 2, 1, 1),
+(25, 'Programmation événementielle', 90, 2, 2, 5, 1),
+(26, 'Technique de programmation structurée', 90, 1, 2, 5, 1),
+(27, 'Langage de programmation structurée', 90, 1, 2, 5, 1),
+(28, 'Programmation orientée objet', 90, 2, 2, 5, 1),
+(29, 'Concept et modélisation d\'un système d\'information', 60, 1, 2, 1, 1),
+(30, 'Installation d\'un poste informatique', 45, 1, 2, 1, 1),
+(31, 'Communication en Anglais', 45, 2, 2, 1, 1),
+(32, 'Assistant technique à la clientèle', 30, 2, 2, 1, 1),
+(33, 'Comptabilité générale', 90, 1, 4, 1, 1),
+(34, 'Concept de base', 60, 1, 4, 1, 1),
+(35, 'Traitement de salaire', 60, 2, 4, 1, 1),
+(36, 'Charge de personnel', 60, 2, 4, 1, 1),
+(37, 'Marketing', 75, 1, 4, 1, 1),
+(38, 'Entreprise', 45, 1, 4, 1, 1),
+(39, 'Statistique', 75, 2, 4, 1, 1),
 (40, 'Algorithm', 50, 1, 3, 5, 2),
 (41, 'Installation d\'un poste', 30, 2, 3, 4, 2),
 (42, 'Bureautique', 40, 2, 3, 3, 2),
@@ -11132,12 +11132,15 @@ CREATE TABLE `pre_inscription` (
 --
 
 INSERT INTO `pre_inscription` (`id_demande`, `cin`, `nom`, `prenom`, `date_naissance`, `adresse`, `email`, `telephone`, `telephone_parent`, `nom_tuteur`, `id_filiere`, `annee_scolaire_visee`, `statut`, `date_soumission`, `date_decision`, `sexe`, `niveaux`, `diplomes`, `formations`, `autre_formation`, `sources`, `source_autre`, `licences`) VALUES
-(1,'ZA300000','Tobji','Zakaria','2007-07-03','26 bd Mohammed V, Hay Mohammadi','zakaria1@gmail.com','0667813512','0677507435','Mustapha Tobji',2,'2026/2027','en_attente','2026-07-03 16:05:00',NULL,'M','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL),
-(2,'ZA300001','Bennis','Amina','2005-03-12','56 bd Anoual, Azemmour','amina2@gmail.com','0663111881','0672206248','Mustapha Bennis',2,'2025/2026','converti','2025-06-10 10:00:00','2025-07-01 11:00:00','F','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL),
-(3,'ZA300002','Jabrane','Hamza','2006-09-15','82 bd Ghandi, Bouskoura','hamza3@gmail.com','0662407708','0672761248','Mustapha Jabrane',3,'2026/2027','en_attente','2026-06-28 14:00:00',NULL,'M','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL),
-(4,'ZA300003','Cherkaoui','Sara','2004-11-20','47 av Moulay Youssef, El Jadida','sara4@gmail.com','0668538919','0677068864','Mustapha Cherkaoui',3,'2025/2026','converti','2025-05-22 09:30:00','2025-06-15 10:00:00','F','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL),
-(5,'ZA300004','Hammouda','Nassim','2006-04-06','14 rue Chefchaouen, Benslimane','nassim5@gmail.com','0662550046','0672811029','Mustapha Hammouda',4,'2026/2027','en_attente','2026-07-01 09:00:00',NULL,'M','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL),
-(6,'ZA300005','Ouazzani','Nour','2003-08-14','36 av Moulay Youssef, Khouribga','nour6@gmail.com','0662209576','0673942800','Mustapha Ouazzani',4,'2025/2026','converti','2025-04-10 11:00:00','2025-05-20 14:00:00','F','["2eme Bac"]','["2eme Bac"]','["Bureautique","Reseau"]',NULL,'["Bouche a oreille"]',NULL,NULL);
+(1, 'ZA300000', 'Tobji', 'Zakaria', '2006-07-03', '12 rue Hassan II, Casablanca', 'zakaria.tobji1@gmail.com', '0661529840', '0679395316', 'Ayoub Tobji', 2, '2026/2027', 'en_attente', '2026-07-03 16:05:00', NULL, 'M', '["2eme Bac"]', '["2eme Bac"]', '["Bureautique","Reseau"]', NULL, '["Bouche a oreille"]', NULL, NULL),
+(2, 'ZA300001', 'Bennis', 'Amina', '2004-03-12', '5 av Mohammed V, Rabat', 'amina.bennis2@gmail.com', '0664213572', '0671503712', 'Rachid Bennis', 2, '2025/2026', 'converti', '2025-06-10 10:00:00', '2025-07-01 11:00:00', 'F', '["2eme Bac"]', '["2eme Bac"]', '["Bureautique","Programmation"]', NULL, '["Relation"]', NULL, NULL),
+(3, 'ZA300002', 'Lahrech', 'Driss', '2005-09-22', '34 bd Zerktouni, Casablanca', 'driss.lahrech3@gmail.com', '0666521845', '0673894521', 'Mounir Lahrech', 2, '2026/2027', 'abandonne', '2026-03-15 09:00:00', '2026-04-20 14:00:00', 'M', '["2eme Bac"]', '["2eme Bac"]', '["Reseau","Programmation"]', NULL, '["Publicite"]', NULL, NULL),
+(4, 'ZA300003', 'Jabrane', 'Hamza', '2006-09-15', '78 av Lalla Meryem, Mohammedia', 'hamza.jabrane4@gmail.com', '0668602189', '0679944088', 'Ibrahim Jabrane', 3, '2026/2027', 'en_attente', '2026-06-28 14:00:00', NULL, 'M', '["2eme Bac"]', '["2eme Bac"]', '["Bureautique","Reseau"]', NULL, '["Reseau social"]', NULL, NULL),
+(5, 'ZA300004', 'Cherkaoui', 'Sara', '2004-11-20', '15 rue Ibn Battouta, El Jadida', 'sara.cherkaoui5@gmail.com', '0661315252', '0676618594', 'Jamal Cherkaoui', 3, '2025/2026', 'converti', '2025-05-22 09:30:00', '2025-06-15 10:00:00', 'F', '["2eme Bac"]', '["2eme Bac"]', '["Bureautique"]', NULL, '["Relation"]', NULL, NULL),
+(6, 'ZA300005', 'Tazi', 'Hamza', '2005-06-09', '67 av Fal Ould Oumeir, Settat', 'hamza.tazi6@gmail.com', '0663616254', '0672953332', 'Anass Tazi', 3, '2026/2027', 'abandonne', '2026-04-11 11:00:00', '2026-05-04 13:00:00', 'M', '["2eme Bac"]', '["2eme Bac"]', '["Programmation","Reseau"]', NULL, '["Bouche a oreille"]', NULL, NULL),
+(7, 'ZA300006', 'Hammouda', 'Nassim', '2006-04-06', '45 rue Tiznit, El Jadida', 'nassim.hammouda7@gmail.com', '0662021071', '0679010482', 'Mustapha Hammouda', 4, '2026/2027', 'en_attente', '2026-07-01 09:00:00', NULL, 'M', '["2eme Bac"]', '["2eme Bac"]', '["Comptabilite"]', NULL, '["Bouche a oreille"]', NULL, NULL),
+(8, 'ZA300007', 'Ouazzani', 'Nour', '2003-08-14', '37 av Annakhil, Azemmour', 'nour.ouazzani8@gmail.com', '0668219392', '0677720949', 'Lotfi Ouazzani', 4, '2025/2026', 'converti', '2025-04-10 11:00:00', '2025-05-20 14:00:00', 'F', '["2eme Bac"]', '["2eme Bac"]', '["Comptabilite","Bureautique"]', NULL, '["Relation"]', NULL, NULL),
+(9, 'ZA300008', 'Mernissi', 'Faisal', '2002-12-04', '52 rue El Jadida, Berrechid', 'faisal.mernissi9@gmail.com', '0669157348', '0677297983', 'Fouad Mernissi', 4, '2026/2027', 'abandonne', '2026-02-07 09:00:00', '2026-04-21 14:00:00', 'M', '["2eme Bac"]', '["2eme Bac"]', '["Bureautique","Programmation"]', NULL, '["Reseau social"]', NULL, NULL);;
 
 -- --------------------------------------------------------
 
