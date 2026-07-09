@@ -148,17 +148,19 @@ if (!$isPublic && isset($pdo)) {
     <!-- Bibliothèques d'icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;600;800&display=swap">
 
     <!-- Feuilles de style de l'application -->
     <link rel="stylesheet" href="assets/css/app.css?v=3">
     <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=7">
-    <link rel="stylesheet" href="assets/css/nexus.css?v=1">
+    <link rel="stylesheet" href="assets/css/nexus.css?v=2">
 
     <!-- Scripts différés (ne bloquent pas le rendu de la page) -->
     <script defer src="assets/js/filiere-filter.js?v=1"></script>
     <script defer src="assets/js/gds-table-filter.js?v=1"></script>
     <script defer src="assets/js/validation.js?v=1"></script>
-    <script defer src="assets/js/nexus.js?v=1"></script>
+    <script defer src="assets/js/nexus.js?v=2"></script>
 
 <?php if ($isPublic): ?>
     <!-- ── Styles spécifiques au shell public (formulaire pré-inscription) ── -->
@@ -340,6 +342,12 @@ if (!$isPublic && isset($pdo)) {
 <?php endif; ?>
 </head>
 <body class="<?= $isPublic ? 'public-page' : '' ?>">
+<canvas id="nx-matrix" aria-hidden="true"></canvas>
+<div id="nx-scanlines" aria-hidden="true"></div>
+<div id="nx-crosshair" aria-hidden="true"></div>
+<div id="nx-boot-overlay" aria-hidden="true">
+    <div id="nx-boot-lines"></div>
+</div>
 
 <?php if ($isPublic): ?>
 <!-- ============================================================
