@@ -345,8 +345,10 @@ if (!$isPublic && isset($pdo)) {
 <canvas id="nx-matrix" aria-hidden="true"></canvas>
 <div id="nx-scanlines" aria-hidden="true"></div>
 <div id="nx-crosshair" aria-hidden="true"></div>
-<div id="nx-boot-overlay" aria-hidden="true">
-    <div id="nx-boot-lines"></div>
+<div id="nx-glitch-wave" aria-hidden="true">
+    <div class="nx-glitch-layer l1"></div>
+    <div class="nx-glitch-layer l2"></div>
+    <div class="nx-glitch-layer l3"></div>
 </div>
 
 <?php if ($isPublic): ?>

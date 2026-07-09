@@ -101,21 +101,6 @@ body::before {
     100% { transform: scale(1.02) translate(-1%,-1%); }
 }
 
-/* ── Boot sequence overlay (played once per page load) ──────── */
-#nx-boot-overlay {
-    position: fixed; inset: 0; z-index: 999999;
-    background: #000;
-    color: var(--nx-green);
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    padding: 2rem;
-    display: flex; align-items: flex-start;
-    pointer-events: none;
-    animation: nxBootOut 0.4s ease-out 1.15s forwards;
-}
-#nx-boot-lines { white-space: pre-wrap; line-height: 1.6; text-shadow: 0 0 6px var(--nx-green-glow); }
-@keyframes nxBootOut { to { opacity: 0; visibility: hidden; transform: scale(1.02); } }
-
 /* ── Glitch headings ──────────────────────────────────────────── */
 h1, h2, .page-title-dash, .brand-name h2 {
     letter-spacing: 0.02em;
@@ -328,20 +313,39 @@ h1, h2, .page-title-dash, .brand-name h2 {
     box-shadow: 0 0 0 2px rgba(57,255,20,0.18) !important;
 }
 
-/* ── Page transition — blocky wave sweeping right → left ───────── */
-#nx-page-wipe {
+/* ── Tab-switch transition — glitchy RGB-split wave, right → left ── */
+/* Only triggered by nexus.js on sidebar .nav-item clicks — no other links. */
+#nx-glitch-wave {
     position: fixed; inset: 0; z-index: 999998;
     pointer-events: none;
-    background: repeating-linear-gradient(90deg, var(--nx-green) 0 28px, #063a0c 28px 30px);
-    transform: scaleX(0);
-    transform-origin: right center;
+    visibility: hidden;
+}
+#nx-glitch-wave.nx-glitch-active { visibility: visible; }
+.nx-glitch-layer {
+    position: absolute; inset: 0;
+    transform: translateX(100%);
     will-change: transform;
 }
-#nx-page-wipe.nx-wipe-active {
-    animation: nxBlockWipe 0.42s steps(9, end) forwards;
+#nx-glitch-wave.nx-glitch-active .l1 {
+    background: repeating-linear-gradient(90deg, var(--nx-green) 0 24px, #04180a 24px 26px);
+    animation: nxGlitchSweep 0.5s steps(7, end) forwards;
 }
-@keyframes nxBlockWipe {
-    to { transform: scaleX(1); }
+#nx-glitch-wave.nx-glitch-active .l2 {
+    background: repeating-linear-gradient(90deg, var(--nx-cyan) 0 24px, transparent 24px 26px);
+    opacity: 0.4; mix-blend-mode: screen;
+    animation: nxGlitchSweep 0.5s steps(7, end) forwards;
+    animation-delay: 0.025s;
+}
+#nx-glitch-wave.nx-glitch-active .l3 {
+    background: repeating-linear-gradient(90deg, var(--nx-magenta) 0 24px, transparent 24px 26px);
+    opacity: 0.3; mix-blend-mode: screen;
+    animation: nxGlitchSweep 0.5s steps(7, end) forwards;
+    animation-delay: -0.025s;
+}
+@keyframes nxGlitchSweep {
+    0%   { transform: translateX(100%); }
+    60%  { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
 }
 
 /* ── Scroll reveal / stagger ──────────────────────────────────── */

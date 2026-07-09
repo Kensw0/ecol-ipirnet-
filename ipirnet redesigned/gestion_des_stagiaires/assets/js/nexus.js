@@ -53,39 +53,23 @@
         if (e.target.closest && e.target.closest('a, button, .nav-item, .btn')) window.nxSfx.click();
     });
 
-    /* ── Boot sequence typed text ─────────────────────────────────── */
-    var bootEl = document.getElementById('nx-boot-lines');
-    if (bootEl) {
-        var bootScript = [
-            '> BOOTING IPIRNET_ADMIN_PORTAL...',
-            '> AUTH TOKEN....... OK',
-            '> LOADING MODULES.... OK',
-            '> RENDER ENGINE..... NEXUS.TERMINAL v2',
-            '> WELCOME, OPERATOR.'
-        ];
-        var flat = bootScript.join('\n');
-        var i = 0;
-        window.nxSfx.boot();
-        var typer = setInterval(function () {
-            bootEl.textContent = flat.slice(0, i);
-            i += 3;
-            if (i > flat.length) clearInterval(typer);
-        }, 8);
-    }
-
-    /* ── Page-transition wipe on internal link clicks ────────────── */
-    var wipe = document.createElement('div');
-    wipe.id = 'nx-page-wipe';
-    document.body.appendChild(wipe);
+    /* ── Tab-switch transition — glitch wave, sidebar nav only ────── */
+    /* Scoped strictly to .sidebar .nav-item links: switching between
+       admin sections. Never fires for form submits, buttons, topbar,
+       logout, or any other link/click. */
+    var glitchWave = document.getElementById('nx-glitch-wave');
     document.addEventListener('click', function (e) {
-        var link = e.target.closest && e.target.closest('a[href]');
-        if (!link) return;
+        var link = e.target.closest && e.target.closest('.sidebar .nav-item[href]');
+        if (!link || !glitchWave) return;
         var href = link.getAttribute('href') || '';
         if (href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank' || e.metaKey || e.ctrlKey) return;
         if (link.hostname && link.hostname !== window.location.hostname) return;
         e.preventDefault();
-        wipe.classList.add('nx-wipe-active');
-        setTimeout(function () { window.location.href = href; }, 260);
+        glitchWave.classList.remove('nx-glitch-active');
+        // Force reflow so the animation restarts cleanly if clicked twice fast.
+        void glitchWave.offsetWidth;
+        glitchWave.classList.add('nx-glitch-active');
+        setTimeout(function () { window.location.href = href; }, 300);
     });
 
     /* ── Custom crosshair cursor — rAF-batched, transform-only (no layout) ── */
