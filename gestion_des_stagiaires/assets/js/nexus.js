@@ -88,12 +88,12 @@
         setTimeout(function () { window.location.href = href; }, 260);
     });
 
-    /* ── Custom crosshair cursor ──────────────────────────────────── */
+    /* ── Custom crosshair cursor — rAF-batched, transform-only (no layout) ── */
     var crosshair = document.getElementById('nx-crosshair');
     if (crosshair && matchMedia('(pointer: fine)').matches) {
+        var mx = -100, my = -100, cx = -100, cy = -100;
         document.addEventListener('mousemove', function (e) {
-            crosshair.style.left = e.clientX + 'px';
-            crosshair.style.top = e.clientY + 'px';
+            mx = e.clientX; my = e.clientY;
         }, { passive: true });
         document.addEventListener('mouseover', function (e) {
             if (e.target.closest && e.target.closest('a, button, .nav-item, .btn')) crosshair.classList.add('nx-hover');
@@ -103,38 +103,64 @@
         });
         document.addEventListener('mousedown', function () { crosshair.classList.add('nx-click'); });
         document.addEventListener('mouseup', function () { crosshair.classList.remove('nx-click'); });
+        (function loop() {
+            cx = mx; cy = my;
+            crosshair.style.transform = 'translate3d(' + cx + 'px,' + cy + 'px,0) translate(-50%,-50%)';
+            requestAnimationFrame(loop);
+        })();
+    } else if (crosshair) {
+        crosshair.style.display = 'none';
     }
 
-    /* ── Matrix rain canvas ────────────────────────────────────────── */
+    /* ── Matrix rain canvas — throttled + low-res render, paused when tab hidden ── */
     var canvas = document.getElementById('nx-matrix');
-    if (canvas && canvas.getContext) {
-        var mctx = canvas.getContext('2d');
-        var chars = 'アイウエオカキクケコサシスセソ01<>/{}[]=+-*ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        var fontSize = 15;
+    if (canvas && canvas.getContext && matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+        var mctx = canvas.getContext('2d', { alpha: false });
+        var chars = 'アイウエオカキクケコサシスセソ01<>/{}[]=+-*'.split('');
+        var fontSize = 16;
+        var scale = 0.6; // render at reduced resolution, upscale via CSS for perf
         var columns, drops;
 
         function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            columns = Math.floor(canvas.width / fontSize);
+            var w = Math.ceil(window.innerWidth * scale);
+            var h = Math.ceil(window.innerHeight * scale);
+            canvas.width = w;
+            canvas.height = h;
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
+            columns = Math.floor(w / fontSize);
             drops = new Array(columns).fill(1).map(function () { return Math.random() * -40; });
         }
         resize();
-        window.addEventListener('resize', resize);
+        var resizeTimer;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(resize, 200);
+        });
+
+        var running = true;
+        document.addEventListener('visibilitychange', function () {
+            running = document.visibilityState === 'visible';
+        });
 
         function draw() {
-            mctx.fillStyle = 'rgba(5,8,6,0.08)';
-            mctx.fillRect(0, 0, canvas.width, canvas.height);
-            mctx.font = fontSize + 'px monospace';
-            for (var i = 0; i < columns; i++) {
-                var text = chars[Math.floor(Math.random() * chars.length)];
-                mctx.fillStyle = Math.random() > 0.96 ? '#00fff2' : '#39ff14';
-                mctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
+            if (running) {
+                mctx.fillStyle = 'rgba(5,8,6,0.14)';
+                mctx.fillRect(0, 0, canvas.width, canvas.height);
+                mctx.font = fontSize + 'px monospace';
+                for (var i = 0; i < columns; i += 2) { // update every other column per tick
+                    var text = chars[(Math.random() * chars.length) | 0];
+                    mctx.fillStyle = Math.random() > 0.96 ? '#00fff2' : '#39ff14';
+                    mctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                    drops[i]++;
+                }
             }
+            setTimeout(function () { requestAnimationFrame(draw); }, 90); // ~11fps, plenty for ambient effect
         }
-        setInterval(draw, 45);
+        requestAnimationFrame(draw);
+    } else if (canvas) {
+        canvas.style.display = 'none';
     }
 
     /* ── Sidebar collapse toggle ─────────────────────────────────── */

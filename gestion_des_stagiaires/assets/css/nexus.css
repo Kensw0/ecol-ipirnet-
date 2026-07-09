@@ -53,10 +53,10 @@ body { background-color: var(--nx-bg-base) !important; color: var(--nx-text-prim
 #nx-crosshair {
     position: fixed; top:0; left:0; width: 18px; height: 18px;
     border: 1px solid var(--nx-green); border-radius: 2px;
-    pointer-events: none; z-index: 100000; mix-blend-mode: difference;
-    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 100000;
+    transform: translate3d(-50%, -50%, 0);
+    will-change: transform;
     transition: width 0.15s, height 0.15s, border-color 0.15s;
-    box-shadow: 0 0 8px var(--nx-green-glow);
 }
 #nx-crosshair::before, #nx-crosshair::after {
     content: ''; position: absolute; background: var(--nx-green);
@@ -72,33 +72,19 @@ body { background-color: var(--nx-bg-base) !important; color: var(--nx-text-prim
     opacity: 0.16;
 }
 
-/* ── CRT scanlines + flicker + vignette ──────────────────────── */
+/* ── CRT scanlines + vignette (static — cheap to paint, no blend modes) ── */
 #nx-scanlines {
     position: fixed; inset: 0; z-index: 99998; pointer-events: none;
-    background: repeating-linear-gradient(
-        to bottom,
-        rgba(0,0,0,0) 0px,
-        rgba(0,0,0,0.12) 1px,
-        rgba(0,0,0,0) 2px
-    );
-    mix-blend-mode: overlay;
-}
-#nx-scanlines::before {
-    content: '';
-    position: fixed; inset: 0;
-    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
-}
-#nx-scanlines::after {
-    content: '';
-    position: fixed; inset: 0;
-    background: rgba(57,255,20,0.02);
-    animation: nxCrtFlicker 6.5s infinite;
+    background:
+        repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0.09) 1px, rgba(0,0,0,0) 3px),
+        radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+    will-change: opacity;
+    animation: nxCrtFlicker 7s steps(1,end) infinite;
 }
 @keyframes nxCrtFlicker {
     0%, 96%, 100% { opacity: 1; }
-    97% { opacity: 0.75; }
+    97% { opacity: 0.93; }
     98% { opacity: 1; }
-    99% { opacity: 0.6; }
 }
 
 body::before {
@@ -136,7 +122,7 @@ h1, h2, .page-title-dash, .brand-name h2 {
     text-transform: uppercase;
     position: relative;
     color: var(--nx-text-primary) !important;
-    text-shadow: 0 0 8px var(--nx-green-glow);
+    text-shadow: 0 0 4px var(--nx-green-glow);
 }
 [data-glitch] { position: relative; display: inline-block; }
 [data-glitch]:hover::before, [data-glitch]:hover::after {
@@ -291,7 +277,7 @@ h1, h2, .page-title-dash, .brand-name h2 {
 .badge-danger   { background: rgba(255,56,96,0.12) !important; color: var(--nx-red) !important; border: 1px solid rgba(255,56,96,0.3) !important; }
 
 /* ── KPI count-up ─────────────────────────────────────────────── */
-[data-count] { font-variant-numeric: tabular-nums; text-shadow: 0 0 10px currentColor; }
+[data-count] { font-variant-numeric: tabular-nums; text-shadow: 0 0 4px currentColor; }
 
 /* ── Donut / histogram animation ─────────────────────────────── */
 .card svg circle[stroke-dasharray] { transition: stroke-dashoffset 1.4s cubic-bezier(0.4,0,0.2,1); }
@@ -342,19 +328,20 @@ h1, h2, .page-title-dash, .brand-name h2 {
     box-shadow: 0 0 0 2px rgba(57,255,20,0.18) !important;
 }
 
-/* ── Page transition wipe ─────────────────────────────────────── */
+/* ── Page transition — blocky wave sweeping right → left ───────── */
 #nx-page-wipe {
     position: fixed; inset: 0; z-index: 999998;
-    background: var(--nx-green);
-    transform: scaleY(0); transform-origin: top;
     pointer-events: none;
+    background: repeating-linear-gradient(90deg, var(--nx-green) 0 28px, #063a0c 28px 30px);
+    transform: scaleX(0);
+    transform-origin: right center;
+    will-change: transform;
 }
-#nx-page-wipe.nx-wipe-active { animation: nxWipe 0.55s cubic-bezier(0.76,0,0.24,1) forwards; }
-@keyframes nxWipe {
-    0%   { transform: scaleY(0); transform-origin: top; }
-    50%  { transform: scaleY(1); transform-origin: top; }
-    50.1%{ transform: scaleY(1); transform-origin: bottom; }
-    100% { transform: scaleY(0); transform-origin: bottom; }
+#nx-page-wipe.nx-wipe-active {
+    animation: nxBlockWipe 0.42s steps(9, end) forwards;
+}
+@keyframes nxBlockWipe {
+    to { transform: scaleX(1); }
 }
 
 /* ── Scroll reveal / stagger ──────────────────────────────────── */
