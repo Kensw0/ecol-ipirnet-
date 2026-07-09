@@ -19489,7 +19489,8 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 ALTER TABLE `absences`
   ADD PRIMARY KEY (`id_absence`),
   ADD KEY `fk_absences_stagiaire` (`id_stagiaire`),
-  ADD KEY `fk_absences_module` (`id_module`);
+  ADD KEY `fk_absences_module` (`id_module`),
+  ADD KEY `idx_absences_date` (`date_absence`);
 
 --
 -- Indexes for table `classes`

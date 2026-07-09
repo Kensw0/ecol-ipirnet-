@@ -93,7 +93,8 @@
               )->execute([$nbControlesPost, $coefficientPost, $semestrePost, $masseHorairePost, $idModulePost]);
               echo json_encode(['success' => true, 'msg' => 'Module mis à jour.']);
           } catch (\Throwable $e) {
-              echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+              error_log('[gestion_modules.php] ' . $e->getMessage());
+              echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
           }
           exit;
       }
@@ -134,7 +135,8 @@
                   'id_filiere' => $idFilierePost,
               ]);
           } catch (\Throwable $e) {
-              echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+              error_log('[gestion_modules.php] ' . $e->getMessage());
+              echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
           }
           exit;
       }

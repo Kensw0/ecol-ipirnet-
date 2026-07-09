@@ -351,6 +351,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash_set('Classe invalide pour cette filière.');
                 redirect('demandes_inscription.php');
             }
+            // ── Vérification de la capacité disponible dans la classe ──────────────
+            $reqCapSingle = $pdo->prepare(
+                'SELECT COALESCE(c.capacite, 30) - COUNT(s.id_stagiaire) AS places_libres
+                   FROM classes c
+                   LEFT JOIN stagiaires s ON s.id_classe = c.id_classe
+                  WHERE c.id_classe = ?
+                  GROUP BY c.id_classe'
+            );
+            $reqCapSingle->execute([$idClasseFinale]);
+            $capSingle = $reqCapSingle->fetch();
+            if ($capSingle !== false && (int)$capSingle['places_libres'] <= 0) {
+                $pdo->rollBack();
+                flash_set('Impossible d\'inscrire ce stagiaire : la classe est pleine (capacité maximale atteinte).', 'danger');
+                redirect('demandes_inscription.php');
+            }
             // ── Création du stagiaire et mise à jour du statut de la demande ────────
             $requeteInsertion = $pdo->prepare(
                 'INSERT INTO stagiaires (num_inscri, cin, nom, prenom, date_naissance, adresse, email, telephone, telephone_parent, nom_tuteur, photo, date_inscription, id_classe, sexe) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
@@ -601,7 +616,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set($msg, 'success');
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            flash_set('Erreur lors de l\'inscription groupée : ' . $e->getMessage());
+            error_log('[demandes_inscription.php bulk_accepter] ' . $e->getMessage());
+            flash_set('Une erreur est survenue lors de l\'inscription groupée. Veuillez réessayer.', 'danger');
         }
         redirect('demandes_inscription.php');
     }

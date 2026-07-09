@@ -89,7 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'capacite'       => $capacite,
             ]);
         } catch (\Throwable $e) {
-            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+            error_log('[gestion_classes.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
@@ -115,7 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'capacite'   => $capacite,
             ]);
         } catch (\Throwable $e) {
-            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+            error_log('[gestion_classes.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
@@ -146,7 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('DELETE FROM classes WHERE id_classe = ?')->execute([$idClasse]);
             echo json_encode(['success' => true, 'msg' => 'Classe supprimée.']);
         } catch (\Throwable $e) {
-            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+            error_log('[gestion_classes.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
@@ -205,7 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'nb_deplaces' => $nbDeplaces,
             ]);
         } catch (\Throwable $e) {
-            echo json_encode(['success' => false, 'error' => 'Erreur : ' . $e->getMessage()]);
+            error_log('[gestion_classes.php] ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Une erreur est survenue. Veuillez réessayer.']);
         }
         exit;
     }
