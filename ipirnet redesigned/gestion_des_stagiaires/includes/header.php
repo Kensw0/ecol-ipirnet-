@@ -342,14 +342,7 @@ if (!$isPublic && isset($pdo)) {
 <?php endif; ?>
 </head>
 <body class="<?= $isPublic ? 'public-page' : '' ?>">
-<canvas id="nx-matrix" aria-hidden="true"></canvas>
-<div id="nx-scanlines" aria-hidden="true"></div>
-<div id="nx-crosshair" aria-hidden="true"></div>
-<div id="nx-glitch-wave" aria-hidden="true">
-    <div class="nx-glitch-layer l1"></div>
-    <div class="nx-glitch-layer l2"></div>
-    <div class="nx-glitch-layer l3"></div>
-</div>
+<div id="nx-page-wipe" aria-hidden="true"></div>
 <div id="nx-intrusion-loader" aria-hidden="true"><span id="nx-intrusion-text"></span><span id="nx-intrusion-cursor">_</span></div>
 
 <?php if ($isPublic): ?>
