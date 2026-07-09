@@ -25,11 +25,8 @@ if ($id > 0) {
     );
     $st->execute([$id]);
     $d = $st->fetch();
-    if ($d) { 
-        $filled = true; 
-        if (!empty($d['id_stagiaire_cree'])) {
-            log_document_gen($pdo, 'fiche_preinscription', (int)$d['id_stagiaire_cree'], (string)$d['num_inscri']);
-        }
+    if ($d) {
+        $filled = true;
     }
 }
 

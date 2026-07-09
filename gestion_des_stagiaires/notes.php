@@ -660,12 +660,20 @@
                   <?php endif; ?>
 
                   <!-- Fiche vierge : tableau de contrôle sans notes -->
+                  <?php if ($nbControles <= 1): ?>
                   <a href="print_tableau_notes_controle.php?<?= $qsImpression ?>&controle_no=1&vierge=1"
                      target="_blank"
                      class="btn-save-notes"
                      style="text-decoration:none;background:rgba(255,255,255,0.05);color:#a1a1aa;border-color:rgba(255,255,255,0.15);">
                       <i class="fa-solid fa-file-lines"></i> Fiche vierge
                   </a>
+                  <?php else: ?>
+                  <button type="button" onclick="ouvrirModalControleVierge()"
+                      class="btn-save-notes"
+                      style="background:rgba(255,255,255,0.05);color:#a1a1aa;border-color:rgba(255,255,255,0.15);">
+                      <i class="fa-solid fa-file-lines"></i> Fiche vierge
+                  </button>
+                  <?php endif; ?>
 
                   <!-- Enregistrement AJAX -->
                   <button type="submit" class="btn-save-notes" id="btn-enregistrer">
@@ -940,8 +948,16 @@
 
   // ── Modal impression tableau de contrôle ────────────────────────────────────
   var _urlImpression = 'print_tableau_notes_controle.php?id_classe=<?= $idClasseSelecte ?>&id_module=<?= $idModuleSelecte ?>';
+  var _viergeMode = false;
 
   function ouvrirModalControle() {
+      _viergeMode = false;
+      var el = document.getElementById('ctrl-modal-overlay');
+      if (el) el.classList.add('open');
+  }
+
+  function ouvrirModalControleVierge() {
+      _viergeMode = true;
       var el = document.getElementById('ctrl-modal-overlay');
       if (el) el.classList.add('open');
   }
@@ -952,9 +968,11 @@
   }
 
   function imprimerControle() {
-      var sel    = document.getElementById('ctrl-modal-select');
+      var sel     = document.getElementById('ctrl-modal-select');
       var numCtrl = sel ? sel.value : 1;
-      window.open(_urlImpression + '&controle_no=' + numCtrl, '_blank');
+      var url     = _urlImpression + '&controle_no=' + numCtrl;
+      if (_viergeMode) url += '&vierge=1';
+      window.open(url, '_blank');
       fermerModalControle();
   }
 
