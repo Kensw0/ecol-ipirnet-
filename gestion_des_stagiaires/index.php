@@ -198,7 +198,7 @@ foreach ($distributionAbsences as $ligneAbs) {
     <div class="dash-main">
 
         <!-- ── Bandeau de bienvenue ────────────────────────────────────────── -->
-        <div class="dash-welcome card" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.05)); border-color: rgba(236, 72, 153, 0.2);">
+        <div class="dash-welcome card" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(34, 211, 238, 0.05)); border-color: rgba(99, 102, 241, 0.25);">
             <h2 style="font-family: 'Instrument Serif', serif; font-size: 2.2rem; color: #fff; margin-bottom: 0.25rem; text-transform:none; letter-spacing:0;">Bienvenue sur le Tableau de Bord 👋</h2>
             <p style="margin:0;font-size:0.95rem;color:rgba(244,244,245,0.7);">Voici le résumé en temps réel de la gestion des stagiaires IPIRNET.</p>
         </div>
@@ -210,7 +210,7 @@ foreach ($distributionAbsences as $ligneAbs) {
             <div class="stat-card stat-featured" style="border-top: 3px solid #60a5fa; background: linear-gradient(to bottom, rgba(96, 165, 250, 0.08) 0%, rgba(255,255,255,0.03) 100%);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <div class="stat-value" style="color: #60a5fa; font-size: 2.4rem; padding-bottom:0.25rem;"><?= $nbStagiaires ?></div>
+                        <div class="stat-value" style="color: #60a5fa; font-size: 2.4rem; padding-bottom:0.25rem;" data-count="<?= $nbStagiaires ?>">0</div>
                         <div class="stat-label">Stagiaires Actifs</div>
                     </div>
                     <i class="fa-solid fa-users" style="color: rgba(96, 165, 250, 0.4); font-size: 1.6rem;"></i>
@@ -224,7 +224,7 @@ foreach ($distributionAbsences as $ligneAbs) {
             <div class="stat-card" style="border-top: 3px solid #fbbf24; background: linear-gradient(to bottom, rgba(251, 191, 36, 0.08) 0%, rgba(255,255,255,0.03) 100%);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <div class="stat-value" style="color: #fbbf24; font-size: 2.4rem; padding-bottom:0.25rem;"><?= $nbDemandesEnAttente ?></div>
+                        <div class="stat-value" style="color: #fbbf24; font-size: 2.4rem; padding-bottom:0.25rem;" data-count="<?= $nbDemandesEnAttente ?>">0</div>
                         <div class="stat-label">Pré-inscriptions</div>
                     </div>
                     <i class="fa-solid fa-clock" style="color: rgba(251, 191, 36, 0.4); font-size: 1.6rem;"></i>
@@ -238,7 +238,7 @@ foreach ($distributionAbsences as $ligneAbs) {
             <div class="stat-card" style="border-top: 3px solid #34d399; background: linear-gradient(to bottom, rgba(52, 211, 153, 0.08) 0%, rgba(255,255,255,0.03) 100%);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <div class="stat-value" style="color: #34d399; font-size: 2.4rem; padding-bottom:0.25rem;"><?= $nbPayesCeMois ?></div>
+                        <div class="stat-value" style="color: #34d399; font-size: 2.4rem; padding-bottom:0.25rem;" data-count="<?= $nbPayesCeMois ?>">0</div>
                         <div class="stat-label">Cotisations payées</div>
                     </div>
                     <i class="fa-solid fa-money-check-dollar" style="color: rgba(52, 211, 153, 0.4); font-size: 1.6rem;"></i>
@@ -255,7 +255,7 @@ foreach ($distributionAbsences as $ligneAbs) {
             <div class="stat-card" style="border-top: 3px solid #f87171; background: linear-gradient(to bottom, rgba(248, 113, 113, 0.08) 0%, rgba(255,255,255,0.03) 100%);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <div class="stat-value" style="color: #f87171; font-size: 2.4rem; padding-bottom:0.25rem;"><?= $nbAbsences30j ?></div>
+                        <div class="stat-value" style="color: #f87171; font-size: 2.4rem; padding-bottom:0.25rem;" data-count="<?= $nbAbsences30j ?>">0</div>
                         <div class="stat-label">Absences (30j)</div>
                     </div>
                     <i class="fa-solid fa-calendar-xmark" style="color: rgba(248, 113, 113, 0.4); font-size: 1.6rem;"></i>

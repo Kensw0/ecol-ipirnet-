@@ -113,6 +113,9 @@ function gds_render_flash(): void
     echo '<i class="fa-solid ' . $icone . '" style="flex-shrink:0;"></i>';
     echo '<span>' . h($flash['msg']) . '</span>';
     echo '</div>';
+    // Jeton discret consommé par nexus.js pour afficher un toast animé
+    // en plus du message inline ci-dessus.
+    echo '<div id="nx-flash-data" data-type="' . h($flash['type']) . '" data-msg="' . h($flash['msg']) . '" style="display:none;"></div>';
 }
 
 
@@ -149,11 +152,13 @@ if (!$isPublic && isset($pdo)) {
     <!-- Feuilles de style de l'application -->
     <link rel="stylesheet" href="assets/css/app.css?v=3">
     <link rel="stylesheet" href="assets/css/gds-php-blink-compat.css?v=7">
+    <link rel="stylesheet" href="assets/css/nexus.css?v=1">
 
     <!-- Scripts différés (ne bloquent pas le rendu de la page) -->
     <script defer src="assets/js/filiere-filter.js?v=1"></script>
     <script defer src="assets/js/gds-table-filter.js?v=1"></script>
     <script defer src="assets/js/validation.js?v=1"></script>
+    <script defer src="assets/js/nexus.js?v=1"></script>
 
 <?php if ($isPublic): ?>
     <!-- ── Styles spécifiques au shell public (formulaire pré-inscription) ── -->
@@ -388,7 +393,7 @@ if (!$isPublic && isset($pdo)) {
 <!-- ============================================================
      BRANCHE ADMIN — Interface complète avec sidebar
      ============================================================ -->
-<div class="admin-layout">
+<div class="admin-layout" data-sidebar-collapsed="false">
     <aside class="sidebar no-print">
 
         <!-- En-tête de la sidebar : logo + nom de l'app -->
@@ -528,6 +533,21 @@ if (!$isPublic && isset($pdo)) {
 
     <!-- Zone de contenu principale -->
     <main class="main-content">
+        <!-- Topbar : toggle sidebar + fil d'ariane + horloge -->
+        <div class="nx-topbar no-print">
+            <div class="nx-topbar-left">
+                <button type="button" id="nx-sidebar-toggle" class="nx-sidebar-toggle" aria-label="Réduire la barre latérale">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span class="nx-breadcrumb">IPIRNET <i class="fa-solid fa-angle-right" style="font-size:.65rem;margin:0 .35rem;opacity:.5;"></i> <b><?= h($pageTitle) ?></b></span>
+            </div>
+            <div class="nx-topbar-right">
+                <div class="nx-clock-pill">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="nx-clock">--:--</span>
+                </div>
+            </div>
+        </div>
         <!-- Overlay utilisé pour l'effet de lumière suivant la souris (voir footer.php) -->
         <div id="mouse-lighting-overlay" class="mouse-light-overlay"></div>
         <div class="page-container">
