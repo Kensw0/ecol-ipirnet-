@@ -654,7 +654,7 @@ $traitees = $pdo->query(
      FROM pre_inscription d
      JOIN filieres f ON f.id_filiere = d.id_filiere
      WHERE d.statut != \'en_attente\'
-     ORDER BY d.date_decision DESC LIMIT 50'
+     ORDER BY d.date_decision DESC LIMIT 500'
 )->fetchAll();
 
 // Filieres list for the pre-inscription form checkboxes

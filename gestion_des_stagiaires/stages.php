@@ -241,7 +241,7 @@
           $stagiaire['has_pfe']   = $aPFE;
 
           // Calcul du statut selon le niveau (1ère année : seul le stage requis ; 2ème : stage + PFE)
-          if (strpos($niveauSelectionne, '1') !== false) {
+          if (strpos($niveauSelectionne, '1ère') !== false || strpos($niveauSelectionne, '1ere') !== false || strpos($niveauSelectionne, '1A') !== false) {
               $stagiaire['status'] = $aStageEntreprise ? 'complet' : 'manquant';
               $stagiaire['recap']  = $aStageEntreprise ? '✅ Stage validé' : '🔴 Stage requis';
           } else {
@@ -506,7 +506,7 @@
                       <?php foreach ($stagiaires as $stagiaire): ?>
                           <?php
                           // Pré-calculer si l'étudiant peut encore ajouter un stage
-                          $estAnnee1 = strpos($niveauSelectionne, '1') !== false;
+                          $estAnnee1 = strpos($niveauSelectionne, '1ère') !== false || strpos($niveauSelectionne, '1ere') !== false || strpos($niveauSelectionne, '1A') !== false;
                           $peutAjouter = true;
                           if ($estAnnee1 && $stagiaire['has_stage'])            $peutAjouter = false;
                           if (!$estAnnee1 && $stagiaire['has_stage'] && $stagiaire['has_pfe']) $peutAjouter = false;

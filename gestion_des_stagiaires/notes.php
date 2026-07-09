@@ -660,7 +660,7 @@
                   <?php endif; ?>
 
                   <!-- Fiche vierge : tableau de contrôle sans notes -->
-                  <a href="print_tableau_notes_controle.php?<?= $qsImpression ?>&controle_no=<?= $controleNo ?>&vierge=1"
+                  <a href="print_tableau_notes_controle.php?<?= $qsImpression ?>&controle_no=1&vierge=1"
                      target="_blank"
                      class="btn-save-notes"
                      style="text-decoration:none;background:rgba(255,255,255,0.05);color:#a1a1aa;border-color:rgba(255,255,255,0.15);">
