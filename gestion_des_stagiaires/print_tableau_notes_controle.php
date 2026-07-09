@@ -156,7 +156,7 @@ if ($idClasse > 0) {
     <?php require __DIR__ . '/includes/print_letterhead.php'; ?>
 
     <div class="doc-title">Tableau de Notes de Contrôle</div>
-    <div class="doc-subtitle">Contrôle N° <?= $controleNo ?></div>
+    <div class="doc-subtitle">Contrôle N° <?= $modeVierge ? '______' : $controleNo ?></div>
 
     <!-- Meta -->
     <table class="meta-table">
