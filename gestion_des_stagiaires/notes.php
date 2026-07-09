@@ -744,7 +744,7 @@
                                   class="note-input<?= $valCtrl !== '' ? ' has-value' : '' ?>"
                                   name="notes[<?= $idStagiaire ?>][<?= $typeCtrl ?>]"
                                   value="<?= h($valCtrl) ?>"
-                                  min="0" max="20" step="0.25"
+                                  min="0" max="20" step="any"
                                   placeholder="—">
                           </td>
                           <?php endfor; ?>
@@ -755,7 +755,7 @@
                                   class="note-input<?= $noteTheo !== '' ? ' has-value' : '' ?>"
                                   name="notes[<?= $idStagiaire ?>][theorique]"
                                   value="<?= h($noteTheo) ?>"
-                                  min="0" max="20" step="0.25"
+                                  min="0" max="20" step="any"
                                   placeholder="—">
                           </td>
                           <!-- Note pratique -->
@@ -765,7 +765,7 @@
                                   class="note-input<?= $notePrat !== '' ? ' has-value' : '' ?>"
                                   name="notes[<?= $idStagiaire ?>][pratique]"
                                   value="<?= h($notePrat) ?>"
-                                  min="0" max="20" step="0.25"
+                                  min="0" max="20" step="any"
                                   placeholder="—">
                           </td>
                           <!-- Liens relevés individuels -->
