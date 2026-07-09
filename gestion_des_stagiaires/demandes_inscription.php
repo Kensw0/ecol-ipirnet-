@@ -675,9 +675,16 @@ $pi_years = $pdo->query(
       ORDER BY annee_scolaire_visee DESC"
 )->fetchAll(\PDO::FETCH_COLUMN);
 
-// Available years for the form — loaded from classes table (same source as stagiaires page)
+// Available years for the form — union of classes AND pre_inscription years
+// so that any year stored in pre_inscription always has a matching <option>
 $years_available = $pdo->query(
-    "SELECT DISTINCT annee_scolaire FROM classes ORDER BY annee_scolaire DESC"
+    "SELECT annee FROM (
+        SELECT DISTINCT annee_scolaire      AS annee FROM classes
+        UNION
+        SELECT DISTINCT annee_scolaire_visee AS annee FROM pre_inscription
+         WHERE annee_scolaire_visee IS NOT NULL AND annee_scolaire_visee != ''
+     ) t
+     ORDER BY annee DESC"
 )->fetchAll(\PDO::FETCH_COLUMN);
 $default_year = !empty($years_available) ? $years_available[0] : '';
 
