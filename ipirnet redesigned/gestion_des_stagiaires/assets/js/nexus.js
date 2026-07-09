@@ -53,6 +53,30 @@
         if (e.target.closest && e.target.closest('a, button, .nav-item, .btn')) window.nxSfx.click();
     });
 
+    /* ── Intrusion loader — plays once per browser session ────────── */
+    var intrusion = document.getElementById('nx-intrusion-loader');
+    var intrusionText = document.getElementById('nx-intrusion-text');
+    if (intrusion && intrusionText && !sessionStorage.getItem('nxBooted')) {
+        sessionStorage.setItem('nxBooted', '1');
+        intrusion.classList.add('nx-intrusion-active');
+        window.nxSfx.boot();
+        var line = 'Warning: Intrusion detected.';
+        var idx = 0;
+        var typer = setInterval(function () {
+            intrusionText.textContent = line.slice(0, idx);
+            idx++;
+            if (idx > line.length) {
+                clearInterval(typer);
+                setTimeout(function () {
+                    intrusion.classList.add('nx-intrusion-out');
+                    setTimeout(function () { intrusion.remove(); }, 400);
+                }, 500);
+            }
+        }, 55);
+    } else if (intrusion) {
+        intrusion.remove();
+    }
+
     /* ── Tab-switch transition — glitch wave, sidebar nav only ────── */
     /* Scoped strictly to .sidebar .nav-item links: switching between
        admin sections. Never fires for form submits, buttons, topbar,

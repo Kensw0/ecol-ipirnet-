@@ -350,6 +350,7 @@ if (!$isPublic && isset($pdo)) {
     <div class="nx-glitch-layer l2"></div>
     <div class="nx-glitch-layer l3"></div>
 </div>
+<div id="nx-intrusion-loader" aria-hidden="true"><span id="nx-intrusion-text"></span><span id="nx-intrusion-cursor">_</span></div>
 
 <?php if ($isPublic): ?>
 <!-- ============================================================
