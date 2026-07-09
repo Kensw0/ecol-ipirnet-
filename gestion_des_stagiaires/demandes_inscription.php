@@ -1049,12 +1049,12 @@ function getAvatarInitials($nom, $prenom) {
 
     <?php if($attente): ?>
     <div style="padding:0.75rem 1.25rem 0.5rem;">
-        <!-- Year filter pills — always shown, sourced from classes table -->
-        <?php if(!empty($years_available)): ?>
+        <!-- Year filter pills — sourced from pre_inscription only (years with actual records) -->
+        <?php if(!empty($pi_years)): ?>
         <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.75rem;align-items:center;">
             <span style="font-size:0.75rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem;"><i class="fa-solid fa-calendar-days"></i></span>
             <button type="button" class="pi-year-btn pi-year-btn-traiter active" data-year="" style="padding:0.25rem 0.75rem;border-radius:20px;border:1px solid rgba(249,115,22,0.4);background:rgba(249,115,22,0.15);color:#f97316;font-size:0.78rem;font-weight:600;cursor:pointer;">Toutes</button>
-            <?php foreach($years_available as $yr): ?>
+            <?php foreach($pi_years as $yr): ?>
             <button type="button" class="pi-year-btn pi-year-btn-traiter" data-year="<?= h($yr) ?>" style="padding:0.25rem 0.75rem;border-radius:20px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#a1a1aa;font-size:0.78rem;font-weight:600;cursor:pointer;"><?= h($yr) ?></button>
             <?php endforeach; ?>
         </div>
@@ -1190,11 +1190,11 @@ function getAvatarInitials($nom, $prenom) {
     <div style="padding:1.5rem;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
         <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <h2 style="margin:0;font-size:1.25rem;"><i class="fa-solid fa-timeline" style="margin-right:0.5rem;color:#a1a1aa;"></i> Historique complet</h2>
-            <?php if(!empty($years_available)): ?>
+            <?php if(!empty($pi_years)): ?>
             <div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
                 <span style="font-size:0.75rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem;"><i class="fa-solid fa-calendar-days"></i></span>
                 <button type="button" class="pi-year-btn pi-year-btn-hist active" data-year="" style="padding:0.25rem 0.75rem;border-radius:20px;border:1px solid rgba(161,161,170,0.4);background:rgba(161,161,170,0.15);color:#a1a1aa;font-size:0.78rem;font-weight:600;cursor:pointer;">Toutes</button>
-                <?php foreach($years_available as $yr): ?>
+                <?php foreach($pi_years as $yr): ?>
                 <button type="button" class="pi-year-btn pi-year-btn-hist" data-year="<?= h($yr) ?>" style="padding:0.25rem 0.75rem;border-radius:20px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#a1a1aa;font-size:0.78rem;font-weight:600;cursor:pointer;"><?= h($yr) ?></button>
                 <?php endforeach; ?>
             </div>
