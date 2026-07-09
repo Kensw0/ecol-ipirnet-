@@ -18,7 +18,7 @@ $selNiveau  = trim((string)($_GET['niveau']     ?? ''));
 $selClasse  = (int)($_GET['id_classe']  ?? 0);
 $selModule   = (int)($_GET['id_module']   ?? 0);
 $selSemestre = trim((string)($_GET['semestre']  ?? ''));
-if (!in_array($selSemestre, ['', 'Semestre 1', 'Semestre 2'], true)) $selSemestre = '';
+if (!in_array($selSemestre, ['', '1', '2'], true)) $selSemestre = '';
 $selDateDe  = trim((string)($_GET['date_de']    ?? ''));
 $selDateA   = trim((string)($_GET['date_a']     ?? ''));
 
@@ -466,8 +466,8 @@ if ($__f):
       <label id="rpt-semestre-label" style="<?= $activeTab==='notes'?'':'display:none' ?>">Semestre
         <select name="semestre" onchange="this.form.submit()">
           <option value="" <?= $selSemestre===''?'selected':'' ?>>— Tous —</option>
-          <option value="Semestre 1" <?= $selSemestre==='Semestre 1'?'selected':'' ?>>Semestre 1</option>
-          <option value="Semestre 2" <?= $selSemestre==='Semestre 2'?'selected':'' ?>>Semestre 2</option>
+          <option value="1" <?= $selSemestre==='1'?'selected':'' ?>>Semestre 1</option>
+          <option value="2" <?= $selSemestre==='2'?'selected':'' ?>>Semestre 2</option>
         </select>
       </label>
 
