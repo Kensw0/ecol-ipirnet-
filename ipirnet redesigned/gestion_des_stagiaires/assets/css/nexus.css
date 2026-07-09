@@ -183,8 +183,9 @@ h1, h2, .page-title-dash, .brand-name h2 {
     transition: all 0.15s;
 }
 .nx-sidebar-toggle:hover { background: rgba(57,255,20,0.1); box-shadow: 0 0 12px var(--nx-green-glow); }
-.nx-sidebar-toggle svg { transition: transform 0.3s; }
-.admin-layout[data-sidebar-collapsed="true"] .nx-sidebar-toggle svg { transform: rotate(180deg); }
+.nx-sidebar-toggle svg, .nx-sidebar-toggle i { transition: transform 0.3s; }
+.admin-layout[data-sidebar-collapsed="true"] .nx-sidebar-toggle svg,
+.admin-layout[data-sidebar-collapsed="true"] .nx-sidebar-toggle i { transform: rotate(180deg); }
 .nx-breadcrumb { font-size: 0.78rem; color: var(--nx-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nx-breadcrumb b { color: var(--nx-green); font-weight: 700; }
 .nx-breadcrumb b::before { content: '> '; opacity: 0.6; }

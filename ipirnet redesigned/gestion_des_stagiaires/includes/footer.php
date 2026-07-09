@@ -33,20 +33,10 @@ if ($isPublic): ?>
     </main><!-- .main-content -->
 </div><!-- .admin-layout -->
 
-<script>
-// ── Effet de lumière suivant le curseur ───────────────────────────────────
-// Met à jour deux variables CSS (--mouse-x, --mouse-y) au mouvement de la
-// souris. L'overlay #mouse-lighting-overlay les utilise via un radial-gradient
-// dans app.css pour simuler un éclairage ambiant dynamique.
-(function () {
-    var overlay = document.getElementById('mouse-lighting-overlay');
-    if (!overlay) return;
-    document.addEventListener('mousemove', function (e) {
-        document.documentElement.style.setProperty('--mouse-x', e.clientX + 'px');
-        document.documentElement.style.setProperty('--mouse-y', e.clientY + 'px');
-    }, { passive: true }); // passive:true = ne bloque pas le scroll
-})();
-</script>
+<?php /* L'ancien effet de lumière suivant le curseur (#mouse-lighting-overlay) a
+         été retiré : l'overlay est désactivé (display:none) depuis le thème
+         NEXUS.TERMINAL, qui utilise son propre curseur (#nx-crosshair, voir
+         nexus.js) sans écouteur mousemove additionnel. */ ?>
 
 <!-- ── Modale de confirmation globale ────────────────────────────────────
      Remplace les window.confirm() natifs du navigateur.

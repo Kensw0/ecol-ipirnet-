@@ -1,8 +1,9 @@
 /* ============================================================
    NEXUS.TERMINAL — full sensory layer
-   Matrix rain, CRT boot sequence, glitch cursor, terminal SFX
-   (synthesized via WebAudio — no external files), page-transition
-   wipe, sidebar collapse, toasts, KPI counters, scroll reveal.
+   Matrix rain, session-scoped intrusion boot line, glitch cursor,
+   terminal SFX (synthesized via WebAudio — no external files),
+   glitch-wave tab-switch transition (sidebar nav only), sidebar
+   collapse, toasts, KPI counters, scroll reveal.
    ============================================================ */
 (function () {
     'use strict';
