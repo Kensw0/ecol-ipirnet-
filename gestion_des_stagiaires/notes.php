@@ -25,8 +25,13 @@
   // ============================================================
 
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_save_notes'])) {
+      // Capture any stray PHP output (notices/warnings) that would corrupt the JSON
+      ob_start();
+
       csrf_verify();
-      header('Content-Type: application/json');
+
+      ob_clean(); // discard any output that slipped in before this point
+      header('Content-Type: application/json; charset=utf-8');
 
       $idModuleSave  = (int)($_POST['id_module']    ?? 0);
       $nbControles   = max(1, min(10, (int)($_POST['nb_controles'] ?? 1)));
@@ -44,57 +49,67 @@
           return ($valeur >= 0 && $valeur <= 20) ? $valeur : null;
       };
 
-      if ($idModuleSave > 0 && is_array($lignesNotes)) {
+      try {
+          if ($idModuleSave > 0 && is_array($lignesNotes)) {
 
-          // ── Suppression préalable des notes existantes pour éviter les doublons ──
-          $idsStagiaires = array_filter(array_map('intval', array_keys($lignesNotes)));
+              // ── Suppression préalable des notes existantes pour éviter les doublons ──
+              $idsStagiaires = array_values(array_filter(array_map('intval', array_keys($lignesNotes))));
 
-          if (!empty($idsStagiaires)) {
-              $placeholdersDel = implode(',', array_fill(0, count($idsStagiaires), '?'));
-              $pdo->prepare(
-                  "DELETE FROM module_notes WHERE id_module = ? AND id_stagiaire IN ($placeholdersDel)"
-              )->execute(array_merge([$idModuleSave], $idsStagiaires));
-          }
+              if (!empty($idsStagiaires)) {
+                  $placeholdersDel = implode(',', array_fill(0, count($idsStagiaires), '?'));
+                  $pdo->prepare(
+                      "DELETE FROM module_notes WHERE id_module = ? AND id_stagiaire IN ($placeholdersDel)"
+                  )->execute(array_merge([$idModuleSave], $idsStagiaires));
+              }
 
-          // ── Insertion des nouvelles notes ──
-          $reqInsertion = $pdo->prepare(
-              'INSERT INTO module_notes (id_stagiaire, id_module, note, type) VALUES (?, ?, ?, ?)'
-          );
+              // ── Insertion des nouvelles notes ──
+              $reqInsertion = $pdo->prepare(
+                  'INSERT INTO module_notes (id_stagiaire, id_module, note, type) VALUES (?, ?, ?, ?)'
+              );
 
-          foreach ($lignesNotes as $idStagiaire => $valeursNote) {
-              $idStagiaire = (int)$idStagiaire;
-              if ($idStagiaire <= 0) continue;
+              foreach ($lignesNotes as $idStagiaire => $valeursNote) {
+                  $idStagiaire = (int)$idStagiaire;
+                  if ($idStagiaire <= 0) continue;
 
-              // Contrôles 1 … nb_controles — on ignore les cases vides
-              for ($numControle = 1; $numControle <= $nbControles; $numControle++) {
-                  $typeControle = "controle_$numControle";
-                  $noteControle = $validerNote((string)($valeursNote[$typeControle] ?? ''));
-                  if ($noteControle !== null) {
-                      $reqInsertion->execute([$idStagiaire, $idModuleSave, $noteControle, $typeControle]);
+                  // Contrôles 1 … nb_controles — on ignore les cases vides
+                  for ($numControle = 1; $numControle <= $nbControles; $numControle++) {
+                      $typeControle = "controle_$numControle";
+                      $noteControle = $validerNote((string)($valeursNote[$typeControle] ?? ''));
+                      if ($noteControle !== null) {
+                          $reqInsertion->execute([$idStagiaire, $idModuleSave, $noteControle, $typeControle]);
+                      }
                   }
-              }
 
-              // Note théorique — on ignore si vide
-              $noteTheorique = $validerNote((string)($valeursNote['theorique'] ?? ''));
-              if ($noteTheorique !== null) {
-                  $reqInsertion->execute([$idStagiaire, $idModuleSave, $noteTheorique, 'theorique']);
-              }
+                  // Note théorique — on ignore si vide
+                  $noteTheorique = $validerNote((string)($valeursNote['theorique'] ?? ''));
+                  if ($noteTheorique !== null) {
+                      $reqInsertion->execute([$idStagiaire, $idModuleSave, $noteTheorique, 'theorique']);
+                  }
 
-              // Note pratique — on ignore si vide
-              $notePratique = $validerNote((string)($valeursNote['pratique'] ?? ''));
-              if ($notePratique !== null) {
-                  $reqInsertion->execute([$idStagiaire, $idModuleSave, $notePratique, 'pratique']);
-              }
+                  // Note pratique — on ignore si vide
+                  $notePratique = $validerNote((string)($valeursNote['pratique'] ?? ''));
+                  if ($notePratique !== null) {
+                      $reqInsertion->execute([$idStagiaire, $idModuleSave, $notePratique, 'pratique']);
+                  }
 
-              $nbSauvegardes++;
+                  $nbSauvegardes++;
+              }
           }
-      }
 
-      echo json_encode([
-          'success' => true,
-          'message' => "Notes enregistrées pour $nbSauvegardes stagiaire(s).",
-          'saved'   => $nbSauvegardes,
-      ]);
+          ob_end_clean();
+          echo json_encode([
+              'success' => true,
+              'message' => "Notes enregistrées pour $nbSauvegardes stagiaire(s).",
+              'saved'   => $nbSauvegardes,
+          ]);
+      } catch (\Throwable $err) {
+          ob_end_clean();
+          http_response_code(500);
+          echo json_encode([
+              'success' => false,
+              'error'   => 'Erreur base de données : ' . $err->getMessage(),
+          ]);
+      }
       exit;
   }
 
@@ -858,10 +873,18 @@
       selClasse.addEventListener('change',  function() { cascadeFiltre(selClasse); });
       selModule.addEventListener('change',  function() { syncBoutonAfficher(); formFiltre.submit(); });
 
-      // ── Coloration des champs note remplis ──────────────────────────────────
+      // ── Coloration des champs note remplis + Enter → save (pas de saut de champ) ──
       document.querySelectorAll('.note-input').forEach(function(champ) {
           champ.addEventListener('input', function() {
               this.classList.toggle('has-value', this.value !== '');
+          });
+          // Enter déclenche la sauvegarde au lieu de passer au champ suivant
+          champ.addEventListener('keydown', function(e) {
+              if (e.key === 'Enter') {
+                  e.preventDefault();
+                  var btn = document.getElementById('btn-enregistrer');
+                  if (btn && !btn.disabled) btn.click();
+              }
           });
       });
 
