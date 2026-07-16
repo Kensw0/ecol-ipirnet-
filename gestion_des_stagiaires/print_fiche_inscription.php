@@ -72,7 +72,8 @@ if ($photoFile !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fiche d'inscription — <?= h($nomComplet) ?></title>
     <style>
-        @page { size: A4; margin: 12mm 14mm; }
+        @page { size: A4; margin: 0; }
+        @media print { .fi-doc { padding: 12mm 14mm !important; } }
         * { box-sizing: border-box; }
         html, body { background: #f1f3f5; }
         body {

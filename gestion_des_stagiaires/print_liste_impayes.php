@@ -110,7 +110,8 @@ foreach ($rows as $r) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Liste des Retards de Paiement — <?= h($moisLabel) ?></title>
     <style>
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4; margin: 0; }
+        @media print { .cs-doc { padding: 12mm !important; } }
         * { box-sizing: border-box; }
         html, body { background: #f1f3f5; }
         body {

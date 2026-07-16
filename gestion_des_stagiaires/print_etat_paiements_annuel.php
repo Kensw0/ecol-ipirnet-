@@ -136,7 +136,8 @@ $fmtDt = static function (?string $d): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>État Annuel des Paiements — <?= h($nomComplet) ?></title>
     <style>
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4; margin: 0; }
+        @media print { .cs-doc { padding: 12mm !important; } }
         * { box-sizing: border-box; }
         html, body { background: #f1f3f5; }
         body {
