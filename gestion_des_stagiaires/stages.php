@@ -541,6 +541,12 @@
                                                   <span style="color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">
                                                       <?= h($stage['entreprise'] ?: 'Non spécifié') ?>
                                                   </span>
+                                                  <?php if (!empty($stage['evaluation_entreprise'])): ?>
+                                                  <span style="font-size:0.7rem; color:#86efac; margin-top:2px;">
+                                                      <i class="fa-solid fa-star" style="font-size:0.6rem;"></i>
+                                                      <?= h($stage['evaluation_entreprise']) ?>
+                                                  </span>
+                                                  <?php endif; ?>
                                               </div>
                                               <div style="display:flex; gap:6px;">
                                                   <button class="action-btn" onclick='openStageModal(<?= h(json_encode($stage)) ?>, <?= $stagiaire['id_stagiaire'] ?>)' title="Modifier">
@@ -616,6 +622,9 @@
                       </label>
                       <label style="grid-column: span 2;">Entreprise / Organisme
                           <input type="text" name="entreprise" id="stage-entreprise" maxlength="255" placeholder="Ex: IPIRNET SARL">
+                      </label>
+                      <label style="grid-column: span 2;">Évaluation entreprise
+                          <input type="text" name="evaluation_entreprise" id="stage-evaluation" maxlength="512" placeholder="Ex: Très bien, Excellent, Satisfaisant…">
                       </label>
                   </fieldset>
                   <fieldset class="modal-fieldset">
@@ -704,6 +713,7 @@
       document.getElementById('stage-datefin').value       = stg ? (stg.date_fin     || '') : '';
       document.getElementById('stage-soutenance').value    = stg ? (stg.date_soutenance || '') : '';
       document.getElementById('stage-jury').value          = stg ? (stg.jury         || '') : '';
+      document.getElementById('stage-evaluation').value    = stg ? (stg.evaluation_entreprise || '') : '';
   }
 
   /** Ferme la modale de saisie du stage. */
@@ -853,11 +863,13 @@
       const typeLabel = estPFE ? 'PFE' : 'Stage';
       const cssClass  = estPFE ? 'pfe' : 'stage';
       const entreprise = stg.entreprise || 'Non spécifié';
+      const evaluation = stg.evaluation_entreprise || '';
       const stgJson    = JSON.stringify(stg).replace(/'/g, "\\'");
       return `<div class="mini-stage-card ${cssClass}">
           <div style="display:flex; flex-direction:column;">
               <strong style="color:#e4e4e7; font-size:0.72rem; text-transform:uppercase;">${typeLabel}</strong>
               <span style="color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">${entreprise}</span>
+              ${evaluation ? `<span style="font-size:0.7rem; color:#86efac; margin-top:2px;"><i class="fa-solid fa-star" style="font-size:0.6rem;"></i> ${evaluation}</span>` : ''}
           </div>
           <div style="display:flex; gap:6px;">
               <button class="action-btn" onclick='openStageModal(${stgJson}, ${sid})' title="Modifier">
