@@ -86,7 +86,8 @@ $stPaie = $pdo->prepare(
 );
 $stPaie->execute([$id]);
 $paiements    = $stPaie->fetchAll();
-$totalDu      = array_sum(array_column($paiements, 'montant_total'));
+$totalDu      = array_sum(array_column($paiements, 'montant_paye'))
+              + array_sum(array_column($paiements, 'montant_restant')); // net after remise
 $totalPaye    = array_sum(array_column($paiements, 'montant_paye'));
 $totalRestant = array_sum(array_column($paiements, 'montant_restant'));
 ?><!DOCTYPE html>
