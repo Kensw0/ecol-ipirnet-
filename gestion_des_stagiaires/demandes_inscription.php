@@ -17,6 +17,11 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 
+// Migration : s'assure que id_stagiaire a bien AUTO_INCREMENT (absent du dump initial).
+try {
+    $pdo->exec("ALTER TABLE stagiaires MODIFY id_stagiaire INT UNSIGNED NOT NULL AUTO_INCREMENT");
+} catch (\Throwable $ignored) {}
+
 /* ──────────────────────────────────────────────────────────────
    TRAITEMENT DES FORMULAIRES POST
 ────────────────────────────────────────────────────────────── */
@@ -391,7 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (str_contains($dbMsg, 'email'))          flash_set('Erreur : cet email est déjà utilisé.');
             elseif (str_contains($dbMsg, 'cin'))         flash_set('Erreur : ce CIN est déjà utilisé.');
             elseif (str_contains($dbMsg, 'num_inscri'))  flash_set('Erreur : conflit de numéro, réessayez.');
-            else flash_set('Erreur DB : ' . $dbMsg, 'danger');
+            else flash_set('Une erreur est survenue. Veuillez réessayer.');
         }
         redirect('demandes_inscription.php');
     }

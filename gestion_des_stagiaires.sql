@@ -16942,7 +16942,7 @@ INSERT INTO `stages` (`id_stage`, `type_stage`, `annee_scolaire`, `sujet`, `entr
 --
 
 CREATE TABLE `stagiaires` (
-  `id_stagiaire` int(10) UNSIGNED NOT NULL,
+  `id_stagiaire` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
   `num_inscri` varchar(32) NOT NULL,
   `cin` varchar(8) DEFAULT NULL,
   `nom` varchar(100) NOT NULL,
@@ -16960,7 +16960,7 @@ CREATE TABLE `stagiaires` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
   `remise_mensuelle` decimal(10,2) NOT NULL DEFAULT 0.00
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1000 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `stagiaires`
