@@ -73,8 +73,7 @@ if ($idClasse > 0) {
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Tableau de Notes de Contrôle <?= $controleNo > 1 ? "N°$controleNo" : '' ?> — IPIRNET</title>
     <style>
-        @page { size: A4 portrait; margin: 0; }
-        @media print { .doc { padding: 12mm 14mm !important; } }
+        @page { size: A4 portrait; margin: 12mm 14mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #f1f3f5; }
         body { padding: 18px 0 40px; font-family: "Arial", "Helvetica", sans-serif; color: #111; font-size: 11pt; }

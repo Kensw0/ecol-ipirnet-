@@ -131,8 +131,7 @@
       <meta charset="utf-8">
       <title>Feuille d'appel<?= $infoClasse ? ' — ' . h((string)$infoClasse['nom_classe']) : '' ?></title>
       <style>
-          @page { size: A4; margin: 0; }
-        @media print { .cs-doc { padding: 10mm 12mm !important; } }
+          @page { size: A4; margin: 10mm 12mm; }
           * { box-sizing: border-box; }
           html, body { background: #f1f3f5; }
           body {

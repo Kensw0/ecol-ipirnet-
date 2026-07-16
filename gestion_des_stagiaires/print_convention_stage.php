@@ -72,8 +72,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Convention de Stage — <?= h($nomComplet) ?></title>
     <style>
-        @page { size: A4; margin: 0; }
-        @media print { .cs-doc { padding: 12mm !important; } }
+        @page { size: A4; margin: 12mm; }
         * { box-sizing: border-box; }
         html, body { background: #f1f3f5; }
         body {

@@ -97,8 +97,7 @@ $totalRestant = array_sum(array_column($paiements, 'montant_restant'));
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Rapport Individuel — <?= h($nomComplet) ?></title>
     <style>
-        @page { size: A4; margin: 0; }
-        @media print { .doc-wrapper { padding: 10mm !important; } }
+        @page { size: A4; margin: 10mm; }
         * { box-sizing: border-box; }
         html, body { background: #e5e7eb; margin: 0; padding: 0; }
         body { font-family: "Times New Roman", Times, serif; color: #000; font-size: 11pt; padding: 20px 0; }

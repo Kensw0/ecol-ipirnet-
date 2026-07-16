@@ -133,8 +133,7 @@ $auto = isset($_GET['auto']) && $_GET['auto'] === '1';
     <title>Billet d'Excuse — <?= h($nomComplet) ?></title>
     <style>
         /* Small paper format (palm-sized: A6 portrait, 105 x 148 mm). */
-        @page { size: A6 portrait; margin: 0; }
-        @media print { .cs-doc { padding: 6mm !important; } }
+        @page { size: A6 portrait; margin: 6mm; }
         * { box-sizing: border-box; }
         html, body { background: #eef0f3; }
         body {
