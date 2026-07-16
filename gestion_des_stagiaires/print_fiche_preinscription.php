@@ -95,7 +95,7 @@ $inArr = fn(array $arr, $val) => in_array((string)$val, array_map('strval', $arr
 <meta charset="utf-8">
 <title><?= $filled ? 'Fiche — '.htmlspecialchars(($d['prenom']??'').' '.($d['nom']??'')) : 'Fiche de Pré-inscription vierge' ?></title>
 <style>
-@page{size:A4 portrait;margin:10mm 14mm 12mm;}
+@page{size:A4 portrait;margin:0;}
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{background:#f1f3f5;}
 body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;color:#111;font-size:11.5pt;}
@@ -103,7 +103,7 @@ body{padding:18px 0 40px;font-family:"Times New Roman","Liberation Serif",serif;
 .no-print{text-align:center;margin-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
 .no-print button,.no-print a{background:#f4f4f5;border:1px solid #ccc;padding:.4rem 1rem;border-radius:8px;font-size:.85rem;cursor:pointer;text-decoration:none;color:#111;}
 .no-print .primary{background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:600;}
-@media print{html,body{background:#fff;}.no-print{display:none!important;}.banner{display:none!important;}.doc{box-shadow:none;border:none;padding:0;margin:0;max-width:100%;}} @page{margin:1cm;size:A4 portrait;}
+@media print{html,body{background:#fff;}.no-print{display:none!important;}.banner{display:none!important;}.doc{box-shadow:none;border:none;padding:10mm 14mm 12mm;margin:0;max-width:100%;}}
 * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
 .lh{display:grid;grid-template-columns:110px 1fr 110px;align-items:center;gap:10px;padding-bottom:5px;border-bottom:1.5px solid #111;}
 .lh-logo{display:flex;justify-content:center;}
