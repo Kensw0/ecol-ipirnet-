@@ -1525,7 +1525,6 @@ if (isset($_GET['id'])) {
                             $prog = $now >= $end ? 100 : ($now <= $start ? 0 : round((($now-$start)/($end-$start))*100));
                         }
                         if ($ds && $today > $ds) $badge = '<span class="badge badge-success">Soutenance passée</span>';
-                        elseif ($df && $today > $df && empty($stg['rapport_url'])) $badge = '<span class="badge badge-danger">Rapport manquant</span>';
                         elseif ($df && $today > $df) $badge = '<span class="badge badge-success">Terminé</span>';
                         elseif ($dd && $df && $today >= $dd && $today <= $df) $badge = '<span class="badge" style="background:rgba(59,130,246,0.1);color:#3b82f6;">En cours</span>';
                         else $badge = '<span class="badge" style="background:rgba(250,204,21,0.1);color:#facc15;">Planifié</span>';
@@ -1571,11 +1570,8 @@ if (isset($_GET['id'])) {
                             </div>
                         </div>
                         <?php endif; ?>
-                        <?php if ($stg['note_stage'] !== null || $stg['jury'] || $stg['evaluation_entreprise']): ?>
+                        <?php if ($stg['jury'] || $stg['evaluation_entreprise'] || $stg['date_soutenance']): ?>
                         <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap; color:#a1a1aa; font-size:0.85rem;">
-                            <?php if ($stg['note_stage'] !== null): ?>
-                                <span><i class="fa-solid fa-star" style="color:#facc15;"></i> Note: <strong style="color:#fff;"><?= number_format((float)$stg['note_stage'], 2) ?>/20</strong></span>
-                            <?php endif; ?>
                             <?php if ($stg['date_soutenance']): ?>
                                 <span><i class="fa-solid fa-podium" style="color:#a855f7;"></i> Soutenance: <strong style="color:#fff;"><?= date('d/m/Y', strtotime($stg['date_soutenance'])) ?></strong></span>
                             <?php endif; ?>
@@ -2807,8 +2803,6 @@ function gdsAjaxForm(form, submitter) {
                             let badge = '';
                             if (stg.date_soutenance && today > stg.date_soutenance) {
                                 badge = '<span class="badge badge-success">Soutenance passée</span>';
-                            } else if (stg.date_fin && today > stg.date_fin && !stg.rapport_url) {
-                                badge = '<span class="badge badge-danger">Rapport manquant</span>';
                             } else if (stg.date_fin && today > stg.date_fin) {
                                 badge = '<span class="badge badge-success">Terminé</span>';
                             } else if (stg.date_debut && stg.date_fin && today >= stg.date_debut && today <= stg.date_fin) {
@@ -2857,9 +2851,6 @@ function gdsAjaxForm(form, submitter) {
                             // Extra info row (note, soutenance, jury)
                             let extraHtml = '';
                             const extraParts = [];
-                            if (stg.note_stage !== null && stg.note_stage !== undefined && stg.note_stage !== '') {
-                                extraParts.push(`<span><i class="fa-solid fa-star" style="color:#facc15;"></i> Note: <strong style="color:#fff;">${parseFloat(stg.note_stage).toFixed(2)}/20</strong></span>`);
-                            }
                             if (stg.date_soutenance) {
                                 extraParts.push(`<span><i class="fa-solid fa-podium" style="color:#a855f7;"></i> Soutenance: <strong style="color:#fff;">${fmtDate(stg.date_soutenance)}</strong></span>`);
                             }
